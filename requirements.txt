@@ -1,0 +1,11 @@
+# Pinned runtime dependencies. The source of truth is pyproject.toml.
+# Regenerate with: uv pip compile pyproject.toml -o requirements.txt
+
+ollama>=0.4.0
+mss>=9.0.1
+Pillow>=10.0.0
+gradio>=4.44.0
+pydantic>=2.7.0
+pydantic-settings>=2.4.0
+PyYAML>=6.0.1
+rich>=13.7.0

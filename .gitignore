@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# uv
+.python-version
+
+# Data + outputs (never commit)
+data/
+!data/.gitkeep
+outputs/
+runs/
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.ckpt
+
+# Screenshots from monitor loop
+*.png
+!docs/**/*.png
+!demo/**/*.png
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Claude Code local state — never commit
+.claude/
+
+# Local Ollama notes — contains private LAN IPs
+ollama-instruction
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Gradio
+flagged/
+gradio_cached_examples/

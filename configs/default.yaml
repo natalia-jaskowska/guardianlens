@@ -1,0 +1,45 @@
+# Default GuardianLens config.
+# Override anything via env vars (see .env.example) or by passing a different
+# YAML file to load_config(). Keys mirror src/guardlens/config.py.
+
+log_level: INFO
+seed: 42
+
+ollama:
+  host: http://localhost:11434
+  inference_model: gemma4:26b
+  finetuned_model: guardlens
+  timeout_seconds: 120
+  temperature: 0.2
+  num_ctx: 8192
+
+monitor:
+  capture_interval_seconds: 15
+  monitor_index: 1
+  keep_last_n: 50
+
+session:
+  window_size: 5
+  escalation_threshold: 2
+
+alerts:
+  enable_email: false
+  smtp_host: ""
+  smtp_port: 587
+  smtp_user: ""
+  smtp_password: ""
+  parent_email: ""
+
+  enable_webhook: false
+  webhook_url: ""
+
+  minimum_urgency: high
+
+dashboard:
+  server_name: 0.0.0.0
+  server_port: 7860
+  share: false
+  title: "GuardianLens — Live Monitor"
+
+database:
+  path: outputs/guardlens.db
