@@ -32,6 +32,10 @@
             <span class="gl-dot gl-dot-safe"></span>
             <span>Connecting...</span>
           </div>
+          <span class="gl-streak gl-streak-hidden" id="header-streak">
+            <span class="gl-streak-dot"></span>
+            <span id="header-streak-text">0 safe</span>
+          </span>
           <div class="gl-header-meta" id="header-duration">--m --s</div>
           <div class="gl-header-meta" id="header-model">{{ model_name }}</div>
         </div>
@@ -95,9 +99,18 @@
                   </div>
                 </div>
                 <div class="gl-breakdown-pills" id="breakdown-pills"></div>
-                <div class="gl-breakdown-stagebar" id="breakdown-stagebar"></div>
-                <div class="gl-breakdown-stagelabels" id="breakdown-stagelabels"></div>
-                <div class="gl-breakdown-statboxes" id="breakdown-statboxes"></div>
+                <!-- Stage bar + stat boxes (active when there's a grooming/alert context) -->
+                <div class="gl-breakdown-stage-wrap" id="breakdown-stage-wrap">
+                  <div class="gl-breakdown-stagebar" id="breakdown-stagebar"></div>
+                  <div class="gl-breakdown-stagelabels" id="breakdown-stagelabels"></div>
+                  <div class="gl-breakdown-statboxes" id="breakdown-statboxes"></div>
+                </div>
+                <!-- Scan trend strip (shown when safe — fills the empty stage region) -->
+                <div class="gl-scan-strip" id="breakdown-scan-strip" style="display:none">
+                  <div class="gl-scan-strip-label">Last 20 scans</div>
+                  <div class="gl-scan-strip-bars" id="scan-strip-bars"></div>
+                  <div class="gl-scan-strip-counts" id="scan-strip-counts"></div>
+                </div>
               </div>
             </div>
           </div>
@@ -121,24 +134,54 @@
           </div>
         </section>
 
-        <!-- RIGHT COLUMN — always shows the most recent ALERT -->
+        <!-- RIGHT COLUMN
+             Dual-mode: if there is a recent ALERT, show the reasoning
+             chain / why this matters / recommended action / telegram
+             stack. Otherwise, collapse all of that and show the
+             Session Health card instead. The JS toggles between the
+             two via class on .gl-side. -->
         <aside class="gl-side">
-          <div class="gl-section-label">AI reasoning chain</div>
-          <div class="gl-reasoning-chain" id="reasoning-chain">
-            <div class="gl-empty">Waiting for the first alert...</div>
+          <!-- Mode A: no alert → Session Health card -->
+          <div class="gl-health" id="session-health">
+            <div class="gl-health-heading">
+              <span class="gl-health-check">✓</span>
+              <span class="gl-health-title" id="health-title">ALL CLEAR</span>
+            </div>
+            <div class="gl-health-summary" id="health-summary">
+              Initializing...
+            </div>
+            <div class="gl-health-section">
+              <div class="gl-health-section-label">Platforms detected</div>
+              <div class="gl-health-platforms" id="health-platforms"></div>
+            </div>
+            <div class="gl-health-section">
+              <div class="gl-health-section-label">Model health</div>
+              <div class="gl-health-model-line" id="health-model">
+                <span class="gl-health-model-dot"></span>
+                <span id="health-model-text">—</span>
+              </div>
+            </div>
           </div>
 
-          <div class="gl-section-label">Why this matters</div>
-          <div class="gl-why" id="why-this-matters">
-            <div class="gl-empty">No flagged conversations yet.</div>
-          </div>
+          <!-- Mode B: alert active → reasoning stack -->
+          <div id="alert-stack">
+            <div class="gl-section-label">AI reasoning chain</div>
+            <div class="gl-reasoning-chain" id="reasoning-chain">
+              <div class="gl-empty">Waiting for the first alert...</div>
+            </div>
 
-          <div class="gl-section-label">Recommended action for parent</div>
-          <div class="gl-action" id="recommended-action">
-            <div class="gl-empty">No action required.</div>
-          </div>
+            <div class="gl-section-label">Why this matters</div>
+            <div class="gl-why" id="why-this-matters">
+              <div class="gl-empty">No flagged conversations yet.</div>
+            </div>
 
-          <div id="telegram-block"></div>
+            <div class="gl-section-label">Recommended action for parent</div>
+            <div class="gl-action" id="recommended-action">
+              <div class="gl-empty">No action required.</div>
+            </div>
+
+            <div id="telegram-block"></div>
+          </div>
 
           <div class="gl-privacy-badge" id="privacy-badge">
             <div class="gl-privacy-icon" aria-hidden="true">

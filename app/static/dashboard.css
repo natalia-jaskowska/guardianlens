@@ -438,6 +438,22 @@ strong {
   font-size: var(--text-sm);
 }
 
+/* Watch-folder / real-image mode: show the captured image directly. */
+.gl-browser-image {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #000;
+}
+.gl-browser-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 /* --- Conversation header (Instagram-ish, generic for all platforms) --- */
 .gl-convo-header {
   display: flex;
@@ -1154,6 +1170,185 @@ strong {
   font-size: var(--text-xs);
 }
 
+/* ============================================================ Session Health card
+ *
+ * Shown in the right panel when there is no active alert. Fills the
+ * dead space with positive signal: scan count, streak, platforms,
+ * model health. Hidden as soon as an alert lands (the reasoning chain
+ * + why/action/telegram cards take over).
+ */
+
+.gl-health {
+  background: #14171f;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 6px;
+  padding: 12px 13px;
+  margin-bottom: 10px;
+}
+.gl-health-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.gl-health-check {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  display: grid;
+  place-items: center;
+  color: var(--safe);
+  font-size: 9px;
+  font-weight: var(--weight-semibold);
+}
+.gl-health-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--safe);
+  font-weight: var(--weight-medium);
+}
+.gl-health-summary {
+  font-size: 10px;
+  color: #94a3b8;
+  line-height: 1.55;
+  margin-bottom: 10px;
+  font-family: var(--font-mono);
+}
+.gl-health-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+.gl-health-section-label {
+  font-size: 8px;
+  color: #3e4660;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: 6px;
+}
+.gl-health-platforms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.gl-health-platform-row {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  gap: 6px;
+  align-items: center;
+  font-size: 10px;
+  color: #94a3b8;
+}
+.gl-health-platform-row .gl-platform-badge {
+  width: 16px;
+  height: 12px;
+  border-radius: 3px;
+}
+.gl-health-platform-row .gl-platform-badge img {
+  width: 9px;
+  height: 9px;
+}
+.gl-health-platform-name {
+  color: #cbd5e1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gl-health-platform-count {
+  color: #64748b;
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+}
+.gl-health-model-line {
+  font-size: 9px;
+  color: #64748b;
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gl-health-model-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--safe);
+  animation: gl-pulse-soft 1.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+/* ============================================================ Scan trend strip
+ *
+ * Replaces the empty stage bar + stat boxes in the threat breakdown
+ * card when the current scan is safe. Shows a row of ~20 colored
+ * segments (one per recent scan) + a tiny legend.
+ */
+
+.gl-scan-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+.gl-scan-strip-label {
+  font-size: 8px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.gl-scan-strip-bars {
+  display: flex;
+  gap: 2px;
+  height: 16px;
+  align-items: flex-end;
+}
+.gl-scan-strip-bar {
+  flex: 1;
+  height: 100%;
+  border-radius: 2px;
+  background: #1a1f2e;
+}
+.gl-scan-strip-bar-safe { background: var(--safe); opacity: 0.85; }
+.gl-scan-strip-bar-caution { background: var(--caution); opacity: 0.9; }
+.gl-scan-strip-bar-alert { background: var(--alert); }
+.gl-scan-strip-counts {
+  display: flex;
+  gap: 12px;
+  font-size: 9px;
+  color: #64748b;
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+.gl-scan-strip-counts .safe { color: var(--safe); }
+.gl-scan-strip-counts .caution { color: var(--caution); }
+.gl-scan-strip-counts .alert { color: var(--alert); }
+
+/* ============================================================ Header streak badge */
+
+.gl-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-sm);
+  color: var(--safe);
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.22);
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-family: var(--font-main);
+}
+.gl-streak-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--safe);
+}
+.gl-streak-hidden {
+  display: none;
+}
+
 /* ============================================================ Right panel components
  *
  * Sized to match guardlens_final_implemented_design.html — these
@@ -1287,10 +1482,13 @@ strong {
   margin-bottom: 3px;
 }
 .gl-telegram-icon {
-  width: 9px;
-  height: 9px;
-  color: #60a5fa;
+  width: 11px;
+  height: 11px;
   flex-shrink: 0;
+  /* Telegram SVG ships with the brand cyan baked in. This filter chain
+     converts it to the lighter #60a5fa we use for the card's blue theme. */
+  filter: brightness(0) saturate(100%) invert(67%) sepia(43%) saturate(917%)
+    hue-rotate(187deg) brightness(99%) contrast(94%);
 }
 .gl-telegram-label {
   font-size: 8px;
@@ -1370,38 +1568,62 @@ strong {
   flex-shrink: 0;
 }
 
-/* ============================================================ Platform badges */
+/* ============================================================ Platform badges
+ *
+ * Colored square + white-masked Simple Icons SVG inside. Adding a new
+ * platform = drop a new SVG into app/static/icons/ + add a brand-color
+ * variant below + add one line in dashboard.js platformBadgeFor().
+ */
 
 .gl-platform-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
+  width: 20px;
   height: 18px;
   border-radius: 4px;
-  font-size: 10px;
+  flex-shrink: 0;
+  overflow: hidden;
+  font-size: 9px;
   font-weight: var(--weight-semibold);
   color: white;
-  letter-spacing: 0.4px;
-  text-transform: none;
-  flex-shrink: 0;
+}
+.gl-platform-badge img {
+  width: 12px;
+  height: 12px;
+  /* Simple Icons SVGs ship with the brand color baked into `fill`.
+     This filter forces them to white so they pop on the colored badge bg.
+     Equivalent to `fill: white` but works for an <img> tag. */
+  filter: brightness(0) invert(1);
 }
 .gl-platform-badge-instagram {
-  background: linear-gradient(135deg, #f58529, #dd2a7b 50%, #8134af);
+  background: linear-gradient(135deg, #f58529 0%, #dd2a7b 50%, #8134af 100%);
 }
 .gl-platform-badge-tiktok {
   background: #000;
-  border: 1px solid #25f4ee;
-  color: #25f4ee;
+  border: 0.5px solid #25f4ee;
 }
 .gl-platform-badge-discord {
   background: #5865f2;
 }
 .gl-platform-badge-minecraft {
-  background: #62b47a;
+  background: #5da02c;
+}
+.gl-platform-badge-roblox {
+  background: #e2231a;
+}
+.gl-platform-badge-snapchat {
+  background: #fffc00;
+}
+.gl-platform-badge-snapchat img {
+  filter: brightness(0); /* Snapchat is yellow, icon should be black */
+}
+.gl-platform-badge-telegram {
+  background: #26a5e4;
 }
 .gl-platform-badge-unknown {
   background: #475569;
+  color: #cbd5e1;
 }
 
 /* ============================================================ Stat boxes (grooming panel) */

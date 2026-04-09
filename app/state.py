@@ -18,6 +18,8 @@ import time
 from typing import Any
 
 from app.serializers import (
+    build_session_health,
+    compute_safe_streak,
     empty_summary,
     format_session_duration,
     metric_sublabels,
@@ -234,8 +236,13 @@ class AppState:
         self.worker.start()
         # Bootstrap the right panel's "latest alert" from the database so it
         # has content immediately on restart instead of waiting for a new
-        # alert to land.
-        self.worker.bootstrap_latest_alert(self.database.most_recent_alert_analysis())
+        # alert to land. SKIP this in watch-folder mode — the user is
+        # debugging real images that are mostly safe, and a stale
+        # bootstrapped alert from a previous demo session would freeze
+        # the right panel on irrelevant content. The JS falls back to
+        # the latest scan when latest_alert is None.
+        if self.config.monitor.watch_folder is None:
+            self.worker.bootstrap_latest_alert(self.database.most_recent_alert_analysis())
 
     def stop(self) -> None:
         self.worker.stop()
@@ -271,6 +278,16 @@ class AppState:
                 payload["parent_alert"]["delivered_at"] = delivered_at
                 payload["parent_alert"]["channel"] = "Telegram"
 
+        session_id = self.database.session_id if self.worker.is_running else None
+        session_health = build_session_health(
+            totals=totals,
+            session_duration=format_session_duration(self.worker.session_seconds),
+            model_name=self.config.ollama.inference_model,
+            platform_counts=self.database.session_platform_counts(session_id),
+            avg_inference_seconds=self.database.session_avg_inference_seconds(session_id),
+            monitoring=self.worker.is_running,
+        )
+
         return {
             "monitoring": self.worker.is_running,
             "session_duration": format_session_duration(self.worker.session_seconds),
@@ -279,7 +296,9 @@ class AppState:
             "metrics": totals,
             "metric_sublabels": metric_sublabels(totals),
             "stat_boxes": stat_boxes(latest, history),
-            "scan_history": serialize_scan_history(self.database.recent_threat_levels(limit=12)),
+            "scan_history": serialize_scan_history(self.database.recent_threat_levels(limit=20)),
+            "safe_streak": compute_safe_streak(history),
+            "session_health": session_health,
             "summary": summary,
             "timeline": serialize_timeline(history),
             "latest": latest_payload,

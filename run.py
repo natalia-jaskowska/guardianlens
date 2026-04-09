@@ -91,6 +91,18 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--watch-folder",
+        type=Path,
+        default=None,
+        help=(
+            "Iterate through real image files in this folder instead of "
+            "running mss capture or the demo synthesizer. Each image is "
+            "symlinked into outputs/screenshots/ so the dashboard can "
+            "serve it. Useful for running the analyzer against scraped "
+            "or staged screenshots."
+        ),
+    )
+    parser.add_argument(
         "--log-level",
         type=str,
         default=None,
@@ -120,6 +132,13 @@ def main() -> int:
         # Respect an explicit --interval override if the user passed one.
         if args.interval is None:
             config.monitor.capture_interval_seconds = 8.0
+    if args.watch_folder is not None:
+        config.monitor.watch_folder = args.watch_folder.resolve()
+        # Folder mode trumps demo mode if both flags are passed.
+        config.monitor.demo_mode = False
+        # Real images are larger and Ollama vision takes longer on them.
+        if args.interval is None:
+            config.monitor.capture_interval_seconds = 12.0
     if args.interval is not None:
         config.monitor.capture_interval_seconds = args.interval
     if args.dashboard_port is not None:

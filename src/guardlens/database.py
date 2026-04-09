@@ -228,11 +228,11 @@ class GuardLensDatabase:
         except (ValueError, TypeError):
             return None
 
-    def recent_threat_levels(self, limit: int = 12) -> list[str]:
+    def recent_threat_levels(self, limit: int = 20) -> list[str]:
         """Return the most recent ``limit`` threat levels (oldest first).
 
-        Used by the dashboard sparkline. Cheap query — only the
-        ``threat_level`` column, capped at ``limit``.
+        Used by the dashboard sparkline + scan-trend strip. Cheap query
+        — only the ``threat_level`` column, capped at ``limit``.
         """
         with self._lock:
             rows = self._conn.execute(
@@ -241,6 +241,41 @@ class GuardLensDatabase:
             ).fetchall()
         # Reverse so the oldest comes first (left side of the chart).
         return [row["threat_level"] for row in reversed(rows)]
+
+    def session_platform_counts(self, session_id: int | None) -> dict[str, int]:
+        """Return per-platform scan counts for the current session.
+
+        Used by the "Session Health" card to show platform distribution
+        when all scans are safe. Returns an empty dict if session_id is
+        None or the query fails.
+        """
+        if session_id is None:
+            return {}
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT COALESCE(platform, 'Unknown') AS platform, COUNT(*) AS n
+                FROM analyses
+                WHERE session_id = ?
+                GROUP BY platform
+                ORDER BY n DESC
+                """,
+                (session_id,),
+            ).fetchall()
+        return {row["platform"]: int(row["n"]) for row in rows}
+
+    def session_avg_inference_seconds(self, session_id: int | None) -> float | None:
+        """Mean Ollama inference time for the current session, or None."""
+        if session_id is None:
+            return None
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT AVG(inference_seconds) AS avg FROM analyses WHERE session_id = ?",
+                (session_id,),
+            ).fetchone()
+        if row is None or row["avg"] is None:
+            return None
+        return float(row["avg"])
 
     def session_summary(self) -> dict[str, int]:
         """Return per-threat-level counts for the current session."""

@@ -52,6 +52,14 @@ class MonitorConfig(BaseModel):
             "for video recording with deterministic content."
         ),
     )
+    watch_folder: Path | None = Field(
+        None,
+        description=(
+            "If set, iterate through real image files in this folder "
+            "instead of mss capture or demo synthesis. Useful for "
+            "running the analyzer against scraped/staged screenshots."
+        ),
+    )
 
 
 class SessionConfig(BaseModel):

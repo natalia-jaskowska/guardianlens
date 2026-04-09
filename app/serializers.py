@@ -248,6 +248,62 @@ def stat_boxes(
     ]
 
 
+def compute_safe_streak(history: list[ScreenAnalysis]) -> int:
+    """How many consecutive safe analyses from the latest backwards.
+
+    Used by the header streak badge. Walks the session window from
+    newest to oldest, counting safe scans until it hits a non-safe one
+    or runs out of history.
+    """
+    count = 0
+    for analysis in reversed(history):
+        if analysis.classification.threat_level == ThreatLevel.SAFE:
+            count += 1
+        else:
+            break
+    return count
+
+
+def build_session_health(
+    *,
+    totals: dict[str, int],
+    session_duration: str,
+    model_name: str,
+    platform_counts: dict[str, int],
+    avg_inference_seconds: float | None,
+    monitoring: bool,
+) -> dict[str, Any]:
+    """Assemble the Session Health payload shown when no alert is active.
+
+    Fills the right panel's dead space with positive signal: total scan
+    count, streak context, platform distribution, and model health.
+    """
+    clean = totals.get("caution", 0) == 0 and totals.get("alerts", 0) == 0
+    # Top 4 platforms by count (truncate longer labels for the UI).
+    platforms: list[dict[str, Any]] = [
+        {"name": (name or "Unknown")[:32], "count": count}
+        for name, count in sorted(
+            platform_counts.items(), key=lambda item: (-item[1], item[0])
+        )[:4]
+    ]
+    avg_label = (
+        f"{avg_inference_seconds:.1f}s avg" if avg_inference_seconds is not None else "— avg"
+    )
+    return {
+        "clean": clean,
+        "monitoring": monitoring,
+        "headline": "ALL CLEAR" if clean else "MINOR ALERTS",
+        "scans": totals.get("screenshots", 0),
+        "safe": totals.get("safe", 0),
+        "caution": totals.get("caution", 0),
+        "alerts": totals.get("alerts", 0),
+        "session_duration": session_duration,
+        "platforms": platforms,
+        "model_name": model_name,
+        "avg_inference_label": avg_label,
+    }
+
+
 def serialize_scan_history(levels: list[str]) -> list[dict[str, str]]:
     """Convert raw threat levels into sparkline payload entries.
 

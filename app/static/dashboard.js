@@ -35,14 +35,26 @@
     breakdownSubtitle: document.getElementById("breakdown-subtitle"),
     breakdownConfidence: document.getElementById("breakdown-confidence"),
     breakdownPills: document.getElementById("breakdown-pills"),
+    breakdownStageWrap: document.getElementById("breakdown-stage-wrap"),
     breakdownStagebar: document.getElementById("breakdown-stagebar"),
     breakdownStagelabels: document.getElementById("breakdown-stagelabels"),
     breakdownStatboxes: document.getElementById("breakdown-statboxes"),
+    scanStrip: document.getElementById("breakdown-scan-strip"),
+    scanStripBars: document.getElementById("scan-strip-bars"),
+    scanStripCounts: document.getElementById("scan-strip-counts"),
     timeline: document.getElementById("timeline"),
+    sessionHealth: document.getElementById("session-health"),
+    healthTitle: document.getElementById("health-title"),
+    healthSummary: document.getElementById("health-summary"),
+    healthPlatforms: document.getElementById("health-platforms"),
+    healthModelText: document.getElementById("health-model-text"),
+    alertStack: document.getElementById("alert-stack"),
     reasoningChain: document.getElementById("reasoning-chain"),
     whyThisMatters: document.getElementById("why-this-matters"),
     recommendedAction: document.getElementById("recommended-action"),
     telegramBlock: document.getElementById("telegram-block"),
+    headerStreak: document.getElementById("header-streak"),
+    headerStreakText: document.getElementById("header-streak-text"),
     privacySubtitle: document.getElementById("privacy-subtitle"),
     lastRefresh: document.getElementById("last-refresh"),
     footerModel: document.getElementById("footer-model"),
@@ -51,23 +63,29 @@
 
   // ----------------------------------------------------------------- platform badges
 
-  // Maps a platform name (possibly with section like "Instagram DM") to
-  // a {key, label} pair the renderer uses to pick a badge variant.
+  // Resolve a platform name (possibly with section like "Instagram DM")
+  // to an SVG icon file in /static/icons/. Adding a new platform = drop
+  // a new SVG into the folder + add one line here.
   function platformBadgeFor(platformText) {
-    if (!platformText) return { key: "unknown", label: "?" };
+    if (!platformText) return null;
     const lower = platformText.toLowerCase();
-    if (lower.includes("instagram")) return { key: "instagram", label: "Ig" };
-    if (lower.includes("tiktok")) return { key: "tiktok", label: "Tk" };
-    if (lower.includes("discord")) return { key: "discord", label: "Dc" };
-    if (lower.includes("minecraft")) return { key: "minecraft", label: "Mc" };
-    if (lower.includes("snap")) return { key: "instagram", label: "Sn" };
-    if (lower.includes("roblox")) return { key: "minecraft", label: "Rb" };
-    return { key: "unknown", label: "?" };
+    if (lower.includes("instagram")) return "instagram";
+    if (lower.includes("tiktok")) return "tiktok";
+    if (lower.includes("discord")) return "discord";
+    if (lower.includes("minecraft")) return "minecraft";
+    if (lower.includes("roblox")) return "roblox";
+    if (lower.includes("snap")) return "snapchat";
+    if (lower.includes("telegram")) return "telegram";
+    return null;
   }
 
   function renderPlatformBadge(platformText) {
-    const badge = platformBadgeFor(platformText);
-    return `<span class="gl-platform-badge gl-platform-badge-${badge.key}" title="${escapeHtml(platformText || "Unknown")}">${badge.label}</span>`;
+    const key = platformBadgeFor(platformText);
+    const title = escapeHtml(platformText || "Unknown");
+    if (!key) {
+      return `<span class="gl-platform-badge gl-platform-badge-unknown" title="${title}">?</span>`;
+    }
+    return `<span class="gl-platform-badge gl-platform-badge-${key}" title="${title}"><img src="/static/icons/${key}.svg" alt=""></span>`;
   }
 
   // ----------------------------------------------------------------- helpers
@@ -159,32 +177,46 @@
     const convo = a.conversation || {};
     const platformKey = convo.platform_key || "unknown";
     els.fakeBrowser.className = `gl-fake-browser gl-fake-browser-${platformKey}`;
-    els.browserUrl.textContent = convo.url || "—";
+    els.browserUrl.textContent = convo.url || a.screenshot_url || "—";
 
     const messages = a.chat_messages || [];
-    if (!messages.length) {
+
+    // Demo mode: synthetic chat with structured messages → render bubbles.
+    if (messages.length) {
+      const username = convo.username || "user";
+      const status = convo.active_status || "Active now";
+      const headerHtml = `
+        <div class="gl-convo-header">
+          <div class="gl-convo-avatar">${escapeHtml(PLATFORM_AVATAR_INITIAL(username))}</div>
+          <div class="gl-convo-meta">
+            <div class="gl-convo-username">${escapeHtml(username)}</div>
+            <div class="gl-convo-status">${escapeHtml(status)}</div>
+          </div>
+        </div>`;
+      const bubbleRowsHtml = messages
+        .map((m) => renderBubbleRow(m, platformKey))
+        .join("");
       els.browserContent.innerHTML =
-        '<div class="gl-browser-empty">No structured messages for this capture.</div>';
+        headerHtml + `<div class="gl-bubbles gl-fade-in">${bubbleRowsHtml}</div>`;
       return;
     }
 
-    const username = convo.username || "user";
-    const status = convo.active_status || "Active now";
-    const headerHtml = `
-      <div class="gl-convo-header">
-        <div class="gl-convo-avatar">${escapeHtml(PLATFORM_AVATAR_INITIAL(username))}</div>
-        <div class="gl-convo-meta">
-          <div class="gl-convo-username">${escapeHtml(username)}</div>
-          <div class="gl-convo-status">${escapeHtml(status)}</div>
-        </div>
-      </div>`;
+    // Watch-folder / real-screenshot mode: no structured messages, just
+    // display the actual captured image so the parent sees what the
+    // analyzer saw.
+    if (a.screenshot_url) {
+      const cacheBuster = a.timestamp || Date.now();
+      const src = `${a.screenshot_url}?t=${encodeURIComponent(cacheBuster)}`;
+      els.browserContent.innerHTML = `
+        <div class="gl-browser-image gl-fade-in">
+          <img src="${src}" alt="Captured screen">
+        </div>`;
+      return;
+    }
 
-    const bubbleRowsHtml = messages
-      .map((m) => renderBubbleRow(m, platformKey))
-      .join("");
-
+    // Fallback: nothing to display.
     els.browserContent.innerHTML =
-      headerHtml + `<div class="gl-bubbles gl-fade-in">${bubbleRowsHtml}</div>`;
+      '<div class="gl-browser-empty">No content for this capture.</div>';
   }
 
   function renderBubbleRow(message, platformKey) {
@@ -365,9 +397,7 @@
     els.telegramBlock.innerHTML = `
       <div class="gl-telegram-card gl-fade-in">
         <div class="gl-telegram-header">
-          <svg class="gl-telegram-icon" width="9" height="9" viewBox="0 0 16 16" fill="none">
-            <path d="M14 2L7 9M14 2L10 14L7 9M14 2L2 6L7 9" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <img class="gl-telegram-icon" src="/static/icons/telegram.svg" alt="">
           <span class="gl-telegram-label">Telegram alert delivered</span>
         </div>
         <div class="gl-telegram-message">"${escapeHtml(alert.summary)}"</div>
@@ -412,6 +442,124 @@
       })
       .join("");
     els.timeline.innerHTML = html;
+  }
+
+  // ----------------------------------------------------------------- session health + streak + scan strip
+
+  function renderSessionHealth(state) {
+    const h = state.session_health || {};
+    if (!els.sessionHealth) return;
+
+    // Headline text + color tint
+    const clean = h.clean !== false;
+    els.sessionHealth.style.borderColor = clean
+      ? "rgba(34, 197, 94, 0.22)"
+      : "rgba(234, 179, 8, 0.25)";
+    setText(els.healthTitle, h.headline || "ALL CLEAR");
+
+    // Summary line: "22 scans · 5m 23s · 0 alerts"
+    const parts = [];
+    if (h.scans !== undefined) parts.push(`${h.scans} scans`);
+    if (h.session_duration) parts.push(h.session_duration);
+    parts.push(`${h.alerts || 0} alerts`);
+    setText(els.healthSummary, parts.join(" · "));
+
+    // Platform distribution
+    const platforms = h.platforms || [];
+    if (!platforms.length) {
+      els.healthPlatforms.innerHTML =
+        '<div class="gl-health-platform-row"><span>—</span><span>no data yet</span><span></span></div>';
+    } else {
+      els.healthPlatforms.innerHTML = platforms
+        .map((p) => {
+          const badge = renderPlatformBadge(p.name);
+          return `
+            <div class="gl-health-platform-row">
+              ${badge}
+              <span class="gl-health-platform-name">${escapeHtml(p.name)}</span>
+              <span class="gl-health-platform-count">${p.count}</span>
+            </div>`;
+        })
+        .join("");
+    }
+
+    // Model health line
+    const modelBits = [h.model_name || "—"];
+    if (h.avg_inference_label) modelBits.push(h.avg_inference_label);
+    modelBits.push(h.monitoring ? "100% up" : "stopped");
+    setText(els.healthModelText, modelBits.join(" · "));
+  }
+
+  function renderRightPanelMode(state) {
+    // Pick which right-panel content to show based on whether there's
+    // a recent alert. No alert → Session Health. Alert → reasoning
+    // stack. Toggle via display:none so layouts don't jump.
+    const alertActive = state && state.latest_alert;
+    if (alertActive) {
+      els.sessionHealth.style.display = "none";
+      els.alertStack.style.display = "";
+    } else {
+      els.sessionHealth.style.display = "";
+      els.alertStack.style.display = "none";
+    }
+  }
+
+  function renderScanStrip(state) {
+    // Shown inside the breakdown card when the latest scan is safe —
+    // replaces the empty stage bar + stat boxes with a row of 20
+    // colored bars (one per recent scan) + total counts.
+    const history = state.scan_history || [];
+    const slots = 20;
+    const padded = history.slice(-slots);
+    while (padded.length < slots) padded.unshift({ tone: "empty" });
+    const bars = padded
+      .map((entry) => {
+        const tone = entry.tone || "empty";
+        const cls = tone === "empty" ? "" : `gl-scan-strip-bar-${tone}`;
+        return `<div class="gl-scan-strip-bar ${cls}"></div>`;
+      })
+      .join("");
+    els.scanStripBars.innerHTML = bars;
+
+    // Aggregate counts
+    const counts = { safe: 0, caution: 0, alert: 0 };
+    for (const entry of history) {
+      if (entry.tone && counts[entry.tone] !== undefined) counts[entry.tone] += 1;
+    }
+    els.scanStripCounts.innerHTML = `
+      <span class="safe">${counts.safe} safe</span>
+      <span class="caution">${counts.caution} caution</span>
+      <span class="alert">${counts.alert} alerts</span>
+    `;
+  }
+
+  function renderBreakdownMode(state) {
+    // Inside the breakdown card: if latest is safe and there's no
+    // grooming stage context, hide the stage bar + stat boxes and
+    // show the scan trend strip instead.
+    const latest = state.latest;
+    const showStage =
+      latest &&
+      latest.threat_level !== "safe" &&
+      latest.stage_segments &&
+      (latest.stage_segments.current_index ?? -1) >= 0;
+    if (showStage) {
+      els.breakdownStageWrap.style.display = "";
+      els.scanStrip.style.display = "none";
+    } else {
+      els.breakdownStageWrap.style.display = "none";
+      els.scanStrip.style.display = "";
+    }
+  }
+
+  function renderStreak(state) {
+    const streak = state.safe_streak || 0;
+    if (streak >= 3) {
+      els.headerStreak.classList.remove("gl-streak-hidden");
+      setText(els.headerStreakText, `${streak} safe in a row`);
+    } else {
+      els.headerStreak.classList.add("gl-streak-hidden");
+    }
   }
 
   // ----------------------------------------------------------------- alert notifications
@@ -600,18 +748,21 @@
       els.shell.classList.remove("gl-alert-active");
     }
     renderHeader(state);
+    renderStreak(state);
     renderMetrics(state);
-    // Capture view + right panel both lock to the most recent ALERT so the
-    // parent always sees the most concerning recent incident, not whatever
-    // safe scan happened to come in last. Falls back to the latest scan
-    // when no alert has been recorded yet.
-    const alertState = state.latest_alert || state.latest;
-    const captureProxy = alertState
-      ? { ...state, latest: alertState }
-      : state;
-    renderFakeBrowser(captureProxy);
-    renderThreatBreakdown(captureProxy);
+    // Capture view always shows the LATEST scan so the dashboard feels
+    // alive — each new screenshot appears in the fake browser as it
+    // arrives.
+    renderFakeBrowser(state);
+    renderThreatBreakdown(state);
+    renderBreakdownMode(state);
+    renderScanStrip(state);
     renderTimeline(state);
+    // Right panel: dual mode. Session Health card when everything is
+    // safe, reasoning-chain stack when there's an alert to explain.
+    renderRightPanelMode(state);
+    renderSessionHealth(state);
+    const alertState = state.latest_alert || state.latest;
     renderReasoningChain(alertState);
     renderWhyThisMatters(alertState);
     renderRecommendedAction(alertState);

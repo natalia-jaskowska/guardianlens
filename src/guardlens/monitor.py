@@ -52,17 +52,21 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
 def capture_loop(config: MonitorConfig) -> Iterator[Path]:
     """Yield screenshot paths forever, sleeping between captures.
 
-    Branches on ``config.demo_mode``:
+    Branches on the monitor config:
 
+    - ``watch_folder`` set: iterate through real image files on disk.
+    - ``demo_mode`` True: render synthetic Pillow chat screenshots,
+      cycling through :data:`guardlens.demo.DEMO_SCENARIO_SEQUENCE`.
     - **Real mode** (default): grab the primary monitor with ``mss``.
-    - **Demo mode**: render synthetic Pillow chat screenshots, cycling
-      through :data:`guardlens.demo.DEMO_SCENARIOS`.
 
     The caller is responsible for breaking out of the loop (e.g. when the
-    dashboard is closed). Old screenshots are pruned to ``keep_last_n`` to
-    avoid filling the disk during long sessions.
+    dashboard is closed). Old demo screenshots are pruned to
+    ``keep_last_n`` to avoid filling the disk during long sessions.
     """
     config.screenshots_dir.mkdir(parents=True, exist_ok=True)
+    if config.watch_folder is not None:
+        yield from _watch_folder_loop(config)
+        return
     if config.demo_mode:
         yield from _demo_capture_loop(config)
         return
@@ -89,6 +93,57 @@ def _demo_capture_loop(config: MonitorConfig) -> Iterator[Path]:
         yield render_demo_chat(path, scenario, platform=platform)
         _prune_old_screenshots(config.screenshots_dir, keep_last_n=config.keep_last_n)
         time.sleep(config.capture_interval_seconds)
+
+
+_IMAGE_EXTS: frozenset[str] = frozenset({".jpg", ".jpeg", ".png", ".webp"})
+
+
+def _watch_folder_loop(config: MonitorConfig) -> Iterator[Path]:
+    """Yield real image files from ``config.watch_folder`` in a loop.
+
+    Iterates through every image in the folder (sorted by filename) and
+    cycles back to the start indefinitely so the dashboard keeps fresh
+    content. Each image is symlinked into ``screenshots_dir`` so the
+    FastAPI ``/screenshots/`` static mount can serve it directly to the
+    fake browser without needing a second mount.
+
+    A symlink is preferred over a copy so we don't waste disk on large
+    images. Falls back to a hard copy if the filesystem refuses
+    symlinks.
+    """
+    watch = config.watch_folder
+    if watch is None:
+        return
+    if not watch.exists():
+        raise FileNotFoundError(f"watch_folder does not exist: {watch}")
+
+    images = sorted(p for p in watch.iterdir() if p.suffix.lower() in _IMAGE_EXTS)
+    if not images:
+        raise FileNotFoundError(
+            f"watch_folder {watch} has no .jpg/.jpeg/.png/.webp files"
+        )
+
+    while True:
+        for source in images:
+            target = _link_into_screenshots_dir(source, config.screenshots_dir)
+            yield target
+            time.sleep(config.capture_interval_seconds)
+
+
+def _link_into_screenshots_dir(source: Path, screenshots_dir: Path) -> Path:
+    """Symlink ``source`` into ``screenshots_dir`` (or copy as fallback).
+
+    Returns the destination path that the dashboard can serve via the
+    ``/screenshots/`` static mount.
+    """
+    target = screenshots_dir / source.name
+    if target.exists() or target.is_symlink():
+        return target
+    try:
+        target.symlink_to(source.resolve())
+    except OSError:
+        target.write_bytes(source.read_bytes())
+    return target
 
 
 def _prune_old_screenshots(screenshots_dir: Path, keep_last_n: int) -> None:

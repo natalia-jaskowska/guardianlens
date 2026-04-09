@@ -76,9 +76,16 @@ def create_app(config: GuardLensConfig) -> FastAPI:
     # ---- static + screenshot mounts ------------------------------------------------
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     config.monitor.screenshots_dir.mkdir(parents=True, exist_ok=True)
+    # follow_symlink=True is required so the watch-folder mode can serve
+    # scraped images that live outside the screenshots directory and are
+    # only symlinked into it.
     app.mount(
         "/screenshots",
-        StaticFiles(directory=str(config.monitor.screenshots_dir), check_dir=False),
+        StaticFiles(
+            directory=str(config.monitor.screenshots_dir),
+            check_dir=False,
+            follow_symlink=True,
+        ),
         name="screenshots",
     )
 
