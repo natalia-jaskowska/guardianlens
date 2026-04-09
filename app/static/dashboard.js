@@ -260,22 +260,31 @@
     else if (level === "caution" || level === "warning") cardClass += " gl-breakdown-card-caution";
     els.breakdownCard.className = cardClass;
 
-    const titleText =
+    els.breakdownTitle.textContent =
       level === "safe"
-        ? `${escapeHtml(a.category_label || "NO THREATS")} OK`
+        ? "ALL CLEAR"
         : level === "caution" || level === "warning"
-        ? `${escapeHtml(a.category_label)} CAUTION`
-        : `${escapeHtml(a.category_label)} DETECTED`;
-    els.breakdownTitle.textContent = "";
-    els.breakdownTitle.textContent = level === "safe" ? "NO THREATS" : `${a.category_label} DETECTED`;
+        ? `${a.category_label} — CAUTION`
+        : `${a.category_label} DETECTED`;
 
-    // Subtitle: "sender → child"
-    const convo = a.conversation || {};
-    const subtitleParts = [convo.username || "—"];
-    if ((a.chat_messages || []).some((m) => ["me", "self", "child"].includes((m.sender || "").toLowerCase()))) {
-      subtitleParts.push("child");
+    // Subtitle: "sender → child" when a conversation was analyzed, or
+    // a calm "no chat detected" line when the scan was just a gameplay
+    // screenshot.
+    if (level === "safe") {
+      const hasChatMessages = (a.chat_messages || []).length > 0;
+      if (hasChatMessages) {
+        els.breakdownSubtitle.textContent = "no risk indicators found";
+      } else {
+        els.breakdownSubtitle.textContent = `${a.platform || "content"} · no chat detected`;
+      }
+    } else {
+      const convo = a.conversation || {};
+      const subtitleParts = [convo.username || "—"];
+      if ((a.chat_messages || []).some((m) => ["me", "self", "child"].includes((m.sender || "").toLowerCase()))) {
+        subtitleParts.push("child");
+      }
+      els.breakdownSubtitle.textContent = subtitleParts.join(" → ");
     }
-    els.breakdownSubtitle.textContent = subtitleParts.join(" → ");
 
     els.breakdownConfidence.textContent = `${a.confidence}%`;
 
@@ -450,25 +459,35 @@
     const h = state.session_health || {};
     if (!els.sessionHealth) return;
 
-    // Headline text + color tint
+    // Headline + color tint (green when clean, yellow when caution/alert
+    // happened earlier in the session).
     const clean = h.clean !== false;
     els.sessionHealth.style.borderColor = clean
       ? "rgba(34, 197, 94, 0.22)"
       : "rgba(234, 179, 8, 0.25)";
     setText(els.healthTitle, h.headline || "ALL CLEAR");
 
-    // Summary line: "22 scans · 5m 23s · 0 alerts"
-    const parts = [];
-    if (h.scans !== undefined) parts.push(`${h.scans} scans`);
-    if (h.session_duration) parts.push(h.session_duration);
-    parts.push(`${h.alerts || 0} alerts`);
-    setText(els.healthSummary, parts.join(" · "));
+    // Summary line: "78 screenshots · 18m 23s · 5 platforms"
+    const summaryParts = [];
+    if (h.scans !== undefined) summaryParts.push(`${h.scans} screenshots analyzed`);
+    if (h.session_duration) summaryParts.push(h.session_duration);
+    if (h.platform_count) summaryParts.push(`${h.platform_count} platforms`);
+    setText(els.healthSummary, summaryParts.join(" · "));
+
+    // Totals sub-line: "66 safe · 7 caution · 5 alerts"
+    const totalsLine = `${h.safe || 0} safe · ${h.caution || 0} caution · ${h.alerts || 0} alerts`;
+
+    // Last alert sub-line: "Last alert 4m 12s ago — Instagram grooming"
+    let lastAlertLine = "";
+    if (h.last_alert) {
+      lastAlertLine = `Last alert ${escapeHtml(h.last_alert.ago)} — ${escapeHtml(h.last_alert.description)}`;
+    }
 
     // Platform distribution
     const platforms = h.platforms || [];
     if (!platforms.length) {
       els.healthPlatforms.innerHTML =
-        '<div class="gl-health-platform-row"><span>—</span><span>no data yet</span><span></span></div>';
+        '<div class="gl-health-platform-row"><span></span><span>no data yet</span><span></span></div>';
     } else {
       els.healthPlatforms.innerHTML = platforms
         .map((p) => {
@@ -488,14 +507,34 @@
     if (h.avg_inference_label) modelBits.push(h.avg_inference_label);
     modelBits.push(h.monitoring ? "100% up" : "stopped");
     setText(els.healthModelText, modelBits.join(" · "));
+
+    // Stash the extra lines into the dedicated spans (see template updates)
+    const totalsEl = document.getElementById("health-totals");
+    const lastAlertEl = document.getElementById("health-last-alert");
+    if (totalsEl) totalsEl.textContent = totalsLine;
+    if (lastAlertEl) {
+      if (lastAlertLine) {
+        lastAlertEl.innerHTML = lastAlertLine;
+        lastAlertEl.style.display = "";
+      } else {
+        lastAlertEl.style.display = "none";
+      }
+    }
   }
 
   function renderRightPanelMode(state) {
-    // Pick which right-panel content to show based on whether there's
-    // a recent alert. No alert → Session Health. Alert → reasoning
-    // stack. Toggle via display:none so layouts don't jump.
-    const alertActive = state && state.latest_alert;
-    if (alertActive) {
+    // Pick which right-panel content to show based on the CURRENT
+    // scan's threat level. Previous version checked latest_alert
+    // existence, which made stale grooming content stick around for
+    // the rest of the session even after many safe scans. Now the
+    // mode tracks what the camera is seeing RIGHT NOW.
+    //
+    // - Current scan is alert/critical → reasoning stack for that scan
+    // - Otherwise → Session Health overview
+    const latest = (state && state.latest) || null;
+    const level = latest && latest.threat_level;
+    const showAlert = level === "alert" || level === "critical";
+    if (showAlert) {
       els.sessionHealth.style.display = "none";
       els.alertStack.style.display = "";
     } else {
@@ -759,14 +798,17 @@
     renderScanStrip(state);
     renderTimeline(state);
     // Right panel: dual mode. Session Health card when everything is
-    // safe, reasoning-chain stack when there's an alert to explain.
+    // safe, reasoning-chain stack when the CURRENT scan is an alert.
+    // The reasoning/why/action renderers always take the latest scan
+    // so they match whatever the mode switcher decided to show — no
+    // stale alert content from earlier in the session.
     renderRightPanelMode(state);
     renderSessionHealth(state);
-    const alertState = state.latest_alert || state.latest;
-    renderReasoningChain(alertState);
-    renderWhyThisMatters(alertState);
-    renderRecommendedAction(alertState);
-    renderTelegram(alertState);
+    const rightPanelAnalysis = state.latest || null;
+    renderReasoningChain(rightPanelAnalysis);
+    renderWhyThisMatters(rightPanelAnalysis);
+    renderRecommendedAction(rightPanelAnalysis);
+    renderTelegram(rightPanelAnalysis);
     setText(els.lastRefresh, formatTime());
     setText(els.footerModel, state.model_name);
     setText(els.footerDb, state.db_path);

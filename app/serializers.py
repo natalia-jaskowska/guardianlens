@@ -272,11 +272,14 @@ def build_session_health(
     platform_counts: dict[str, int],
     avg_inference_seconds: float | None,
     monitoring: bool,
+    last_alert: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the Session Health payload shown when no alert is active.
 
     Fills the right panel's dead space with positive signal: total scan
-    count, streak context, platform distribution, and model health.
+    count, streak context, platform distribution, model health, and a
+    dimmed "last alert N ago" reference so the parent knows the system
+    has caught things in the past even when the current scan is clean.
     """
     clean = totals.get("caution", 0) == 0 and totals.get("alerts", 0) == 0
     # Top 4 platforms by count (truncate longer labels for the UI).
@@ -289,6 +292,25 @@ def build_session_health(
     avg_label = (
         f"{avg_inference_seconds:.1f}s avg" if avg_inference_seconds is not None else "— avg"
     )
+
+    last_alert_payload: dict[str, Any] | None = None
+    if last_alert is not None:
+        ts_raw = last_alert.get("timestamp")
+        elapsed_label = "just now"
+        if ts_raw:
+            try:
+                ts = datetime.fromisoformat(ts_raw)
+                elapsed = (datetime.now() - ts).total_seconds()
+                elapsed_label = _format_elapsed(elapsed)
+            except (TypeError, ValueError):
+                elapsed_label = "earlier"
+        platform_name = last_alert.get("platform") or "Unknown"
+        category = (last_alert.get("category") or "threat").replace("_", " ")
+        last_alert_payload = {
+            "ago": elapsed_label,
+            "description": f"{platform_name} {category}",
+        }
+
     return {
         "clean": clean,
         "monitoring": monitoring,
@@ -299,9 +321,24 @@ def build_session_health(
         "alerts": totals.get("alerts", 0),
         "session_duration": session_duration,
         "platforms": platforms,
+        "platform_count": len(platform_counts),
         "model_name": model_name,
         "avg_inference_label": avg_label,
+        "last_alert": last_alert_payload,
     }
+
+
+def _format_elapsed(seconds: float) -> str:
+    """'4m 12s ago' / '1h 3m ago' / '2d ago'."""
+    s = max(0, int(seconds))
+    if s < 60:
+        return f"{s}s ago"
+    if s < 3600:
+        return f"{s // 60}m {s % 60:02d}s ago"
+    if s < 86400:
+        hours, rem = divmod(s, 3600)
+        return f"{hours}h {rem // 60}m ago"
+    return f"{s // 86400}d ago"
 
 
 def serialize_scan_history(levels: list[str]) -> list[dict[str, str]]:

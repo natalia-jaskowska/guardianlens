@@ -286,6 +286,7 @@ class AppState:
             platform_counts=self.database.session_platform_counts(session_id),
             avg_inference_seconds=self.database.session_avg_inference_seconds(session_id),
             monitoring=self.worker.is_running,
+            last_alert=self.database.last_alert_summary(),
         )
 
         return {

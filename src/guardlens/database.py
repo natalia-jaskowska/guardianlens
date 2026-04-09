@@ -33,6 +33,7 @@ from datetime import datetime
 from pathlib import Path
 
 import json as _json
+from typing import Any
 
 from guardlens.schema import ScreenAnalysis, ThreatLevel
 
@@ -276,6 +277,31 @@ class GuardLensDatabase:
         if row is None or row["avg"] is None:
             return None
         return float(row["avg"])
+
+    def last_alert_summary(self) -> dict[str, Any] | None:
+        """Return a short summary of the most recent alert across all sessions.
+
+        Used by the Session Health card to show "Last alert: 4m 12s ago
+        — Instagram DM grooming" even when the current scan is safe and
+        the right panel is in Session Health mode.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT platform, category, timestamp
+                FROM analyses
+                WHERE threat_level IN ('alert', 'critical')
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "platform": row["platform"],
+            "category": row["category"],
+            "timestamp": row["timestamp"],
+        }
 
     def session_summary(self) -> dict[str, int]:
         """Return per-threat-level counts for the current session."""

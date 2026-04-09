@@ -1214,7 +1214,25 @@ strong {
   font-size: 10px;
   color: #94a3b8;
   line-height: 1.55;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
+}
+.gl-health-totals {
+  font-size: 10px;
+  color: #64748b;
+  line-height: 1.55;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+}
+.gl-health-last-alert {
+  font-size: 10px;
+  color: #475569;
+  line-height: 1.55;
   margin-bottom: 10px;
+  padding: 6px 9px;
+  background: rgba(239, 68, 68, 0.04);
+  border-left: 2px solid rgba(239, 68, 68, 0.22);
+  border-radius: 0 4px 4px 0;
   font-family: var(--font-mono);
 }
 .gl-health-section {
@@ -1332,21 +1350,28 @@ strong {
   align-items: center;
   gap: 5px;
   font-size: var(--text-sm);
-  color: var(--safe);
-  background: rgba(34, 197, 94, 0.08);
-  border: 1px solid rgba(34, 197, 94, 0.22);
+  /* Force the colors — gl-alert-active on the shell was tinting
+     text via inheritance + ambient filters on some browsers. */
+  color: #22c55e !important;
+  background: rgba(34, 197, 94, 0.08) !important;
+  border: 1px solid rgba(34, 197, 94, 0.28) !important;
   padding: 3px 9px;
   border-radius: 999px;
   font-family: var(--font-main);
+  font-weight: var(--weight-medium);
 }
 .gl-streak-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--safe);
+  background: #22c55e !important;
 }
 .gl-streak-hidden {
-  display: none;
+  display: none !important;
+}
+/* Also explicitly override any inherited color on the inner text span */
+.gl-streak #header-streak-text {
+  color: #22c55e !important;
 }
 
 /* ============================================================ Right panel components
@@ -1622,8 +1647,11 @@ strong {
   background: #26a5e4;
 }
 .gl-platform-badge-unknown {
-  background: #475569;
-  color: #cbd5e1;
+  background: #334155;
+  color: #94a3b8;
+  font-size: 9px;
+  font-weight: var(--weight-semibold);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* ============================================================ Stat boxes (grooming panel) */

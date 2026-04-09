@@ -141,7 +141,7 @@
              Session Health card instead. The JS toggles between the
              two via class on .gl-side. -->
         <aside class="gl-side">
-          <!-- Mode A: no alert → Session Health card -->
+          <!-- Mode A: current scan is safe → Session Health card -->
           <div class="gl-health" id="session-health">
             <div class="gl-health-heading">
               <span class="gl-health-check">✓</span>
@@ -150,6 +150,8 @@
             <div class="gl-health-summary" id="health-summary">
               Initializing...
             </div>
+            <div class="gl-health-totals" id="health-totals">—</div>
+            <div class="gl-health-last-alert" id="health-last-alert" style="display:none"></div>
             <div class="gl-health-section">
               <div class="gl-health-section-label">Platforms detected</div>
               <div class="gl-health-platforms" id="health-platforms"></div>
