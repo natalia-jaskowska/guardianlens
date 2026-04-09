@@ -44,10 +44,12 @@
     metricSparkline: document.getElementById("metric-sparkline"),
 
     captureCard: document.getElementById("capture-card"),
-    captureThumb: document.getElementById("capture-thumb"),
-    captureStatusText: document.getElementById("capture-status-text"),
-    captureLine: document.getElementById("capture-line"),
-    captureMetaLine: document.getElementById("capture-meta-line"),
+    captureScreen: document.getElementById("capture-screen"),
+    captureBarIcon: document.getElementById("capture-bar-icon"),
+    captureBarTitle: document.getElementById("capture-bar-title"),
+    captureBarSub: document.getElementById("capture-bar-sub"),
+    captureBarTime: document.getElementById("capture-bar-time"),
+    captureBarBadge: document.getElementById("capture-bar-badge"),
 
     heartbeat: document.getElementById("heartbeat"),
     timeline: document.getElementById("timeline"),
@@ -202,8 +204,24 @@
 
   function renderHeader(state) {
     const monitoring = state.monitoring;
-    const dotClass = monitoring ? "gl-dot gl-dot-safe" : "gl-dot gl-dot-dim";
-    const label = monitoring ? "Active" : "Stopped";
+    const latest = state.latest;
+    const isAlert =
+      latest && (latest.threat_level === "alert" || latest.threat_level === "critical");
+    let dotClass;
+    let label;
+    let extraClass = "";
+    if (!monitoring) {
+      dotClass = "gl-dot gl-dot-dim";
+      label = "Stopped";
+    } else if (isAlert) {
+      dotClass = "gl-dot gl-dot-alert";
+      label = "Threat detected";
+      extraClass = "gl-header-status-alert";
+    } else {
+      dotClass = "gl-dot gl-dot-safe";
+      label = "Active";
+    }
+    els.headerStatus.className = `gl-header-status ${extraClass}`.trim();
     els.headerStatus.innerHTML = `<span class="${dotClass}"></span><span>${escapeHtml(label)}</span>`;
     setText(els.headerDuration, state.session_duration || "0m 00s");
     setText(els.headerModel, state.model_name || "");
@@ -250,51 +268,135 @@
     els.metricSparkline.innerHTML = html;
   }
 
+  // Tiny inline icons for the capture status bar — reuse currentColor
+  // so the parent .gl-capture-{safe,caution,alert} class drives the
+  // color in one place.
+  const CAPTURE_ICON_CHECK =
+    '<svg viewBox="0 0 24 24" fill="none">' +
+    '<circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.35" stroke-width="1.5"/>' +
+    '<path d="M8 12.5L11 15.5L16 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    "</svg>";
+  const CAPTURE_ICON_EYE =
+    '<svg viewBox="0 0 24 24" fill="none">' +
+    '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="12" cy="12" r="2.5" fill="currentColor"/>' +
+    "</svg>";
+  const CAPTURE_ICON_WARN =
+    '<svg viewBox="0 0 24 24" fill="none">' +
+    '<path d="M12 3L22 21H2L12 3z" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="M12 10v5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>' +
+    '<circle cx="12" cy="18" r="1.1" fill="currentColor"/>' +
+    "</svg>";
+
   function renderCapture(state) {
     const a = state.latest;
     if (!a) {
-      els.captureCard.className = "gl-capture-simple";
-      els.captureThumb.innerHTML = '<div class="gl-capture-thumb-placeholder">Waiting...</div>';
-      setText(els.captureStatusText, "Initializing");
-      setText(els.captureLine, "Connecting to monitor stream...");
-      setText(els.captureMetaLine, "—");
+      els.captureCard.className = "gl-capture gl-capture-safe";
+      els.captureScreen.innerHTML =
+        '<div class="gl-capture-placeholder">Connecting to monitor stream…</div>';
+      els.captureBarIcon.innerHTML = CAPTURE_ICON_CHECK;
+      setText(els.captureBarTitle, "Initializing");
+      setText(els.captureBarSub, "Waiting for the first capture");
+      setText(els.captureBarTime, "--:--:--");
+      els.captureBarBadge.style.display = "none";
       return;
     }
 
     const level = a.threat_level || "safe";
     const isAlert = level === "alert" || level === "critical";
     const isCaution = level === "caution" || level === "warning";
+    const mode = isAlert ? "alert" : isCaution ? "caution" : "safe";
+    els.captureCard.className = `gl-capture gl-capture-${mode}`;
 
-    let cardClass = "gl-capture-simple";
-    if (isAlert) cardClass += " gl-capture-alert";
-    else if (isCaution) cardClass += " gl-capture-caution";
-    els.captureCard.className = cardClass;
-
-    // Thumbnail
-    if (a.screenshot_url) {
+    // Screen area: alert/caution renders the inline chat (the "money
+    // shot"), safe falls back to the actual screenshot image.
+    const hasChat = (a.chat_messages || []).length > 0;
+    if ((isAlert || isCaution) && hasChat) {
+      els.captureScreen.innerHTML = renderCaptureChat(a);
+    } else if (a.screenshot_url) {
       const src = `${a.screenshot_url}?t=${encodeURIComponent(a.timestamp || Date.now())}`;
-      els.captureThumb.innerHTML = `<img src="${src}" alt="">`;
+      els.captureScreen.innerHTML = `<img class="gl-capture-img" src="${src}" alt="">`;
     } else {
-      els.captureThumb.innerHTML = `<div class="gl-capture-thumb-placeholder">${escapeHtml(a.platform || "—")}</div>`;
+      els.captureScreen.innerHTML = `<div class="gl-capture-placeholder">${escapeHtml(a.platform || "—")}</div>`;
     }
 
-    // Status text
-    const statusText = isAlert
-      ? `${a.category_label || "Threat"} detected`
-      : isCaution
-      ? `${a.category_label || "Caution"} — caution`
-      : "All clear";
-    setText(els.captureStatusText, statusText);
+    // Status bar
+    if (isAlert) {
+      els.captureBarIcon.innerHTML = CAPTURE_ICON_WARN;
+      const label = (a.category_label || "Threat").trim();
+      setText(els.captureBarTitle, `${label} detected — ${a.confidence}%`);
+      const conv = a.conversation || {};
+      const platform = a.platform || "Unknown";
+      const who = conv.username && conv.username !== "—" ? `${conv.username} → child` : "child";
+      setText(els.captureBarSub, `${who} · ${platform}`);
+    } else if (isCaution) {
+      els.captureBarIcon.innerHTML = CAPTURE_ICON_EYE;
+      const label = (a.category_label || "Caution").trim();
+      setText(els.captureBarTitle, `${label} — watch closely`);
+      setText(els.captureBarSub, truncate(a.reasoning || "", 64));
+    } else {
+      els.captureBarIcon.innerHTML = CAPTURE_ICON_CHECK;
+      setText(els.captureBarTitle, "All clear");
+      setText(els.captureBarSub, `No threats detected · ${a.platform || "Unknown"}`);
+    }
+    setText(els.captureBarTime, a.time_label || "--:--:--");
 
-    // Reasoning one-liner
-    const oneLiner = isAlert || isCaution
-      ? truncate(a.reasoning || "", 80)
-      : "Normal activity. No chat or social interaction detected.";
-    setText(els.captureLine, oneLiner);
+    // Stage badge (alert only, when grooming stage is set)
+    const stage = a.stage_segments;
+    if (isAlert && stage && typeof stage.current_index === "number" && stage.current_index >= 0) {
+      els.captureBarBadge.style.display = "";
+      els.captureBarBadge.textContent = `Stage ${stage.current_index + 1}/5`;
+    } else {
+      els.captureBarBadge.style.display = "none";
+    }
+  }
 
-    // Meta line
-    const meta = `${a.time_label || "—"} · ${a.platform || "Unknown"}`;
-    setText(els.captureMetaLine, meta);
+  // Render an inline fake-browser chat for the capture screen area.
+  // Treats "me/self/child" senders as right-aligned blue bubbles, all
+  // others as left-aligned grey bubbles. Flagged messages get the red
+  // outlined treatment + a small flag tag underneath.
+  function renderCaptureChat(a) {
+    const conv = a.conversation || {};
+    const messages = a.chat_messages || [];
+    const platformKey = conv.platform_key || a.platform_key || "unknown";
+    const username = conv.username || a.platform || "Conversation";
+
+    const avatarHtml =
+      platformKey && platformKey !== "unknown"
+        ? `<img src="/static/icons/${platformKey}.svg" alt="">`
+        : "?";
+
+    const header = `
+      <div class="gl-capture-chat-header">
+        <div class="gl-capture-chat-avatar">${avatarHtml}</div>
+        <div class="gl-capture-chat-titles">
+          <div class="gl-capture-chat-username">${escapeHtml(username)}</div>
+          <div class="gl-capture-chat-status">Active now</div>
+        </div>
+      </div>`;
+
+    const bubbles = messages
+      .map((m) => {
+        const senderLow = (m.sender || "").toLowerCase();
+        const isMe = senderLow === "me" || senderLow === "self" || senderLow === "child";
+        const sideClass = isMe ? "gl-capture-msg-me" : "gl-capture-msg-them";
+        const flaggedClass = m.flag ? "gl-capture-msg-flagged" : "";
+        const flagTag = m.flag
+          ? `<span class="gl-capture-msg-flag-tag">⚠ ${escapeHtml(m.flag)}</span>`
+          : "";
+        return `
+          <div class="gl-capture-msg ${sideClass} ${flaggedClass}">
+            <span class="gl-capture-msg-bubble">${escapeHtml(m.text)}</span>
+            ${flagTag}
+          </div>`;
+      })
+      .join("");
+
+    return `
+      <div class="gl-capture-chat">
+        ${header}
+        <div class="gl-capture-chat-body">${bubbles}</div>
+      </div>`;
   }
 
   // ----------------------------------------------------------------- heartbeat + timeline
@@ -308,15 +410,15 @@
       .map((entry) => {
         const tone = entry.tone || "empty";
         const cls = tone === "empty" ? "" : `gl-heartbeat-bar-${tone}`;
-        // Dramatic spread so the chart reads like a heart-rate monitor
-        // — alert spikes dwarf safe baseline.
+        // Dramatic spread per the redesign spec — safe ~12%, caution
+        // ~50%, alert 100%. Reads like a heart-rate monitor.
         const height =
           tone === "alert"
             ? 100
             : tone === "caution"
-            ? 55
+            ? 50
             : tone === "safe"
-            ? 14
+            ? 12
             : 6;
         return `<div class="gl-heartbeat-bar ${cls}" style="height:${height}%"></div>`;
       })

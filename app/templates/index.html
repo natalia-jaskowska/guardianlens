@@ -45,7 +45,7 @@
       <main class="gl-main">
         <!-- LEFT COLUMN ............................................. -->
         <section class="gl-left">
-          <!-- Metric cards row -->
+          <!-- Metrics row (horizontal across the top) -->
           <div class="gl-metrics" id="metrics">
             <div class="gl-metric-card">
               <div class="gl-metric-label">Screenshots</div>
@@ -70,30 +70,44 @@
             </div>
           </div>
 
-          <!-- Latest capture: simple single card with thumbnail + status -->
-          <div class="gl-section">
-            <div class="gl-section-label">Latest capture</div>
-            <div class="gl-capture-simple" id="capture-card">
-              <div class="gl-capture-thumb" id="capture-thumb">
-                <div class="gl-capture-thumb-placeholder">Waiting...</div>
+          <!-- Latest capture — big framed view of what the child is
+               looking at right now. Hero of the left column at ~42vh.
+               The container is one component with a colored border
+               (green = safe, yellow = caution, red = alert). Inside: a
+               tall screen area (image OR inline chat render for alerts)
+               and a thin status bar below acting as a caption. Section
+               label has only "Latest capture" — all the timestamp /
+               context lives inside the bar so the screen area gets
+               every pixel of vertical space. -->
+          <div class="gl-section gl-section-capture">
+            <div class="gl-section-label">
+              <span>Latest capture</span>
+              <span class="gl-live-tag" id="capture-live-tag">
+                <span class="gl-live-dot"></span>
+                <span class="gl-live-text">LIVE</span>
+              </span>
+            </div>
+            <div class="gl-capture gl-capture-safe" id="capture-card">
+              <div class="gl-capture-screen" id="capture-screen">
+                <div class="gl-capture-placeholder">Connecting to monitor stream…</div>
               </div>
-              <div class="gl-capture-meta">
-                <div class="gl-capture-status" id="capture-status">
-                  <svg class="gl-capture-icon" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="9" stroke="rgba(34,197,94,0.25)" stroke-width="1.5"/>
-                    <path d="M8 12.5L11 15.5L16 9.5" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  <span class="gl-capture-status-text" id="capture-status-text">Initializing</span>
+              <div class="gl-capture-bar" id="capture-bar">
+                <div class="gl-capture-bar-left">
+                  <div class="gl-capture-bar-icon" id="capture-bar-icon"></div>
+                  <div class="gl-capture-bar-textwrap">
+                    <div class="gl-capture-bar-title" id="capture-bar-title">Initializing</div>
+                    <div class="gl-capture-bar-sub" id="capture-bar-sub">—</div>
+                  </div>
                 </div>
-                <div class="gl-capture-line" id="capture-line">
-                  Connecting to monitor stream...
+                <div class="gl-capture-bar-right">
+                  <span class="gl-capture-bar-time" id="capture-bar-time">--:--:--</span>
+                  <span class="gl-capture-bar-badge" id="capture-bar-badge" style="display:none"></span>
                 </div>
-                <div class="gl-capture-meta-line" id="capture-meta-line">—</div>
               </div>
             </div>
           </div>
 
-          <!-- Threat heartbeat: horizontal bars showing the last 30 scans -->
+          <!-- Threat heartbeat: thin horizontal bar chart of last 30 scans -->
           <div class="gl-section">
             <div class="gl-section-label">Threat heartbeat</div>
             <div class="gl-heartbeat" id="heartbeat"></div>
