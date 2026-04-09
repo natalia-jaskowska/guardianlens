@@ -287,7 +287,9 @@ class AppState:
             platform_counts=self.database.session_platform_counts(session_id),
             avg_inference_seconds=self.database.session_avg_inference_seconds(session_id),
             monitoring=self.worker.is_running,
-            last_alert=self.database.last_alert_summary(),
+            # Scope the "last alert" reference to the current session so a
+            # fresh restart doesn't surface a stale alert from yesterday.
+            last_alert=self.database.last_alert_summary(session_id=session_id),
         )
 
         alert_history = build_alert_history(self.database.recent_alert_analyses(limit=10))
@@ -297,6 +299,7 @@ class AppState:
             "session_duration": format_session_duration(self.worker.session_seconds),
             "model_name": self.config.ollama.inference_model,
             "db_path": str(self.config.database.path),
+            "current_session_id": session_id,
             "metrics": totals,
             "metric_sublabels": metric_sublabels(totals),
             "stat_boxes": stat_boxes(latest, history),
@@ -305,7 +308,15 @@ class AppState:
             "session_health": session_health,
             "alert_history": alert_history,
             "summary": summary,
-            "timeline": serialize_timeline(history),
+            # Timeline display is decoupled from SessionTracker's
+            # in-memory window — that one is sized for the AI's
+            # cross-reference logic, this one is a UX surface and
+            # benefits from more rows. Pulled straight from the DB,
+            # then reversed because serialize_timeline expects
+            # oldest-first input.
+            "timeline": serialize_timeline(
+                list(reversed(self.database.recent_analyses_models(limit=15)))
+            ),
             "latest": latest_payload,
             "latest_alert": latest_alert_payload,
             "is_alert": latest is not None and latest.classification.threat_level.value

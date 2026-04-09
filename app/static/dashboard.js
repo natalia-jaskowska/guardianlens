@@ -55,6 +55,8 @@
 
     // Right panel - safe overview
     rightSafe: document.getElementById("right-safe"),
+    allclearCard: document.getElementById("allclear-card"),
+    allclearIcon: document.getElementById("allclear-icon"),
     allclearTitle: document.getElementById("allclear-title"),
     allclearSub: document.getElementById("allclear-sub"),
     miniStatMonitored: document.getElementById("mini-stat-monitored"),
@@ -306,14 +308,16 @@
       .map((entry) => {
         const tone = entry.tone || "empty";
         const cls = tone === "empty" ? "" : `gl-heartbeat-bar-${tone}`;
+        // Dramatic spread so the chart reads like a heart-rate monitor
+        // — alert spikes dwarf safe baseline.
         const height =
           tone === "alert"
-            ? 90
+            ? 100
             : tone === "caution"
-            ? 40
+            ? 55
             : tone === "safe"
             ? 14
-            : 8;
+            : 6;
         return `<div class="gl-heartbeat-bar ${cls}" style="height:${height}%"></div>`;
       })
       .join("");
@@ -352,13 +356,12 @@
     const h = state.session_health || {};
     const streak = state.safe_streak || 0;
 
-    setText(els.allclearTitle, h.clean ? "All clear" : "Watch closely");
-    setText(els.allclearSub, streak >= 3 ? `${streak} safe in a row` : `${h.scans || 0} scans this session`);
+    renderAllClear(h, streak);
 
     setText(els.miniStatMonitored, h.session_duration || "—");
     setText(els.miniStatPlatforms, h.platform_count || "—");
 
-    renderAlertHistory(state.alert_history || []);
+    renderAlertHistory(state.alert_history || [], state.current_session_id);
 
     // Historical action from latest alert (dimmed)
     const lastAlert = state.latest_alert;
@@ -385,16 +388,79 @@
     }
   }
 
-  function renderAlertHistory(history) {
+  // Three icons for the status card. They use currentColor so the
+  // surrounding card class can recolor them in one place.
+  const ICON_CHECK =
+    '<svg viewBox="0 0 40 40" fill="none" aria-hidden="true">' +
+    '<circle cx="20" cy="20" r="16" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5"/>' +
+    '<path d="M13 20.5L17.5 25L27 15" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    "</svg>";
+  const ICON_EYE =
+    '<svg viewBox="0 0 40 40" fill="none" aria-hidden="true">' +
+    '<circle cx="20" cy="20" r="16" stroke="currentColor" stroke-opacity="0.25" stroke-width="1.5"/>' +
+    '<path d="M9 20s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<circle cx="20" cy="20" r="2.5" fill="currentColor"/>' +
+    "</svg>";
+  const ICON_WARN =
+    '<svg viewBox="0 0 40 40" fill="none" aria-hidden="true">' +
+    '<path d="M20 6L34 30H6L20 6z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>' +
+    '<path d="M20 16v6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>' +
+    '<circle cx="20" cy="26" r="1.4" fill="currentColor"/>' +
+    "</svg>";
+
+  function renderAllClear(h, streak) {
+    const alerts = h.alerts || 0;
+    const caution = h.caution || 0;
+
+    let mode = "safe";
+    let title = "All clear";
+    let sub = streak >= 3 ? `${streak} safe in a row` : `${h.scans || 0} scans this session`;
+    let icon = ICON_CHECK;
+
+    if (alerts > 0) {
+      mode = "alert";
+      title = alerts === 1 ? "1 threat detected" : `${alerts} threats detected`;
+      sub = "Action recommended below";
+      icon = ICON_WARN;
+    } else if (caution > 0) {
+      mode = "caution";
+      title = "Watch closely";
+      sub = caution === 1 ? "1 caution flag this session" : `${caution} caution flags this session`;
+      icon = ICON_EYE;
+    }
+
+    // Reset and set the single mode class so colors flip in one place.
+    els.allclearCard.classList.remove(
+      "gl-allclear-safe",
+      "gl-allclear-caution",
+      "gl-allclear-alert",
+    );
+    els.allclearCard.classList.add(`gl-allclear-${mode}`);
+    els.allclearIcon.innerHTML = icon;
+    setText(els.allclearTitle, title);
+    setText(els.allclearSub, sub);
+  }
+
+  function renderAlertHistory(history, currentSessionId) {
     setText(els.historyLabel, `Alert history (${history.length})`);
     if (!history.length) {
       els.alertHistory.innerHTML =
         '<div class="gl-history-empty">No alerts yet — your child is safe.</div>';
       return;
     }
+
+    // Cards from previous monitoring runs get a quiet visual dim so they
+    // don't compete with this session's events, but they're not pulled
+    // into a separate group — the time_ago label already conveys
+    // freshness and the parent doesn't need to know what a "session" is.
     els.alertHistory.innerHTML = history
-      .map((alert, idx) => renderAlertCard(alert, idx))
+      .map((alert) => {
+        const archived =
+          currentSessionId != null && alert.session_id !== currentSessionId;
+        return renderAlertCard(alert, archived);
+      })
       .join("");
+
     // Wire up click handlers
     els.alertHistory.querySelectorAll("[data-analysis-id]").forEach((card) => {
       card.addEventListener("click", () => {
@@ -404,16 +470,16 @@
     });
   }
 
-  function renderAlertCard(alert, idx) {
+  function renderAlertCard(alert, archived) {
     const severityClass = alert.severity === "caution" ? "gl-alert-card-caution" : "";
-    const fadeClass = idx >= 3 ? "gl-alert-card-faded" : "";
+    const archivedClass = archived ? "gl-alert-card-archived" : "";
     const badge = renderPlatformBadge(alert.platform);
     const pills = (alert.indicators || [])
       .slice(0, 3)
       .map((p) => `<span class="gl-alert-card-pill">${escapeHtml(p)}</span>`)
       .join("");
     return `
-      <div class="gl-alert-card ${severityClass} ${fadeClass}" data-analysis-id="${alert.analysis_id}">
+      <div class="gl-alert-card ${severityClass} ${archivedClass}" data-analysis-id="${alert.analysis_id}">
         <div class="gl-alert-card-row1">
           <div class="gl-alert-card-titlebar">
             ${badge.replace("gl-platform-badge", "gl-platform-badge gl-alert-card-platform")}

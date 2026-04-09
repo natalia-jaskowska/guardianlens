@@ -65,12 +65,16 @@ def serialize_analysis(
         "timestamp": analysis.timestamp.isoformat(),
         "time_label": analysis.timestamp.strftime("%H:%M:%S"),
         "screenshot_url": _screenshot_url(analysis),
-        "platform": analysis.platform or "Unknown",
+        "platform": _clean_platform_label(analysis.platform),
         "platform_key": _platform_key(analysis.platform),
         "inference_seconds": round(analysis.inference_seconds, 2),
         "threat_level": cls.threat_level.value,
         "category": cls.category.value,
-        "category_label": cls.category.value.upper().replace("_", " "),
+        "category_label": (
+            ""
+            if cls.category.value == "none"
+            else cls.category.value.upper().replace("_", " ")
+        ),
         "confidence": round(cls.confidence, 0),
         "reasoning": cls.reasoning,
         "indicators": list(cls.indicators_found),
@@ -282,11 +286,18 @@ def build_session_health(
     has caught things in the past even when the current scan is clean.
     """
     clean = totals.get("caution", 0) == 0 and totals.get("alerts", 0) == 0
-    # Top 4 platforms by count (truncate longer labels for the UI).
+    # Collapse Gemma's noisy variant strings ("Instagram (Direct
+    # Message)", "Instagram chat with @lily") into stable buckets so
+    # platform_count reflects DISTINCT apps, not distinct phrasings.
+    collapsed: dict[str, int] = {}
+    for raw_name, raw_count in platform_counts.items():
+        bucket = _normalize_platform_label(raw_name)
+        collapsed[bucket] = collapsed.get(bucket, 0) + raw_count
+    # Top 4 platforms by count, with human-friendly display labels.
     platforms: list[dict[str, Any]] = [
-        {"name": (name or "Unknown")[:32], "count": count}
-        for name, count in sorted(
-            platform_counts.items(), key=lambda item: (-item[1], item[0])
+        {"name": _platform_display_label(bucket), "count": count}
+        for bucket, count in sorted(
+            collapsed.items(), key=lambda item: (-item[1], item[0])
         )[:4]
     ]
     avg_label = (
@@ -321,7 +332,7 @@ def build_session_health(
         "alerts": totals.get("alerts", 0),
         "session_duration": session_duration,
         "platforms": platforms,
-        "platform_count": len(platform_counts),
+        "platform_count": len(collapsed),
         "model_name": model_name,
         "avg_inference_label": avg_label,
         "last_alert": last_alert_payload,
@@ -342,32 +353,53 @@ def _format_elapsed(seconds: float) -> str:
 
 
 def build_alert_history(
-    rows: list[tuple[int, ScreenAnalysis]],
+    rows: list[tuple[int, int, ScreenAnalysis]],
 ) -> list[dict[str, Any]]:
-    """Convert a list of (id, ScreenAnalysis) tuples into card payloads.
+    """Convert a list of (id, session_id, ScreenAnalysis) tuples into card payloads.
 
     Each card is a small summary dict the front-end uses to render an
-    item in the "Alert history" list. The full analysis (reasoning
-    chain, why this matters, recommended action, telegram, etc.) is
-    NOT included here — the JS fetches that on-demand from
-    ``/api/analysis/{id}`` when the user clicks a card.
+    item in the "Alert history" list. The ``session_id`` is exposed so
+    the JS can partition the list into "FROM THIS SESSION" vs "EARLIER"
+    groups — old alerts from previous sessions get visually dimmed so
+    they don't confuse the current monitoring narrative.
+
+    The full analysis (reasoning chain, why this matters, recommended
+    action, telegram, etc.) is NOT included here — the JS fetches that
+    on-demand from ``/api/analysis/{id}`` when the user clicks a card.
     """
     out: list[dict[str, Any]] = []
     now = datetime.now()
-    for analysis_id, analysis in rows:
+    for analysis_id, session_id, analysis in rows:
         cls = analysis.classification
         level = cls.threat_level.value
-        severity = "alert" if level in ("alert", "critical") else "caution"
-        # Pick the first non-self sender as "user", fall back per platform
-        user = "unknown"
+        category = cls.category.value
+        confidence = cls.confidence
+
+        # Severity (red vs yellow card) is derived from BOTH the model's
+        # threat_level AND the category+confidence. Reason: Gemma 4
+        # routinely returns threat_level=warning at 95-98% confidence on
+        # grooming/bullying — strictly trusting threat_level would paint
+        # those as caution-yellow when they should be red. We override
+        # to "alert" when category is dangerous AND confidence is high.
+        if level in ("alert", "critical"):
+            severity = "alert"
+        elif category in ("grooming", "inappropriate_content") and confidence >= 80:
+            severity = "alert"
+        elif category == "bullying" and confidence >= 90:
+            severity = "alert"
+        else:
+            severity = "caution"
+
+        # Pick the first non-self sender as "user", fall back per platform.
+        user: str | None = None
         for msg in analysis.chat_messages or []:
             sender = (msg.sender or "").strip()
             if sender and sender.lower() not in _GENERIC_SENDERS:
                 user = sender.lstrip("@<").rstrip(">")
                 break
-        if user == "unknown":
+        if user is None:
             key = _platform_key(analysis.platform)
-            user = _DEFAULT_USERNAMES.get(key, "unknown")
+            user = _DEFAULT_USERNAMES.get(key) or "—"
 
         # One-line summary: a couple of indicator phrases + grooming stage if any
         indicator_words = [s.split("(")[0].strip() for s in (cls.indicators_found or [])[:3]]
@@ -389,6 +421,7 @@ def build_alert_history(
         out.append(
             {
                 "analysis_id": analysis_id,
+                "session_id": session_id,
                 "time_label": analysis.timestamp.strftime("%H:%M:%S"),
                 "time_ago": elapsed_label,
                 "platform": analysis.platform or "Unknown",
@@ -460,6 +493,79 @@ def _platform_key(platform: str | None) -> str:
     if "minecraft" in lower or "roblox" in lower:
         return "minecraft"
     return "unknown"
+
+
+# Pretty labels keyed by the normalized platform bucket, used by the
+# Session Health platform list so the user sees "Instagram" not
+# "instagram".
+_PLATFORM_LABELS: dict[str, str] = {
+    "instagram": "Instagram",
+    "tiktok": "TikTok",
+    "discord": "Discord",
+    "minecraft": "Minecraft",
+    "snapchat": "Snapchat",
+    "telegram": "Telegram",
+    "youtube": "YouTube",
+    "unknown": "Unknown",
+}
+
+
+def _normalize_platform_label(platform: str | None) -> str:
+    """Collapse Gemma's noisy platform strings into a stable bucket.
+
+    Without this, every variant ("Instagram", "Instagram (Direct
+    Message)", "Instagram chat with @lily.summer") counts as a unique
+    platform — turning a 4-platform demo into "43 PLATFORMS" in the
+    Session Health card. We collapse known platforms via
+    :func:`_platform_key` and use the lowercase first word as a fallback
+    so unknown apps still distinguish themselves.
+    """
+    if not platform:
+        return "unknown"
+    key = _platform_key(platform)
+    if key != "unknown":
+        return key
+    lower = platform.lower().strip()
+    if not lower:
+        return "unknown"
+    # Strip parenthetical / version-info noise the model loves to append.
+    head = lower.split("(")[0].strip().split()
+    if not head:
+        return "unknown"
+    first = head[0]
+    if first in {"snap", "snapchat"}:
+        return "snapchat"
+    if first in {"telegram", "tg"}:
+        return "telegram"
+    if first in {"youtube", "yt"}:
+        return "youtube"
+    if first == "version" or first == "info":
+        return "unknown"
+    return first
+
+
+def _platform_display_label(bucket: str) -> str:
+    return _PLATFORM_LABELS.get(bucket, bucket.title())
+
+
+def _clean_platform_label(platform: str | None) -> str:
+    """Sanitize the model's platform string for the capture meta line.
+
+    Gemma occasionally returns labels like ``"Unknown (Version Info
+    Only)"`` or ``"Unknown - System Settings"`` when it can't identify
+    the app — in the dashboard those read as bugs, not model
+    confusion. We collapse them to a clean ``"Unknown"`` and keep
+    recognizable labels intact via the bucket map.
+    """
+    if not platform:
+        return "Unknown"
+    bucket = _normalize_platform_label(platform)
+    if bucket != "unknown":
+        return _platform_display_label(bucket)
+    cleaned = platform.split("(")[0].split(" - ")[0].strip()
+    if not cleaned or cleaned.lower() in {"unknown", "version", "info", "n/a"}:
+        return "Unknown"
+    return cleaned[:32]
 
 
 def _threat_breakdown(analysis: ScreenAnalysis) -> list[dict[str, str]]:

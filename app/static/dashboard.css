@@ -242,18 +242,20 @@ strong {
   font-family: var(--font-mono);
 }
 
-/* Streak badge — always green */
+/* Streak badge — always green. Background bumped from 0.06 to 0.18
+ * so the badge reads as visibly green-toned, not as a faint outlined
+ * pill that could be misread as alarming next to the alert metrics. */
 .gl-streak {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: 9px;
   color: #22c55e !important;
-  background: rgba(34, 197, 94, 0.06) !important;
-  border: 0.5px solid rgba(34, 197, 94, 0.1) !important;
-  padding: 2px 8px;
+  background: rgba(34, 197, 94, 0.18) !important;
+  border: 0.5px solid rgba(34, 197, 94, 0.38) !important;
+  padding: 3px 9px;
   border-radius: var(--radius-sm);
-  font-weight: 500;
+  font-weight: 600;
 }
 .gl-streak-dot {
   width: 5px;
@@ -388,18 +390,22 @@ strong {
 .gl-capture-thumb {
   width: 120px;
   height: 75px;
-  background: #0a100a;
+  background: #161b24;
   border-radius: var(--radius-md);
-  border: 0.5px solid #152215;
+  border: 1px solid rgba(120, 140, 180, 0.30);
   flex-shrink: 0;
   overflow: hidden;
   display: grid;
   place-items: center;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
 }
 .gl-capture-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Bumped brightness/contrast so screenshot content reads as a
+   * screenshot, not a dark blob, against the dark dashboard. */
+  filter: brightness(1.18) contrast(1.06) saturate(1.08);
 }
 .gl-capture-thumb-placeholder {
   font-size: 9px;
@@ -443,23 +449,27 @@ strong {
 .gl-capture-simple.gl-capture-alert .gl-capture-meta-line { color: rgba(252, 165, 165, 0.4); }
 .gl-capture-simple.gl-capture-caution .gl-capture-meta-line { color: rgba(167, 139, 27, 0.5); }
 
-/* Threat heartbeat — horizontal bar chart of last 30 scans */
+/* Threat heartbeat — horizontal bar chart of the last 30 scans.
+ * Container is intentionally tall (52px) so the percentage spread
+ * between safe / caution / alert reads as dramatic spikes — like a
+ * heart-rate monitor — instead of bars of nearly the same size. */
 .gl-heartbeat {
   display: flex;
   align-items: flex-end;
   gap: 1px;
-  height: 28px;
+  height: 52px;
   margin-bottom: 3px;
 }
 .gl-heartbeat-bar {
   flex: 1;
+  min-height: 2px;
   border-radius: 1px 1px 0 0;
   background: #1a2030;
   transition: height 0.4s ease, background 0.4s ease;
 }
 .gl-heartbeat-bar-safe { background: var(--safe); }
-.gl-heartbeat-bar-caution { background: var(--caution); }
-.gl-heartbeat-bar-alert { background: var(--alert); }
+.gl-heartbeat-bar-caution { background: var(--caution); box-shadow: 0 0 4px rgba(234, 179, 8, 0.45); }
+.gl-heartbeat-bar-alert { background: var(--alert); box-shadow: 0 0 6px rgba(239, 68, 68, 0.55); }
 .gl-heartbeat-axis {
   display: flex;
   justify-content: space-between;
@@ -609,26 +619,58 @@ strong {
 
 .gl-allclear {
   background: var(--bg-elevated);
+  border: 0.5px solid transparent;
   border-radius: var(--radius-lg);
   padding: 12px;
   margin-bottom: 10px;
   text-align: center;
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 .gl-allclear-icon {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   margin: 0 auto 4px;
+  display: block;
+}
+.gl-allclear-icon svg {
+  width: 100%;
+  height: 100%;
   display: block;
 }
 .gl-allclear-title {
   font-size: 13px;
   font-weight: 500;
-  color: var(--safe);
 }
 .gl-allclear-sub {
   font-size: 9px;
-  color: #2a5a2a;
   margin-top: 2px;
+}
+
+/* SAFE — green check */
+.gl-allclear-safe { background: rgba(34, 197, 94, 0.06); border-color: rgba(34, 197, 94, 0.18); }
+.gl-allclear-safe .gl-allclear-icon { color: #22c55e; }
+.gl-allclear-safe .gl-allclear-title { color: var(--safe); }
+.gl-allclear-safe .gl-allclear-sub { color: #2a5a2a; }
+
+/* CAUTION — yellow eye */
+.gl-allclear-caution { background: rgba(234, 179, 8, 0.08); border-color: rgba(234, 179, 8, 0.22); }
+.gl-allclear-caution .gl-allclear-icon { color: var(--caution); }
+.gl-allclear-caution .gl-allclear-title { color: var(--caution); }
+.gl-allclear-caution .gl-allclear-sub { color: var(--caution-text); }
+
+/* ALERT — red warning triangle */
+.gl-allclear-alert {
+  background: rgba(239, 68, 68, 0.10);
+  border-color: rgba(239, 68, 68, 0.35);
+  animation: gl-allclear-pulse 2.4s ease-in-out infinite;
+}
+.gl-allclear-alert .gl-allclear-icon { color: var(--alert); }
+.gl-allclear-alert .gl-allclear-title { color: var(--alert); font-weight: 600; }
+.gl-allclear-alert .gl-allclear-sub { color: var(--alert-text-dim); }
+
+@keyframes gl-allclear-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.0); }
+  50%      { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.10); }
 }
 
 .gl-mini-stats {
@@ -693,28 +735,40 @@ strong {
   color: var(--text-faint);
 }
 
-/* Individual alert card in history list */
+/* Individual alert card in history list. Alpha bumped from 0.03/0.04
+ * (essentially invisible) to 0.12/0.30 — still subtle enough to layer
+ * but unmistakably colored on the dark background. */
 .gl-alert-card {
-  background: rgba(239, 68, 68, 0.04);
-  border: 0.5px solid rgba(239, 68, 68, 0.08);
+  background: rgba(239, 68, 68, 0.12);
+  border: 0.5px solid rgba(239, 68, 68, 0.30);
   border-radius: 5px;
   padding: 7px 9px;
   cursor: pointer;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 .gl-alert-card:hover {
-  background: rgba(239, 68, 68, 0.08);
-  border-color: rgba(239, 68, 68, 0.16);
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.45);
 }
 .gl-alert-card-caution {
-  background: rgba(234, 179, 8, 0.03);
-  border-color: rgba(234, 179, 8, 0.06);
+  background: rgba(234, 179, 8, 0.10);
+  border-color: rgba(234, 179, 8, 0.28);
 }
 .gl-alert-card-caution:hover {
-  background: rgba(234, 179, 8, 0.06);
-  border-color: rgba(234, 179, 8, 0.12);
+  background: rgba(234, 179, 8, 0.16);
+  border-color: rgba(234, 179, 8, 0.40);
 }
-.gl-alert-card-faded { opacity: 0.65; }
+/* Cards from previous monitoring runs are dimmed so this session's
+ * events stay visually dominant. The time_ago label still tells the
+ * full story; the dim is just secondary reinforcement. */
+.gl-alert-card-archived {
+  opacity: 0.55;
+  filter: saturate(0.6);
+}
+.gl-alert-card-archived:hover {
+  opacity: 0.85;
+  filter: saturate(0.85);
+}
 .gl-alert-card-row1 {
   display: flex;
   align-items: center;
@@ -1041,22 +1095,25 @@ strong {
 }
 .gl-action-step {
   display: flex;
-  gap: 6px;
-  margin-bottom: 5px;
+  gap: 8px;
+  margin-bottom: 7px;
+  align-items: flex-start;
 }
 .gl-action-step:last-of-type { margin-bottom: 0; }
 .gl-action-num {
-  width: 15px;
-  height: 15px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
-  background: rgba(139, 92, 246, 0.15);
+  background: rgba(139, 92, 246, 0.22);
+  border: 1px solid rgba(139, 92, 246, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  margin-top: 1px;
-  font-size: 8px;
-  color: #a78bfa;
+  margin-top: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: #c4b5fd;
 }
 .gl-action-text {
   font-size: 10px;

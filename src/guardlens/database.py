@@ -229,29 +229,65 @@ class GuardLensDatabase:
         except (ValueError, TypeError):
             return None
 
-    def recent_alert_analyses(self, limit: int = 10) -> list[tuple[int, ScreenAnalysis]]:
+    def recent_alert_analyses(
+        self, limit: int = 10
+    ) -> list[tuple[int, int, ScreenAnalysis]]:
         """Reconstruct the N most recent alert/caution :class:`ScreenAnalysis` rows.
 
         Used by the dashboard's "Alert history" list in the safe-state
-        right panel. Returns ``(analysis_id, ScreenAnalysis)`` tuples
-        ordered newest first so each card can wire to
-        ``/api/analysis/{id}`` for the click-to-inspect flow.
+        right panel. Returns ``(analysis_id, session_id, ScreenAnalysis)``
+        tuples ordered newest first. The session_id lets the front-end
+        group cards into "from this session" vs "earlier" buckets.
+
+        Filters out rows where the model returned a non-safe
+        ``threat_level`` but ``category=none`` — those are uninformative
+        in a history list and the card has nothing meaningful to show.
         """
         with self._lock:
             rows = self._conn.execute(
                 """
-                SELECT id, raw_json FROM analyses
+                SELECT id, session_id, raw_json FROM analyses
                 WHERE threat_level IN ('alert', 'critical', 'warning', 'caution')
+                  AND category != 'none'
                 ORDER BY id DESC
                 LIMIT ?
                 """,
                 (limit,),
             ).fetchall()
-        out: list[tuple[int, ScreenAnalysis]] = []
+        out: list[tuple[int, int, ScreenAnalysis]] = []
         for row in rows:
             try:
                 payload = _json.loads(row["raw_json"])
-                out.append((int(row["id"]), ScreenAnalysis.model_validate(payload)))
+                out.append(
+                    (
+                        int(row["id"]),
+                        int(row["session_id"]),
+                        ScreenAnalysis.model_validate(payload),
+                    )
+                )
+            except (ValueError, TypeError):
+                continue
+        return out
+
+    def recent_analyses_models(self, limit: int = 15) -> list[ScreenAnalysis]:
+        """Return the most recent ``limit`` analyses as :class:`ScreenAnalysis`.
+
+        Used by the dashboard's main-column timeline so its row count is
+        independent of :class:`SessionTracker`'s in-memory window
+        (``window_size``). The session window is sized for the AI's
+        cross-reference logic; the timeline is a UX surface and wants
+        more rows. Returns newest first; the caller flips it as needed.
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT raw_json FROM analyses ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        out: list[ScreenAnalysis] = []
+        for row in rows:
+            try:
+                payload = _json.loads(row["raw_json"])
+                out.append(ScreenAnalysis.model_validate(payload))
             except (ValueError, TypeError):
                 continue
         return out
@@ -325,23 +361,43 @@ class GuardLensDatabase:
             return None
         return float(row["avg"])
 
-    def last_alert_summary(self) -> dict[str, Any] | None:
-        """Return a short summary of the most recent alert across all sessions.
+    def last_alert_summary(self, session_id: int | None = None) -> dict[str, Any] | None:
+        """Return a short summary of the most recent alert.
 
-        Used by the Session Health card to show "Last alert: 4m 12s ago
-        — Instagram DM grooming" even when the current scan is safe and
-        the right panel is in Session Health mode.
+        When ``session_id`` is given, the search is scoped to that
+        session only — so a fresh dashboard restart doesn't surface a
+        stale alert from yesterday's session. When omitted, the search
+        spans all history (the previous behavior, kept for callers that
+        explicitly want cross-session bootstrapping).
+
+        Also requires ``category != 'none'`` so we don't surface
+        uninformative model-misclassification rows.
         """
         with self._lock:
-            row = self._conn.execute(
-                """
-                SELECT platform, category, timestamp
-                FROM analyses
-                WHERE threat_level IN ('alert', 'critical')
-                ORDER BY id DESC
-                LIMIT 1
-                """,
-            ).fetchone()
+            if session_id is not None:
+                row = self._conn.execute(
+                    """
+                    SELECT platform, category, timestamp
+                    FROM analyses
+                    WHERE threat_level IN ('alert', 'critical')
+                      AND category != 'none'
+                      AND session_id = ?
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                    (session_id,),
+                ).fetchone()
+            else:
+                row = self._conn.execute(
+                    """
+                    SELECT platform, category, timestamp
+                    FROM analyses
+                    WHERE threat_level IN ('alert', 'critical')
+                      AND category != 'none'
+                    ORDER BY id DESC
+                    LIMIT 1
+                    """,
+                ).fetchone()
         if row is None:
             return None
         return {

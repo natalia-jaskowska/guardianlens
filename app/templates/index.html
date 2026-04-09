@@ -129,12 +129,11 @@
 
           <!-- ============= STATE 1: SAFE OVERVIEW ============= -->
           <div id="right-safe">
-            <!-- Big "All clear" card -->
+            <!-- Big status card. The icon, title and color are swapped
+                 by JS depending on the current alert state — see
+                 renderAllClear() in dashboard.js. -->
             <div class="gl-allclear" id="allclear-card">
-              <svg class="gl-allclear-icon" viewBox="0 0 40 40" fill="none">
-                <circle cx="20" cy="20" r="16" stroke="rgba(34,197,94,0.18)" stroke-width="1.5"/>
-                <path d="M13 20.5L17.5 25L27 15" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <div class="gl-allclear-icon" id="allclear-icon"></div>
               <div class="gl-allclear-title" id="allclear-title">All clear</div>
               <div class="gl-allclear-sub" id="allclear-sub">12 safe in a row</div>
             </div>
