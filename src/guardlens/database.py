@@ -32,6 +32,8 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
+import json as _json
+
 from guardlens.schema import ScreenAnalysis, ThreatLevel
 
 _SCHEMA = """
@@ -201,6 +203,44 @@ class GuardLensDatabase:
                     (limit,),
                 )
             )
+
+    def most_recent_alert_analysis(self) -> ScreenAnalysis | None:
+        """Reconstruct the most recent ALERT/CRITICAL :class:`ScreenAnalysis`.
+
+        Used by the dashboard to bootstrap the right panel after a
+        restart so it has content immediately instead of waiting for the
+        next alert to land.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT raw_json FROM analyses
+                WHERE threat_level IN ('alert', 'critical')
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = _json.loads(row["raw_json"])
+            return ScreenAnalysis.model_validate(payload)
+        except (ValueError, TypeError):
+            return None
+
+    def recent_threat_levels(self, limit: int = 12) -> list[str]:
+        """Return the most recent ``limit`` threat levels (oldest first).
+
+        Used by the dashboard sparkline. Cheap query — only the
+        ``threat_level`` column, capped at ``limit``.
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT threat_level FROM analyses ORDER BY id DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+        # Reverse so the oldest comes first (left side of the chart).
+        return [row["threat_level"] for row in reversed(rows)]
 
     def session_summary(self) -> dict[str, int]:
         """Return per-threat-level counts for the current session."""

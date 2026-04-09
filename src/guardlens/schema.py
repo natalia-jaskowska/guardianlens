@@ -90,6 +90,20 @@ class ParentAlert(BaseModel):
     urgency: AlertUrgency
 
 
+class ChatMessage(BaseModel):
+    """One message inside the captured conversation.
+
+    Used by the dashboard's "fake browser" capture view, which renders
+    the conversation as platform-styled chat bubbles. Each message can
+    be tagged with a ``flag`` (e.g. "age inquiry", "isolation") so the
+    front-end can outline it in red and show the indicator label.
+    """
+
+    sender: str
+    text: str
+    flag: str | None = None
+
+
 class ScreenAnalysis(BaseModel):
     """Full analysis result for one screenshot.
 
@@ -106,6 +120,14 @@ class ScreenAnalysis(BaseModel):
     grooming_stage: GroomingStageResult | None = None
     parent_alert: ParentAlert | None = None
     inference_seconds: float = Field(..., ge=0.0)
+    chat_messages: list[ChatMessage] | None = Field(
+        None,
+        description=(
+            "Reconstructed conversation as structured messages. Populated "
+            "in demo mode where the chat lines are known ahead of time; "
+            "may be None in real-screenshot mode."
+        ),
+    )
 
     @property
     def is_safe(self) -> bool:

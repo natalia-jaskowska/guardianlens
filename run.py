@@ -3,19 +3,20 @@
 Usage::
 
     python run.py
-    python run.py --model gemma4:26b --interval 15 --dashboard-port 7860
+    python run.py --model gemma4 --interval 8 --dashboard-port 7860
     python run.py --config configs/default.yaml
     python run.py --use-finetuned          # use the Unsloth-trained variant
-    python run.py --share                  # expose a public Gradio link
+    python run.py --demo-mode              # synthetic chat screenshots, no display required
 
-Starts the screen-capture monitor loop AND the Gradio dashboard in one
-process. The monitor lives in a daemon thread; the Gradio server runs on
-the main thread and shuts the monitor down on exit.
+Starts the FastAPI dashboard server (uvicorn) which spins up the
+monitor thread inside its lifespan handler. The monitor lives in a
+daemon thread; uvicorn runs the event loop on the main thread and
+shuts the worker down on exit.
 
 This file deliberately stays thin — all the real work lives in
-``src/guardlens`` and ``app/dashboard.py``. Its job is to parse CLI flags,
-build a :class:`GuardLensConfig` with the overrides applied, and hand off
-to :func:`app.dashboard.main`.
+``src/guardlens`` and ``app/``. Its job is to parse CLI flags, build a
+:class:`GuardLensConfig` with the overrides applied, and hand off to
+``app.server.create_app`` + uvicorn.
 """
 
 from __future__ import annotations
@@ -49,7 +50,13 @@ def _parse_args() -> argparse.Namespace:
         "--model",
         type=str,
         default=None,
-        help="Override the Ollama inference model (e.g. gemma4:26b).",
+        help="Override the Ollama inference model (e.g. gemma4 or gemma4:26b).",
+    )
+    parser.add_argument(
+        "--ollama-host",
+        type=str,
+        default=None,
+        help="Override the Ollama base URL (e.g. http://192.168.1.55:11434).",
     )
     parser.add_argument(
         "--interval",
@@ -61,12 +68,13 @@ def _parse_args() -> argparse.Namespace:
         "--dashboard-port",
         type=int,
         default=None,
-        help="Override the Gradio dashboard port (default: 7860).",
+        help="Override the FastAPI dashboard port (default: 7860).",
     )
     parser.add_argument(
-        "--share",
-        action="store_true",
-        help="Expose the Gradio dashboard via a public share link.",
+        "--bind",
+        type=str,
+        default=None,
+        help="Override the FastAPI bind address (default: 0.0.0.0).",
     )
     parser.add_argument(
         "--use-finetuned",
@@ -104,6 +112,8 @@ def main() -> int:
 
     if args.model:
         config.ollama.inference_model = args.model
+    if args.ollama_host:
+        config.ollama.host = args.ollama_host
     if args.demo_mode:
         config.monitor.demo_mode = True
         # Faster default interval for demo mode so the UI feels live.
@@ -114,8 +124,11 @@ def main() -> int:
         config.monitor.capture_interval_seconds = args.interval
     if args.dashboard_port is not None:
         config.dashboard.server_port = args.dashboard_port
-    if args.share:
-        config.dashboard.share = True
+    if args.bind:
+        config.dashboard.server_name = args.bind
+    if args.use_finetuned:
+        # Swap the inference model for the fine-tuned variant.
+        config.ollama.inference_model = config.ollama.finetuned_model
     if args.log_level:
         config.log_level = args.log_level.upper()
 
@@ -124,45 +137,29 @@ def main() -> int:
 
     log = logging.getLogger("guardlens.run")
     log.info(
-        "Starting GuardianLens — model=%s interval=%ss port=%d share=%s db=%s",
+        "Starting GuardianLens — model=%s host=%s interval=%ss bind=%s:%d db=%s",
         config.ollama.inference_model,
+        config.ollama.host,
         config.monitor.capture_interval_seconds,
+        config.dashboard.server_name,
         config.dashboard.server_port,
-        config.dashboard.share,
         config.database.path,
     )
 
-    # Late imports so the CLI's --help stays fast and Gradio is not loaded
-    # before logging is configured.
-    from app.dashboard import MonitorWorker, build_app
-    from guardlens.alerts import AlertSender
-    from guardlens.analyzer import GuardLensAnalyzer
-    from guardlens.database import GuardLensDatabase
-    from guardlens.session_tracker import SessionTracker
+    # Late imports so the CLI's --help stays fast and uvicorn / FastAPI
+    # are not loaded before logging is configured.
+    import uvicorn
 
-    if args.use_finetuned:
-        # Swap the inference model for the fine-tuned variant. The analyzer
-        # accepts ``use_finetuned=True`` per-call, but flipping the default
-        # here is simpler and matches the CLI flag's intent.
-        config.ollama.inference_model = config.ollama.finetuned_model
+    from app.server import create_app
 
-    analyzer = GuardLensAnalyzer(config.ollama)
-    session = SessionTracker(config.session)
-    alerts = AlertSender(config.alerts)
-    database = GuardLensDatabase(config.database.path)
-    worker = MonitorWorker(config, analyzer, session, alerts, database)
-    worker.start()
-
-    try:
-        app = build_app(config, worker, session, database)
-        app.launch(
-            server_name=config.dashboard.server_name,
-            server_port=config.dashboard.server_port,
-            share=config.dashboard.share,
-        )
-    finally:
-        worker.stop()
-        database.close()
+    app = create_app(config)
+    uvicorn.run(
+        app,
+        host=config.dashboard.server_name,
+        port=config.dashboard.server_port,
+        log_level=config.log_level.lower(),
+        access_log=False,
+    )
     return 0
 
 

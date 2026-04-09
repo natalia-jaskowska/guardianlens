@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }}</title>
+    <meta name="description" content="On-device AI child safety monitor powered by Gemma 4." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/dashboard.css" />
+  </head>
+  <body>
+    <div id="shell" class="gl-shell">
+      <!-- ===================== HEADER ===================== -->
+      <header class="gl-header">
+        <div class="gl-header-left">
+          <div class="gl-logo-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2L4 6v6c0 5.25 3.75 9.75 8 10 4.25-0.25 8-4.75 8-10V6l-8-4z"/>
+              <circle cx="12" cy="11" r="2.5"/>
+            </svg>
+          </div>
+          <div class="gl-logo-text">GuardianLens</div>
+          <span class="gl-tag">on-device safety monitor</span>
+        </div>
+        <div class="gl-header-right">
+          <div class="gl-header-status" id="header-status">
+            <span class="gl-dot gl-dot-safe"></span>
+            <span>Connecting...</span>
+          </div>
+          <div class="gl-header-meta" id="header-duration">--m --s</div>
+          <div class="gl-header-meta" id="header-model">{{ model_name }}</div>
+        </div>
+      </header>
+
+      <!-- ===================== MAIN ===================== -->
+      <main class="gl-main">
+        <!-- LEFT COLUMN ............................................. -->
+        <section class="gl-left">
+          <!-- Metric cards row -->
+          <div class="gl-metrics" id="metrics">
+            <div class="gl-metric-card">
+              <div class="gl-metric-label">Screenshots</div>
+              <div class="gl-metric-value" id="metric-screenshots">0</div>
+              <div class="gl-sparkline" id="metric-sparkline"></div>
+              <div class="gl-metric-sublabel" id="metric-screenshots-sub">warming up</div>
+            </div>
+            <div class="gl-metric-card">
+              <div class="gl-metric-label">Safe</div>
+              <div class="gl-metric-value gl-metric-value-safe" id="metric-safe">0</div>
+              <div class="gl-metric-sublabel" id="metric-safe-sub">0% of scans</div>
+            </div>
+            <div class="gl-metric-card gl-metric-card-caution">
+              <div class="gl-metric-label">Caution</div>
+              <div class="gl-metric-value gl-metric-value-caution" id="metric-caution">0</div>
+              <div class="gl-metric-sublabel" id="metric-caution-sub">0% of scans</div>
+            </div>
+            <div class="gl-metric-card gl-metric-card-alert">
+              <div class="gl-metric-label">Alerts</div>
+              <div class="gl-metric-value gl-metric-value-alert" id="metric-alerts">0</div>
+              <div class="gl-metric-sublabel" id="metric-alerts-sub">no active threats</div>
+            </div>
+          </div>
+
+          <!-- Latest capture: fake browser + threat breakdown -->
+          <div class="gl-section">
+            <div class="gl-section-label">Latest capture</div>
+            <div class="gl-capture-row">
+              <div class="gl-fake-browser" id="fake-browser">
+                <div class="gl-browser-bar">
+                  <div class="gl-browser-dots">
+                    <span class="gl-browser-dot"></span>
+                    <span class="gl-browser-dot"></span>
+                    <span class="gl-browser-dot"></span>
+                  </div>
+                  <div class="gl-browser-url" id="browser-url">—</div>
+                </div>
+                <div class="gl-browser-content" id="browser-content">
+                  <div class="gl-browser-empty">Waiting for first capture...</div>
+                </div>
+              </div>
+              <div class="gl-breakdown-card" id="breakdown-card">
+                <div class="gl-breakdown-header">
+                  <div>
+                    <div class="gl-breakdown-title" id="breakdown-title">Threat breakdown</div>
+                    <div class="gl-breakdown-subtitle" id="breakdown-subtitle">—</div>
+                  </div>
+                  <div class="gl-breakdown-confidence">
+                    <span class="gl-breakdown-confidence-value" id="breakdown-confidence">—</span>
+                    <span class="gl-breakdown-confidence-label">Confidence</span>
+                  </div>
+                </div>
+                <div class="gl-breakdown-pills" id="breakdown-pills"></div>
+                <div class="gl-breakdown-stagebar" id="breakdown-stagebar"></div>
+                <div class="gl-breakdown-stagelabels" id="breakdown-stagelabels"></div>
+                <div class="gl-breakdown-statboxes" id="breakdown-statboxes"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live timeline -->
+          <div class="gl-section gl-section-grow">
+            <div class="gl-section-label">
+              <span>Live timeline</span>
+              <span class="gl-legend">
+                <span class="gl-legend-item"><span class="gl-legend-dot gl-legend-dot-safe"></span>Safe</span>
+                <span class="gl-legend-item"><span class="gl-legend-dot gl-legend-dot-caution"></span>Caution</span>
+                <span class="gl-legend-item"><span class="gl-legend-dot gl-legend-dot-alert"></span>Alert</span>
+                <span class="gl-section-meta" id="last-refresh">--</span>
+              </span>
+            </div>
+            <div class="gl-timeline" id="timeline">
+              <div class="gl-empty">
+                Connecting to the monitor stream...
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- RIGHT COLUMN — always shows the most recent ALERT -->
+        <aside class="gl-side">
+          <div class="gl-section-label">AI reasoning chain</div>
+          <div class="gl-reasoning-chain" id="reasoning-chain">
+            <div class="gl-empty">Waiting for the first alert...</div>
+          </div>
+
+          <div class="gl-section-label">Why this matters</div>
+          <div class="gl-why" id="why-this-matters">
+            <div class="gl-empty">No flagged conversations yet.</div>
+          </div>
+
+          <div class="gl-section-label">Recommended action for parent</div>
+          <div class="gl-action" id="recommended-action">
+            <div class="gl-empty">No action required.</div>
+          </div>
+
+          <div id="telegram-block"></div>
+
+          <div class="gl-privacy-badge" id="privacy-badge">
+            <div class="gl-privacy-icon" aria-hidden="true">
+              <svg viewBox="0 0 16 16" fill="none">
+                <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="#22c55e" stroke-width="1.3"/>
+                <path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="#22c55e" stroke-width="1.3" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <div class="gl-privacy-text">
+              <div class="gl-privacy-title">Fully local &middot; zero cloud dependency</div>
+              <div class="gl-privacy-subtitle" id="privacy-subtitle">
+                Gemma 4 via Ollama &middot; data sent to cloud: 0 bytes
+              </div>
+            </div>
+            <span class="gl-privacy-pill">Private</span>
+          </div>
+        </aside>
+      </main>
+
+      <!-- ===================== FOOTER ===================== -->
+      <footer class="gl-footer">
+        <span>
+          <strong id="footer-model">{{ model_name }}</strong>
+          via Ollama &middot; local inference
+        </span>
+        <span class="gl-footer-receipt">
+          bytes sent to cloud: <strong>0</strong> &middot; storage:
+          <span class="gl-mono" id="footer-db">{{ db_path }}</span>
+        </span>
+      </footer>
+    </div>
+
+    <!-- Initial state, server-rendered. The JS picks this up so the page
+         isn't blank for the first SSE round-trip. -->
+    <script id="initial-state" type="application/json">{{ initial_state | tojson }}</script>
+    <script src="/static/dashboard.js" defer></script>
+  </body>
+</html>

@@ -7,6 +7,11 @@
 > with dated entries describing what was built in each session and what
 > state the repo is in. Always read the most recent two entries before
 > making changes, and append a new entry when you finish a session.
+>
+> **For any UI work, also read [CONTEXT_UI.md](CONTEXT_UI.md)** — design
+> system, color tokens, typography, layout, components, animations, and
+> the "wow moment" alert state. The dashboard implementation must follow
+> that file exactly.
 
 ---
 

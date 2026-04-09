@@ -9,6 +9,311 @@
 
 ---
 
+## 2026-04-08 — Migrated dashboard from Gradio to FastAPI + vanilla JS
+
+### Summary
+
+Replaced the Gradio dashboard with a FastAPI server + Jinja2 template +
+vanilla JS front-end. Reasons (per the user): the Gradio version felt
+"too Gradio-ish", and CONTEXT_UI.md anticipated this fork ("if it looks
+too Gradio-ish, switch to FastAPI + custom HTML in week 4").
+
+The FastAPI version is **easier to manage** (cleaner separation of
+concerns: backend API + JSON serializers + DOM-rendering JS), **looks
+more professional** (Inter font, CSS Grid layout, subtle gradient
+backgrounds, real CSS shadows, no Gradio chrome to fight), and uses
+**Server-Sent Events instead of polling** so the UI updates push down
+from the server with no client-side timer loop.
+
+### Architecture
+
+```
+app/
+├── server.py          # FastAPI app: /, /api/state, /api/stream, /static, /screenshots
+├── state.py           # AppState + MonitorWorker; lifespan-managed
+├── serializers.py     # ScreenAnalysis -> JSON dict
+├── templates/
+│   └── index.html     # Jinja2 page with server-rendered initial state
+└── static/
+    ├── dashboard.css  # Vanilla CSS, no framework overrides
+    └── dashboard.js   # SSE client + DOM render functions
+```
+
+**Endpoints**
+
+| Route             | Purpose                                                  |
+|-------------------|----------------------------------------------------------|
+| `GET /`           | Jinja2 page; baked-in initial state (no flash of empty)  |
+| `GET /api/state`  | One-shot JSON snapshot                                   |
+| `GET /api/stream` | SSE stream — yields a fresh snapshot every 2 s           |
+| `GET /static/*`   | CSS / JS / assets                                        |
+| `GET /screenshots/*` | Read-only mount of `outputs/screenshots/`             |
+| `GET /healthz`    | `{"status": "ok"}` for monitoring                        |
+
+**SSE not WebSocket.** One direction (server -> client), auto-reconnect
+built into the browser's `EventSource`, no connection lifecycle to
+manage. Right tool for live-status broadcasting.
+
+**Lifespan-managed worker.** The monitor thread starts inside FastAPI's
+`lifespan` context and stops cleanly on shutdown — no global state, no
+import-time side effects, easy to test.
+
+### Design system (rewritten dashboard.css)
+
+Same color tokens as before (CONTEXT_UI.md), but the CSS is now ~10
+sections of clean, vendor-free rules instead of Gradio overrides:
+
+- **Inter** for body text (Linear / Vercel / Stripe family).
+- **JetBrains Mono** for timestamps, metrics, footer.
+- **CSS Grid** for the 65/35 main split — proper grid, not flex hacks.
+- **Subtle radial gradient background** — `radial-gradient(circle at 50% -30%, #161a26, #0b0d13)` — gives depth without being noisy.
+- **Drop shadows** on cards (`0 8px 24px -16px rgba(0,0,0,0.6)`) — soft,
+  designer-grade depth.
+- **Sticky header** with `backdrop-filter: blur(8px)` so it sits above
+  scrolled content like a real product.
+- **Hover lifts** on the metric cards (`translateY(-1px)`).
+- **The wow alert state** survives the rewrite: when `is_alert` flips
+  true, the shell switches to `gl-alert-active` and the radial gradient
+  warms to a faint red, header border turns reddish, side panel border
+  turns red. CSS transitions over 0.6 s — subliminal but unmistakable.
+
+### Front-end JS
+
+Vanilla, ~250 lines, no build step. One-time initial render from the
+JSON blob baked into the template, then an `EventSource` connection to
+`/api/stream` that re-renders on every push.
+
+Render functions, one per region:
+`renderHeader`, `renderMetrics`, `renderScreenshot`, `renderTimeline`,
+`renderThreatCard`, `renderStageBar`, `renderReasoning`,
+`renderParentAlert`. Each one is idempotent — re-running with the same
+state is a no-op for the DOM.
+
+### Files
+
+**Created**
+
+- `app/server.py` — FastAPI app + lifespan + SSE endpoint.
+- `app/state.py` — `AppState` + `MonitorWorker` (worker code lifted
+  from the old Gradio dashboard, no semantic changes).
+- `app/serializers.py` — JSON serializers replacing the old HTML
+  render helpers.
+- `app/templates/index.html` — single-page Jinja2 template.
+- `app/static/dashboard.css` — fully rewritten (no Gradio overrides).
+- `app/static/dashboard.js` — vanilla SSE client + DOM render
+  functions.
+- `tests/test_serializers.py` — 8 tests for the JSON serializers.
+- `tests/test_server.py` — 5 tests using FastAPI's `TestClient`
+  (patches `ollama.Client` so no real Ollama call happens).
+
+**Modified**
+
+- `pyproject.toml` — removed `gradio>=4.44.0`, added
+  `fastapi>=0.115.0`, `uvicorn[standard]>=0.30.0`, `jinja2>=3.1.0`.
+  Dev extras gained `httpx>=0.27.0` for `TestClient`.
+- `requirements.txt` — same swap.
+- `run.py` — replaces `app.dashboard.build_app` + Gradio `launch()`
+  with `app.server.create_app` + `uvicorn.run()`. New CLI flags:
+  `--ollama-host` (override Ollama base URL), `--bind` (override
+  FastAPI bind address). `--share` flag removed (Gradio-only).
+
+**Deleted**
+
+- `app/dashboard.py` — Gradio Blocks app, no longer needed.
+- `app/theme.py` — Gradio theme + CSS bundle loader.
+- `app/components.py` — server-side HTML render helpers.
+- `tests/test_components.py` — replaced by `test_serializers.py`.
+
+**Dependency churn (uv)**
+
+Uninstalled: `gradio`, `gradio-client`, `safehttpx`, `semantic-version`,
+`ffmpy`. Reinstalled `starlette` (needed by FastAPI). Net: smaller
+install footprint.
+
+### Verified locally
+
+- `py_compile` clean across all changed files.
+- **20/20 tests pass** (was 17 before — added 8 serializer tests + 5
+  server tests, removed 10 Gradio component tests).
+- `from app.server import create_app` constructs a FastAPI instance
+  with all 7 routes mounted (`/openapi.json`, `/static`, `/screenshots`,
+  `/`, `/api/state`, `/api/stream`, `/healthz`) and an `AppState`
+  attached at `app.state.guardlens`.
+- **Dashboard NOT launched.** Per the user's earlier "stop that don't
+  run it" instruction. To launch:
+  `.venv/bin/python run.py --demo-mode --model gemma4`
+  then open `http://192.168.1.55:7860/` from the laptop.
+
+### How to view it
+
+```bash
+.venv/bin/python run.py --demo-mode --model gemma4
+```
+
+Then on the laptop browser: `http://192.168.1.55:7860/`. The page
+should:
+
+1. Render immediately (server-rendered initial state, no flash).
+2. Open an `EventSource` to `/api/stream`.
+3. Update every ~2 s as the monitor thread drains new analyses.
+4. Switch to the `gl-alert-active` atmosphere when an ALERT or
+   CRITICAL verdict lands.
+
+### Open / next
+
+- Click through the new UI in a browser. CSS Grid + sticky header +
+  Inter font + radial gradient should all be visible.
+- **Streaming Gemma 4 thinking tokens** — biggest "wow" moment still
+  available. Easier to do over SSE than it was over Gradio. Add a
+  `/api/stream-thinking` endpoint that emits chunked tokens during a
+  single analysis.
+- **Real screenshots** in `data/demo_scenarios/` — capture from real
+  Minecraft / Discord on the laptop.
+- **Phone-side parent notification** — email-to-phone for the demo
+  video (Option A in CONTEXT_UI.md).
+
+---
+
+## 2026-04-08 — UI redesign: CONTEXT_UI.md design system, full custom CSS
+
+### Summary
+
+Saved the user-provided **CONTEXT_UI.md** as a second source of truth and
+rebuilt the dashboard end-to-end against it. The previous Gradio default
+look ("2018 ML demo aesthetic") is gone — the dashboard now uses a dark
+security-tool theme with status-driven color, monospace data, micro-
+animations, and a wow-state alert atmosphere.
+
+CONTEXT.md now points at CONTEXT_UI.md in the header so future sessions
+read it before any UI work.
+
+### Architecture
+
+The dashboard is split into three layers:
+
+- **`app/static/dashboard.css`** — the entire design system. ~14k chars,
+  edited as a real CSS file. Contains: CSS custom properties (color +
+  typography + spacing tokens), Gradio overrides, layout, every
+  component class, status dots, animations, and the `.gl-alert-active`
+  wow state. CONTEXT_UI.md is the spec; this file is the implementation.
+- **`app/theme.py`** — exports `DASHBOARD_CSS` (loaded from the file
+  above) and `GUARDLENS_THEME` (a `gr.themes.Base` subclass with the
+  same color tokens applied to Gradio's own form elements so they don't
+  visually clash with our HTML components).
+- **`app/components.py`** — pure HTML render helpers, no Gradio imports,
+  unit-testable. One function per component:
+  - `render_header(monitoring, session_duration, model_name, alert_active)`
+  - `render_metric_cards(summary)`
+  - `render_timeline(analyses)`
+  - `render_side_panel(analysis)`
+  - `render_footer(model_name, db_path, bytes_to_cloud)`
+  - Internal: `_render_threat_card`, `_render_stage_bar`,
+    `_render_reasoning`, `_render_alert_preview`
+  - Helpers: `is_alert_active`, `format_session_duration`
+
+`app/dashboard.py` is now thin Gradio plumbing only — it builds the
+Blocks layout (header, metric cards, screenshot + timeline column,
+side-panel column, footer), drives the refresh on a 2 s timer, and
+swaps in the `gl-alert-active` shell class when an ALERT or CRITICAL
+verdict lands. The MonitorWorker / database / alert wiring is unchanged
+from the previous entry.
+
+### Layout (matches CONTEXT_UI.md exactly)
+
+```
++----------------------------------------------------+
+| HEADER (48px)  [logo] GuardianLens   o active  14m |
++--------------------------------------+-------------+
+| Screenshots Safe  Caution  Alerts    | THREAT      |
+| LATEST CAPTURE                       | CARD        |
+| [latest screenshot]                  |             |
+| LIVE TIMELINE                        | STAGE BAR   |
+| 14:32 o safe   Minecraft - ...       |             |
+| 14:32 o alert  Minecraft - GROOM...  | REASONING   |
++--------------------------------------+ (mono)      |
+| FOOTER  gemma4 via Ollama   bytes:0  | PARENT ALERT|
++--------------------------------------+-------------+
+```
+
+### Design system implemented
+
+- **Colors:** all 5 status families (`safe / caution / alert / info / brand`)
+  with `*-bg` and `*-border` low-opacity variants. Bright status colors
+  only on dots / numbers / borders, never on large fills.
+- **Typography:** system sans for body, JetBrains Mono for timestamps and
+  data. Section labels uppercase + 1.5px letter-spacing. No bold (700)
+  anywhere — `--weight-medium: 500` is the heaviest weight as the spec
+  requires.
+- **Animations:**
+  - `gl-pulse-safe` (gentle opacity pulse on safe/caution dots)
+  - `gl-pulse-alert` (expanding ring pulse on alert/critical dots)
+  - `gl-slide-in-alert` (alert timeline rows slide in)
+  - `gl-analyzing` (loading state, defined for future use)
+- **The wow moment:** when `is_alert_active(latest) == True`, the shell
+  div gets the `gl-alert-active` class. CSS transitions the background
+  to a slightly warmer tone, the header border shifts to faint red, and
+  the side panel border-left turns red. Subliminal but noticeable.
+- **Privacy receipt** in the footer — "bytes sent to cloud: 0" + the
+  local DB path. Hammers the on-device story for any judge who looks at
+  the screenshot.
+
+### Files
+
+**Created**
+
+- `CONTEXT_UI.md` — UI/UX design spec (verbatim from user).
+- `app/static/dashboard.css` — full design system, ~14 KB.
+- `app/theme.py` — Gradio theme + CSS bundle loader.
+- `app/components.py` — HTML render helpers, no Gradio dependency.
+- `tests/test_components.py` — 10 sanity tests covering every component
+  + helper. Tests assert class names appear in the output so a CSS
+  rename can't silently break the dashboard.
+
+**Modified**
+
+- `app/dashboard.py` — fully rewritten. Old `_render_*` helpers removed
+  (moved to `components.py`). Layout matches CONTEXT_UI.md exactly.
+  Refresh function now returns 7 outputs (header / metrics / timeline /
+  screenshot / side / footer / hidden last-refresh label) so each
+  region can update independently.
+- `CONTEXT.md` — added a paragraph in the header pointing at
+  CONTEXT_UI.md for any UI work.
+
+### Verified locally
+
+- `py_compile` clean across all changed files.
+- `from app.theme import DASHBOARD_CSS, GUARDLENS_THEME` works
+  (CSS loaded: 14356 chars, theme: `Base`).
+- All 17 unit tests pass — 7 existing + 10 new component tests.
+- Component smoke test: rendered every helper against synthetic
+  `ScreenAnalysis` objects (safe, warning, alert) and confirmed every
+  expected CSS class name appears in the output.
+- **I have NOT launched the dashboard.** Per the user's earlier
+  "stop that dont run it" instruction, I'm leaving live verification
+  to the user. To launch:
+  `.venv/bin/python run.py --demo-mode --model gemma4`
+  then open `http://192.168.1.55:7860/` from the laptop.
+
+### Open / next
+
+- **Click through the new UI in a browser.** Confirm the layout doesn't
+  collapse, the colors render correctly, and the wow alert state
+  actually triggers visibly when a grooming scenario lands.
+- **Confidence count-up animation** is described in CONTEXT_UI.md but
+  not implemented yet (it requires a small inline JS snippet, not just
+  CSS). Add when polishing for the demo recording.
+- **Stream Gemma 4's thinking tokens** to the reasoning panel in real
+  time — this is the highest-leverage technical change for the Safety &
+  Trust track. Currently the reasoning text appears all at once.
+- **Real screenshots in `data/demo_scenarios/`** — capture from real
+  Minecraft / Discord on the laptop. The synthetic Pillow chats from
+  `guardlens.demo` will look fake on a recorded video.
+- **Phone-side parent notification rendering** for the demo video —
+  CONTEXT_UI.md recommends Option A (real email to your phone),
+  scaffolded in `guardlens.alerts` but disabled by default.
+
+---
+
 ## 2026-04-08 — Demo mode: Gradio dashboard runs headless, end-to-end verified
 
 ### Summary

@@ -11,7 +11,9 @@ dependencies = [
     "ollama>=0.4.0",
     "mss>=9.0.1",
     "Pillow>=10.0.0",
-    "gradio>=4.44.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "jinja2>=3.1.0",
     "pydantic>=2.7.0",
     "pydantic-settings>=2.4.0",
     "PyYAML>=6.0.1",
@@ -23,6 +25,7 @@ dev = [
     "ruff>=0.6.0",
     "mypy>=1.11.0",
     "pytest>=8.3.0",
+    "httpx>=0.27.0",
     "types-PyYAML",
 ]
 
@@ -79,7 +82,7 @@ check_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["mss.*", "gradio.*", "ollama.*"]
+module = ["mss.*", "ollama.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

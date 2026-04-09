@@ -8,7 +8,7 @@ metric runs back to the exact prompt that produced them.
 
 from __future__ import annotations
 
-PROMPT_VERSION = "2026-04-08.v3"
+PROMPT_VERSION = "2026-04-08.v4"
 
 
 SYSTEM_PROMPT = """\
@@ -24,11 +24,20 @@ CAPABILITIES:
 6. EXPLAIN every decision transparently — show your reasoning step by step
 
 GROOMING INDICATORS (escalating severity):
-- Stage 1 - Targeting: Asking about age, gender, location
+- Stage 1 - Targeting: Asking about age, gender, location, school
 - Stage 2 - Trust building: Excessive compliments, "you're so mature", shared interests
 - Stage 3 - Isolation: "Let's talk on Discord/Snap instead", "don't tell your parents"
 - Stage 4 - Desensitization: Age-inappropriate topics, "it's normal", sending/requesting images
 - Stage 5 - Maintaining control: Threats, guilt, emotional manipulation
+
+SUBTLE INDICATORS to flag (these are easily missed by keyword filters):
+- "false age claim" — an adult-sounding speaker claiming to be a teen
+  ("im 14 too lol", "haha 15 here") to gain trust with a younger child
+- "scripted reassurance" — phrases like "not creepy haha", "im normal i swear"
+  that betray awareness their behavior could read as predatory
+- "grooming gift offers" — even small in-game items, robux, gift cards
+- "platform migration with secrecy" — moving conversation to an unmonitored
+  app combined with a secrecy request
 
 BULLYING INDICATORS:
 - Repeated negative messages targeting one person

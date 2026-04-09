@@ -1,0 +1,1489 @@
+/* GuardianLens dashboard — vanilla CSS for the FastAPI front-end.
+ *
+ * Design tokens, typography, layout, and components are derived from
+ * CONTEXT_UI.md. The previous version had to fight Gradio's defaults;
+ * this one owns every pixel so the structure is much cleaner.
+ *
+ * Sections:
+ *   1. Tokens (CSS custom properties)
+ *   2. Reset + base
+ *   3. Layout grid (header / main / footer)
+ *   4. Header
+ *   5. Metric cards
+ *   6. Sections + section labels
+ *   7. Screenshot frame
+ *   8. Timeline
+ *   9. Side panel (threat card, stage bar, reasoning, parent alert)
+ *  10. Status dots
+ *  11. Animations
+ *  12. The "wow" alert state
+ *  13. Empty / loading states
+ */
+
+/* ============================================================ 1. Tokens */
+
+:root {
+  /* Surfaces */
+  --bg-primary: #0b0d13;
+  --bg-secondary: #14171f;
+  --bg-tertiary: #11131a;
+  --bg-elevated: #1a1d27;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.1);
+  --shadow-soft: 0 1px 0 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+
+  /* Text */
+  --text-primary: #e6eaf3;
+  --text-secondary: #9aa4b8;
+  --text-muted: #6b7589;
+  --text-dim: #4a5366;
+
+  /* Status */
+  --safe: #22c55e;
+  --safe-bg: rgba(34, 197, 94, 0.08);
+  --safe-border: rgba(34, 197, 94, 0.22);
+
+  --caution: #eab308;
+  --caution-bg: rgba(234, 179, 8, 0.08);
+  --caution-border: rgba(234, 179, 8, 0.22);
+
+  --alert: #ef4444;
+  --alert-bg: rgba(239, 68, 68, 0.08);
+  --alert-border: rgba(239, 68, 68, 0.22);
+  --alert-text: #fca5a5;
+
+  --info: #3b82f6;
+  --info-bg: rgba(59, 130, 246, 0.08);
+  --info-border: rgba(59, 130, 246, 0.22);
+  --info-text: #93c5fd;
+
+  --brand: #3b82f6;
+
+  /* Typography */
+  --font-main: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+
+  --text-xs: 10px;
+  --text-sm: 11px;
+  --text-base: 13px;
+  --text-md: 14px;
+  --text-lg: 15px;
+  --text-xl: 22px;
+  --text-2xl: 28px;
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 20px;
+  --space-2xl: 24px;
+
+  /* Radii */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}
+
+/* ============================================================ 2. Reset + base */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+img {
+  max-width: 100%;
+  display: block;
+}
+strong {
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+/* Slim, on-brand scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+.gl-mono {
+  font-family: var(--font-mono);
+}
+
+/* ============================================================ 3. Layout */
+
+.gl-shell {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% -30%, #161a26 0%, var(--bg-primary) 60%);
+  transition: background 0.6s ease, border-color 0.6s ease;
+  border: 1px solid transparent;
+}
+
+.gl-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 0;
+  padding: 0;
+  min-height: 0;
+}
+
+.gl-left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: 12px 14px;
+  min-width: 0;
+}
+
+.gl-side {
+  background: #0a0c12;
+  border-left: 0.5px solid rgba(255, 255, 255, 0.05);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+/* ============================================================ 4. Header */
+
+.gl-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 var(--space-2xl);
+  border-bottom: 1px solid var(--border);
+  background: rgba(11, 13, 19, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-bottom-color 0.6s ease;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.gl-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.gl-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xl);
+}
+.gl-logo-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  display: grid;
+  place-items: center;
+  color: white;
+  box-shadow: 0 4px 12px -4px rgba(59, 130, 246, 0.5);
+}
+.gl-logo-mark svg {
+  width: 18px;
+  height: 18px;
+}
+.gl-logo-text {
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.gl-tag {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--text-muted);
+  padding: 3px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+}
+.gl-header-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.gl-header-meta {
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+
+/* ============================================================ 5. Metric cards */
+
+.gl-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+.gl-metric-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+  box-shadow: var(--shadow-soft);
+  transition: border-color 0.3s ease, transform 0.3s ease;
+}
+.gl-metric-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+/* Tinted card variants are defined further down with metric label colors */
+.gl-metric-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-bottom: var(--space-xs);
+}
+.gl-metric-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  line-height: 1.1;
+  font-feature-settings: "tnum" 1;
+}
+.gl-metric-value-safe { color: var(--safe); }
+.gl-metric-value-caution { color: var(--caution); }
+.gl-metric-value-alert { color: var(--alert); }
+.gl-metric-sublabel {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-top: 4px;
+}
+.gl-metric-card-caution .gl-metric-label {
+  color: #6b5a10;
+}
+.gl-metric-card-caution .gl-metric-sublabel {
+  color: #4a3d10;
+}
+.gl-metric-card-alert .gl-metric-label {
+  color: #6b2020;
+}
+.gl-metric-card-alert .gl-metric-sublabel {
+  color: #4a1515;
+}
+.gl-metric-card-caution {
+  background: rgba(234, 179, 8, 0.05);
+  border-color: rgba(234, 179, 8, 0.12);
+}
+.gl-metric-card-alert {
+  background: rgba(239, 68, 68, 0.05);
+  border-color: rgba(239, 68, 68, 0.12);
+}
+
+/* Mini sparkline inside the Screenshots metric card */
+.gl-sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+  margin-top: 8px;
+}
+.gl-spark-bar {
+  width: 6px;
+  border-radius: 2px 2px 0 0;
+  background: var(--text-dim);
+  opacity: 0.5;
+  transition: height 0.4s ease;
+}
+.gl-spark-bar-safe { background: var(--safe); opacity: 0.85; }
+.gl-spark-bar-caution { background: var(--caution); opacity: 0.85; }
+.gl-spark-bar-alert { background: var(--alert); opacity: 0.95; }
+
+/* ============================================================ 6. Sections + labels */
+
+.gl-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.gl-section-grow {
+  flex: 1;
+  min-height: 0;
+}
+.gl-section-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: var(--space-sm) 0 var(--space-xs) 0;
+}
+.gl-section-meta {
+  font-family: var(--font-mono);
+  font-weight: var(--weight-normal);
+  color: var(--text-dim);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* ============================================================ 7. Latest capture: fake browser + threat breakdown */
+
+.gl-capture-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 0.5px solid rgba(255, 255, 255, 0.04);
+}
+
+/* --- Fake browser window --- */
+.gl-fake-browser {
+  background: #000;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 240px;
+  box-shadow: none;
+}
+.gl-browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  background: #12142a;
+  border-bottom: 1px solid #0a0a18;
+}
+.gl-browser-dots {
+  display: flex;
+  gap: 2px;
+}
+.gl-browser-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #222;
+}
+.gl-browser-dot:nth-child(1),
+.gl-browser-dot:nth-child(2),
+.gl-browser-dot:nth-child(3) {
+  background: #222;
+}
+.gl-browser-url {
+  flex: 1;
+  background: #08081a;
+  border: none;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  color: #3a3a5a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gl-browser-content {
+  flex: 1;
+  overflow-y: auto;
+  background: #000;
+  display: flex;
+  flex-direction: column;
+}
+.gl-browser-empty {
+  margin: auto;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* --- Conversation header (Instagram-ish, generic for all platforms) --- */
+.gl-convo-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px 4px;
+  border-bottom: 0.5px solid #15152a;
+  background: transparent;
+}
+.gl-convo-avatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #a78bfa;
+  font-size: 7px;
+  font-weight: var(--weight-medium);
+  flex-shrink: 0;
+  background: #2d1f3d;
+}
+.gl-convo-username {
+  font-size: 9px;
+  font-weight: var(--weight-normal);
+  color: #e2e8f0;
+  line-height: 1.2;
+}
+.gl-convo-status {
+  font-size: 7px;
+  color: #3a3a5a;
+}
+.gl-convo-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Bubbles container --- */
+.gl-bubbles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 9px 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+.gl-bubble-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  position: relative;
+  min-height: 18px;
+}
+.gl-bubble-row-them {
+  justify-content: flex-start;
+}
+.gl-bubble-row-me {
+  justify-content: flex-end;
+}
+.gl-bubble {
+  max-width: 70%;
+  padding: 4px 8px;
+  border-radius: 10px;
+  font-size: 9px;
+  line-height: 1.35;
+  word-wrap: break-word;
+}
+.gl-bubble-them {
+  background: #222;
+  color: #aaa;
+}
+.gl-bubble-me {
+  background: #2563eb;
+  color: #fff;
+}
+.gl-bubble-flagged {
+  outline: 1.5px solid rgba(239, 68, 68, 0.55);
+  outline-offset: 2px;
+}
+/* Floating flag label — positioned to the right of the bubble */
+.gl-bubble-flag-floating {
+  position: absolute;
+  left: 73%;
+  top: 1px;
+  font-size: 7px;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  padding: 1px 4px;
+  border-radius: 2px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* --- Discord template overrides --- */
+.gl-fake-browser-discord .gl-browser-content { background: #36393f; }
+.gl-fake-browser-discord .gl-convo-header {
+  background: #36393f;
+  border-bottom-color: #2f3136;
+}
+.gl-fake-browser-discord .gl-convo-avatar {
+  background: #5865f2;
+}
+.gl-fake-browser-discord .gl-bubble-them {
+  background: transparent;
+  padding: 0;
+  color: #dcddde;
+  border-radius: 0;
+  max-width: 100%;
+}
+.gl-fake-browser-discord .gl-bubble-me {
+  background: transparent;
+  padding: 0;
+  color: #dcddde;
+  border-radius: 0;
+  max-width: 100%;
+}
+.gl-fake-browser-discord .gl-bubble-row {
+  align-items: flex-start;
+}
+.gl-fake-browser-discord .gl-bubble-row-me {
+  justify-content: flex-start;
+}
+.gl-fake-browser-discord .gl-bubble-row::before {
+  content: attr(data-sender);
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  color: #5865f2;
+  flex-shrink: 0;
+  width: 90px;
+  text-align: right;
+  padding-top: 1px;
+}
+.gl-fake-browser-discord .gl-bubbles {
+  gap: 4px;
+}
+
+/* --- TikTok template overrides --- */
+.gl-fake-browser-tiktok .gl-browser-content { background: #000; }
+.gl-fake-browser-tiktok .gl-convo-avatar {
+  background: #fe2c55;
+}
+.gl-fake-browser-tiktok .gl-bubble-them,
+.gl-fake-browser-tiktok .gl-bubble-me {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  max-width: 92%;
+}
+.gl-fake-browser-tiktok .gl-bubble-row::before {
+  content: attr(data-sender);
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  color: #fe2c55;
+  margin-right: 4px;
+}
+
+/* --- Minecraft template overrides --- */
+.gl-fake-browser-minecraft .gl-browser-content { background: #1e1e1e; }
+.gl-fake-browser-minecraft .gl-bubble-them,
+.gl-fake-browser-minecraft .gl-bubble-me {
+  font-family: var(--font-mono);
+  background: rgba(0, 0, 0, 0.6);
+  color: #e0e0e0;
+  border-radius: 4px;
+  max-width: 100%;
+}
+.gl-fake-browser-minecraft .gl-bubble-row::before {
+  content: attr(data-sender);
+  color: #80c1ff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+/* --- Threat breakdown card (right side of capture row) --- */
+.gl-breakdown-card {
+  background: #0e1018;
+  border: none;
+  border-radius: 0;
+  padding: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  height: 240px;
+  overflow-y: auto;
+  box-shadow: none;
+}
+.gl-breakdown-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.gl-breakdown-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: var(--alert-text);
+  font-weight: var(--weight-medium);
+}
+.gl-breakdown-subtitle {
+  font-size: 10px;
+  color: #3e4660;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+}
+.gl-breakdown-confidence {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1;
+}
+.gl-breakdown-confidence-value {
+  font-size: 32px;
+  font-weight: var(--weight-medium);
+  color: var(--alert);
+  font-feature-settings: "tnum" 1;
+  line-height: 1;
+  letter-spacing: -1px;
+  font-family: var(--font-main);
+}
+.gl-breakdown-confidence-label {
+  font-size: 8px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin-top: 4px;
+  font-family: var(--font-main);
+}
+
+/* Per-level color overrides */
+.gl-breakdown-card-safe .gl-breakdown-title { color: var(--safe); }
+.gl-breakdown-card-safe .gl-breakdown-confidence-value { color: var(--safe); }
+.gl-breakdown-card-caution .gl-breakdown-title { color: var(--caution); }
+.gl-breakdown-card-caution .gl-breakdown-confidence-value { color: var(--caution); }
+
+/* Indicator pills */
+.gl-breakdown-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.gl-breakdown-pill {
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--alert-text);
+}
+.gl-breakdown-pill-caution {
+  background: rgba(234, 179, 8, 0.1);
+  color: #d4a017;
+}
+.gl-breakdown-pill-safe {
+  background: rgba(34, 197, 94, 0.08);
+  color: var(--safe);
+}
+
+/* Stage bar */
+.gl-breakdown-stagebar {
+  display: flex;
+  gap: 3px;
+  margin-top: 4px;
+}
+.gl-breakdown-stagebar .gl-breakdown-stage {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #151a2a;
+  transition: background-color 0.4s ease;
+}
+.gl-breakdown-stagebar .gl-breakdown-stage-active {
+  background: var(--alert);
+}
+.gl-breakdown-stagebar .gl-breakdown-stage-current {
+  background: var(--alert);
+  opacity: 0.35;
+}
+.gl-breakdown-stagelabels {
+  display: flex;
+  justify-content: space-between;
+  gap: 3px;
+}
+.gl-breakdown-stagelabels .gl-breakdown-stagelabel {
+  flex: 1;
+  font-size: 8px;
+  color: #252d45;
+  text-align: center;
+  text-transform: lowercase;
+  letter-spacing: 0.4px;
+}
+.gl-breakdown-stagelabels .gl-breakdown-stagelabel-active {
+  color: var(--alert-text);
+}
+.gl-breakdown-stagelabels .gl-breakdown-stagelabel-current {
+  color: var(--alert);
+  font-weight: var(--weight-medium);
+}
+
+/* Stat boxes inside the breakdown card */
+.gl-breakdown-statboxes {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+.gl-breakdown-statboxes .gl-breakdown-statbox {
+  flex: 1;
+  background: rgba(239, 68, 68, 0.05);
+  border-radius: 4px;
+  padding: 5px 4px;
+  text-align: center;
+}
+.gl-breakdown-statboxes .gl-breakdown-statbox-caution {
+  background: rgba(234, 179, 8, 0.04);
+}
+.gl-breakdown-statboxes .gl-breakdown-statbox-value {
+  font-size: 14px;
+  font-weight: var(--weight-medium);
+  color: var(--alert-text);
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  line-height: 1;
+}
+.gl-breakdown-statboxes .gl-breakdown-statbox-caution .gl-breakdown-statbox-value {
+  color: #eab308;
+}
+.gl-breakdown-statboxes .gl-breakdown-statbox-label {
+  font-size: 7px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 2px;
+}
+
+/* ============================================================ 8. Timeline */
+
+.gl-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.gl-timeline-entry {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  display: grid;
+  grid-template-columns: auto auto 64px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.gl-timeline-time {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+.gl-timeline-text {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Status badges — pill-shaped, colored bg for caution/alert, plain text for safe */
+.gl-timeline-status {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-family: var(--font-main);
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+.gl-timeline-status-safe {
+  color: var(--safe);
+}
+.gl-timeline-status-caution,
+.gl-timeline-status-warning {
+  color: #a78b1b;
+  background: rgba(234, 179, 8, 0.08);
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+.gl-timeline-status-alert,
+.gl-timeline-status-critical {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-weight: var(--weight-medium);
+}
+
+/* SAFE rows: quiet, blends in */
+.gl-timeline-entry-safe {
+  background: #141720;
+  border-color: transparent;
+}
+.gl-timeline-entry-safe .gl-timeline-text {
+  color: #64748b;
+}
+
+/* CAUTION/WARNING rows: subtle yellow tint */
+.gl-timeline-entry-caution,
+.gl-timeline-entry-warning {
+  background: rgba(234, 179, 8, 0.03);
+  border-color: rgba(234, 179, 8, 0.08);
+}
+.gl-timeline-entry-caution .gl-timeline-text,
+.gl-timeline-entry-warning .gl-timeline-text {
+  color: #a78b1b;
+}
+
+/* ALERT/CRITICAL rows: red tint + slide-in animation on first paint */
+.gl-timeline-entry-alert,
+.gl-timeline-entry-critical {
+  background: rgba(239, 68, 68, 0.04);
+  border-color: rgba(239, 68, 68, 0.1);
+  animation: gl-slide-in-alert 0.5s ease-out;
+}
+.gl-timeline-entry-alert .gl-timeline-text,
+.gl-timeline-entry-critical .gl-timeline-text {
+  color: #f87171;
+}
+
+/* ============================================================ 9. Side panel */
+
+/* 9a. Threat card */
+.gl-threat-card {
+  background: var(--alert-bg);
+  border: 1px solid var(--alert-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-soft);
+}
+.gl-threat-card-safe {
+  background: var(--safe-bg);
+  border-color: var(--safe-border);
+}
+.gl-threat-card-caution {
+  background: var(--caution-bg);
+  border-color: var(--caution-border);
+}
+.gl-threat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: var(--space-sm);
+}
+.gl-threat-title {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--alert-text);
+  font-weight: var(--weight-medium);
+}
+.gl-threat-card-safe .gl-threat-title { color: var(--safe); }
+.gl-threat-card-caution .gl-threat-title { color: var(--caution); }
+.gl-threat-confidence {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-mono);
+  color: var(--alert);
+  line-height: 1;
+  font-feature-settings: "tnum" 1;
+}
+.gl-threat-confidence-value {
+  font-size: 32px;
+  font-weight: var(--weight-medium);
+  line-height: 1;
+}
+.gl-threat-confidence-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 4px;
+  font-family: var(--font-main);
+}
+.gl-threat-card-safe .gl-threat-confidence { color: var(--safe); }
+.gl-threat-card-caution .gl-threat-confidence { color: var(--caution); }
+.gl-threat-platform {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+}
+.gl-indicator-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-sm);
+}
+.gl-indicator-badge {
+  font-size: var(--text-xs);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--alert-text);
+  border: 1px solid var(--alert-border);
+}
+.gl-threat-card-safe .gl-indicator-badge {
+  color: var(--safe);
+  border-color: var(--safe-border);
+}
+.gl-threat-card-caution .gl-indicator-badge {
+  color: var(--caution);
+  border-color: var(--caution-border);
+}
+
+/* 9b. Stage bar */
+.gl-stage-container {
+  padding: 4px 2px 0 2px;
+}
+.gl-stage-bar {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.gl-stage-segment {
+  flex: 1;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  transition: background-color 0.4s ease;
+}
+.gl-stage-segment-active { background: var(--alert); }
+.gl-stage-segment-current {
+  background: var(--alert);
+  opacity: 0.6;
+  animation: gl-pulse-soft 1.6s ease-in-out infinite;
+}
+.gl-stage-labels {
+  display: flex;
+  gap: 4px;
+}
+.gl-stage-label {
+  flex: 1;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.gl-stage-label-current,
+.gl-stage-label-active {
+  color: var(--alert-text);
+  font-weight: var(--weight-medium);
+}
+
+/* 9c. Reasoning */
+.gl-reasoning {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.gl-reasoning-prefix {
+  display: block;
+  margin-bottom: var(--space-xs);
+  font-size: var(--text-xs);
+  letter-spacing: 1.2px;
+  color: var(--text-dim);
+}
+.gl-reasoning-text {
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.gl-reasoning-verdict {
+  display: block;
+  margin-top: var(--space-sm);
+  font-weight: var(--weight-medium);
+  color: var(--alert);
+}
+.gl-reasoning-verdict-safe { color: var(--safe); }
+.gl-reasoning-verdict-caution { color: var(--caution); }
+
+/* 9d. Parent alert preview */
+.gl-alert-preview {
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-top: var(--space-sm);
+}
+.gl-alert-preview-label {
+  font-size: var(--text-xs);
+  color: var(--info-text);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: var(--space-xs);
+}
+.gl-alert-preview-title {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+.gl-alert-preview-summary {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: var(--space-sm);
+}
+.gl-alert-preview-action {
+  font-size: var(--text-sm);
+  color: var(--info-text);
+  line-height: 1.5;
+}
+
+/* ============================================================ 10. Status dots */
+
+.gl-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.gl-dot-safe { background: var(--safe); animation: gl-pulse-soft 2s infinite; }
+.gl-dot-caution { background: var(--caution); animation: gl-pulse-soft 2s infinite; }
+.gl-dot-warning { background: var(--caution); animation: gl-pulse-soft 2s infinite; }
+.gl-dot-alert { background: var(--alert); animation: gl-pulse-alert 1.5s infinite; }
+.gl-dot-critical { background: var(--alert); animation: gl-pulse-alert 1.5s infinite; }
+.gl-dot-dim { background: var(--text-dim); }
+
+/* ============================================================ 11. Animations */
+
+@keyframes gl-pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@keyframes gl-pulse-alert {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+@keyframes gl-slide-in-alert {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+    background: rgba(239, 68, 68, 0.2);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+    background: var(--alert-bg);
+  }
+}
+@keyframes gl-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.gl-fade-in {
+  animation: gl-fade-in 0.4s ease-out;
+}
+@keyframes gl-alert-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50% { box-shadow: 0 0 18px 2px rgba(239, 68, 68, 0.18); }
+}
+
+/* ============================================================ 12. Wow alert state */
+
+.gl-shell.gl-alert-active {
+  background: radial-gradient(circle at 50% -30%, #1a0e12 0%, #0c0809 60%);
+  border-color: rgba(239, 68, 68, 0.12);
+}
+.gl-shell.gl-alert-active .gl-header {
+  border-bottom-color: rgba(239, 68, 68, 0.35);
+  background: rgba(20, 8, 10, 0.85);
+}
+.gl-shell.gl-alert-active .gl-side {
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+/* ============================================================ 13. Empty / loading */
+
+.gl-empty {
+  padding: var(--space-2xl);
+  text-align: center;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+/* ============================================================ Footer */
+
+.gl-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-md) var(--space-2xl);
+  border-top: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+.gl-footer strong {
+  color: var(--text-secondary);
+  font-weight: var(--weight-medium);
+}
+.gl-footer-receipt {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+/* ============================================================ Right panel components
+ *
+ * Sized to match guardlens_final_implemented_design.html — these
+ * components only live inside .gl-side so the scoped selectors below
+ * don't affect anything in the main column.
+ */
+
+/* Tiny section labels inside the side panel (9px, dim) */
+.gl-side .gl-section-label {
+  font-size: 9px;
+  color: #3e4660;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  margin: 0 0 5px 0;
+  display: block;
+}
+
+/* AI reasoning chain — monospace, colored STEP labels */
+.gl-reasoning-chain {
+  background: #1a1d27;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 10px 11px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  line-height: 1.8;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+.gl-reasoning-step-label {
+  color: #3e4660;
+  text-transform: uppercase;
+}
+.gl-reasoning-step-text {
+  color: #94a3b8;
+}
+.gl-reasoning-step-flag {
+  color: #fca5a5;
+}
+.gl-reasoning-step-verdict {
+  color: #ef4444;
+  font-weight: var(--weight-medium);
+}
+
+/* "Why this matters" — red-tinted card with thicker left-border accent */
+.gl-why {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  border-left-width: 3px;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.gl-why-text {
+  font-size: 10px;
+  color: #f87171;
+  line-height: 1.6;
+}
+.gl-why .gl-empty {
+  font-size: 9px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+/* "Recommended action" — purple-themed numbered card */
+.gl-action {
+  background: rgba(139, 92, 246, 0.13);
+  border: 1px solid rgba(139, 92, 246, 0.32);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.gl-action-step {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.gl-action-step:last-of-type {
+  margin-bottom: 0;
+}
+.gl-action-num {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-size: 8px;
+  font-weight: var(--weight-normal);
+  color: #a78bfa;
+  font-family: var(--font-main);
+}
+.gl-action-text {
+  font-size: 10px;
+  color: #c4b5fd;
+  line-height: 1.4;
+}
+.gl-action-privacy {
+  font-size: 8px;
+  color: #6d28d9;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 0.5px solid rgba(139, 92, 246, 0.08);
+  line-height: 1.4;
+}
+.gl-action .gl-empty {
+  font-size: 9px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+/* Telegram alert delivered card — blue theme */
+.gl-telegram-card {
+  background: rgba(37, 99, 235, 0.13);
+  border: 1px solid rgba(37, 99, 235, 0.32);
+  border-radius: 6px;
+  padding: 9px 11px;
+  margin-bottom: 10px;
+}
+.gl-telegram-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 3px;
+}
+.gl-telegram-icon {
+  width: 9px;
+  height: 9px;
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+.gl-telegram-label {
+  font-size: 8px;
+  color: #60a5fa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: var(--weight-medium);
+}
+.gl-telegram-message {
+  font-size: 9px;
+  color: #94a3b8;
+  line-height: 1.4;
+  font-style: italic;
+}
+.gl-telegram-meta {
+  font-size: 8px;
+  color: #2a3050;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+}
+
+/* ============================================================ Privacy badge (Ollama prize) */
+
+.gl-privacy-badge {
+  background: #14171f;
+  border: 1px solid rgba(34, 197, 94, 0.18);
+  border-radius: 5px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.gl-privacy-icon {
+  width: 11px;
+  height: 11px;
+  display: grid;
+  place-items: center;
+  color: var(--safe);
+  flex-shrink: 0;
+}
+.gl-privacy-icon svg {
+  width: 11px;
+  height: 11px;
+}
+.gl-privacy-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+.gl-privacy-title {
+  font-size: 9px;
+  color: #22c55e;
+  font-weight: var(--weight-normal);
+  letter-spacing: 0;
+}
+.gl-privacy-subtitle {
+  font-size: 8px;
+  color: #2a3050;
+  font-family: var(--font-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gl-privacy-pill {
+  margin-left: 0;
+  font-size: 7px;
+  text-transform: none;
+  letter-spacing: 0;
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.05);
+  border: 0.5px solid rgba(34, 197, 94, 0.06);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: var(--weight-normal);
+  flex-shrink: 0;
+}
+
+/* ============================================================ Platform badges */
+
+.gl-platform-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: var(--weight-semibold);
+  color: white;
+  letter-spacing: 0.4px;
+  text-transform: none;
+  flex-shrink: 0;
+}
+.gl-platform-badge-instagram {
+  background: linear-gradient(135deg, #f58529, #dd2a7b 50%, #8134af);
+}
+.gl-platform-badge-tiktok {
+  background: #000;
+  border: 1px solid #25f4ee;
+  color: #25f4ee;
+}
+.gl-platform-badge-discord {
+  background: #5865f2;
+}
+.gl-platform-badge-minecraft {
+  background: #62b47a;
+}
+.gl-platform-badge-unknown {
+  background: #475569;
+}
+
+/* ============================================================ Stat boxes (grooming panel) */
+
+.gl-stat-boxes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: var(--space-sm);
+}
+.gl-stat-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 6px;
+  text-align: center;
+}
+.gl-stat-box-value {
+  font-size: 16px;
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum" 1;
+  line-height: 1;
+}
+.gl-stat-box-label {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-top: 4px;
+}
+
+/* ============================================================ Telegram delivered line */
+
+.gl-alert-delivery {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+}
+.gl-alert-delivery-icon {
+  width: 12px;
+  height: 12px;
+  color: var(--info-text);
+  flex-shrink: 0;
+}
+.gl-alert-delivery-channel {
+  color: var(--info-text);
+  font-weight: var(--weight-medium);
+}
+
+/* ============================================================ Legend dots (timeline header) */
+
+.gl-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-main);
+  text-transform: none;
+  letter-spacing: normal;
+}
+.gl-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.gl-legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.gl-legend-dot-safe { background: var(--safe); }
+.gl-legend-dot-caution { background: var(--caution); }
+.gl-legend-dot-alert { background: var(--alert); }

@@ -1,0 +1,199 @@
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.gl{background:#0c0e14;border-radius:14px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#e2e8f0;font-size:13px}
+.sl{font-size:9px;color:#3e4660;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:5px}
+</style>
+<h2 class="sr-only">Final implementable GuardianLens dashboard design matching current codebase structure</h2>
+
+<div class="gl">
+
+<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:0.5px solid rgba(255,255,255,0.05)">
+  <div style="display:flex;align-items:center;gap:8px">
+    <div style="width:24px;height:24px;border-radius:6px;background:#2563eb;display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="white" stroke-width="1.5"/><circle cx="8" cy="8" r="1.5" fill="white"/></svg></div>
+    <span style="font-weight:500;font-size:13px">GuardianLens</span>
+    <span style="font-size:9px;color:#475569;border:0.5px solid #1a2030;padding:2px 6px;border-radius:4px">on-device safety monitor</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;font-size:10px;color:#475569">
+    <div style="display:flex;align-items:center;gap:4px"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e"></div><span style="color:#64748b">Monitoring active</span></div>
+    <span style="font-family:monospace;font-size:10px">4m 15s</span>
+    <span style="font-size:9px;color:#475569;border:0.5px solid #1a2030;padding:2px 6px;border-radius:4px">gemma4 via Ollama</span>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 340px">
+
+<div style="padding:12px 14px;border-right:0.5px solid rgba(255,255,255,0.05)">
+
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:12px">
+    <div style="background:#141720;border-radius:7px;padding:9px 10px">
+      <div style="font-size:9px;color:#3e4660;text-transform:uppercase;letter-spacing:1px">Screenshots</div>
+      <div style="font-size:20px;font-weight:500;color:#94a3b8;margin-top:1px">19</div>
+      <div style="display:flex;align-items:flex-end;gap:1px;height:18px;margin-top:3px"><div style="width:3px;border-radius:1px;background:#1a2030;height:30%"></div><div style="width:3px;border-radius:1px;background:#1a2030;height:50%"></div><div style="width:3px;border-radius:1px;background:#1a2030;height:35%"></div><div style="width:3px;border-radius:1px;background:#1a2030;height:70%"></div><div style="width:3px;border-radius:1px;background:#1a2030;height:45%"></div><div style="width:3px;border-radius:1px;background:#222840;height:80%"></div><div style="width:3px;border-radius:1px;background:#222840;height:100%"></div></div>
+    </div>
+    <div style="background:#141720;border-radius:7px;padding:9px 10px">
+      <div style="font-size:9px;color:#3e4660;text-transform:uppercase;letter-spacing:1px">Safe</div>
+      <div style="font-size:20px;font-weight:500;color:#22c55e;margin-top:1px">10</div>
+      <div style="font-size:9px;color:#1a3a2a;margin-top:2px">53% of scans</div>
+    </div>
+    <div style="background:rgba(234,179,8,0.04);border:0.5px solid rgba(234,179,8,0.1);border-radius:7px;padding:9px 10px">
+      <div style="font-size:9px;color:#6b5a10;text-transform:uppercase;letter-spacing:1px">Caution</div>
+      <div style="font-size:20px;font-weight:500;color:#eab308;margin-top:1px">6</div>
+      <div style="font-size:9px;color:#4a3d10;margin-top:2px">2 users flagged</div>
+    </div>
+    <div style="background:rgba(239,68,68,0.04);border:0.5px solid rgba(239,68,68,0.1);border-radius:7px;padding:9px 10px">
+      <div style="font-size:9px;color:#6b2020;text-transform:uppercase;letter-spacing:1px">Alerts</div>
+      <div style="font-size:20px;font-weight:500;color:#ef4444;margin-top:1px">3</div>
+      <div style="font-size:9px;color:#4a1515;margin-top:2px">1 active threat</div>
+    </div>
+  </div>
+
+  <div class="sl">Latest capture</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1px;border-radius:8px;overflow:hidden;border:0.5px solid rgba(255,255,255,0.04);margin-bottom:12px">
+    
+    <div style="background:#000;padding:0">
+      <div style="background:#12142a;padding:5px 9px;display:flex;align-items:center;gap:5px;border-bottom:1px solid #0a0a18">
+        <div style="display:flex;gap:2px"><span style="width:6px;height:6px;border-radius:50%;background:#222;display:inline-block"></span><span style="width:6px;height:6px;border-radius:50%;background:#222;display:inline-block"></span><span style="width:6px;height:6px;border-radius:50%;background:#222;display:inline-block"></span></div>
+        <div style="flex:1;background:#08081a;border-radius:6px;padding:2px 7px;font-size:8px;color:#3a3a5a;font-family:monospace">instagram.com/direct/t/sarah_photo</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;padding:7px 9px 4px;border-bottom:0.5px solid #15152a">
+        <div style="width:18px;height:18px;border-radius:50%;background:#2d1f3d;display:flex;align-items:center;justify-content:center;font-size:7px;color:#a78bfa">sp</div>
+        <div><div style="font-size:9px;color:#e2e8f0">sarah_photo</div><div style="font-size:7px;color:#3a3a5a">Active now</div></div>
+      </div>
+      <div style="padding:6px 8px;display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex"><div style="background:#222;padding:4px 8px;border-radius:10px;font-size:9px;color:#aaa;max-width:72%">hey loved ur pics!</div></div>
+        <div style="display:flex;position:relative"><div style="background:#222;padding:4px 8px;border-radius:10px;font-size:9px;color:#aaa;outline:1.5px solid rgba(239,68,68,0.5);outline-offset:2px">how old are you?</div><div style="position:absolute;left:calc(55% + 6px);top:0;font-size:6px;color:#ef4444;background:rgba(239,68,68,0.12);padding:1px 4px;border-radius:2px;white-space:nowrap">age inquiry</div></div>
+        <div style="display:flex;justify-content:flex-end"><div style="background:#2563eb;padding:4px 8px;border-radius:10px;font-size:9px;color:white">thanks! im 13</div></div>
+        <div style="display:flex"><div style="background:#222;padding:4px 8px;border-radius:10px;font-size:9px;color:#aaa">cool im 14 too lol</div></div>
+        <div style="display:flex;position:relative"><div style="background:#222;padding:4px 8px;border-radius:10px;font-size:9px;color:#aaa;outline:1.5px solid rgba(239,68,68,0.5);outline-offset:2px">add me on snap its private</div><div style="position:absolute;left:calc(60% + 6px);top:0;font-size:6px;color:#ef4444;background:rgba(239,68,68,0.12);padding:1px 4px;border-radius:2px;white-space:nowrap">isolation</div></div>
+        <div style="display:flex;position:relative"><div style="background:#222;padding:4px 8px;border-radius:10px;font-size:9px;color:#aaa;outline:1.5px solid rgba(239,68,68,0.5);outline-offset:2px">i can send u a giftcard</div><div style="position:absolute;left:calc(55% + 6px);top:0;font-size:6px;color:#ef4444;background:rgba(239,68,68,0.12);padding:1px 4px;border-radius:2px;white-space:nowrap">gift offering</div></div>
+      </div>
+    </div>
+
+    <div style="background:#0e1018;padding:9px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">
+        <div><div style="font-size:9px;font-weight:500;color:#fca5a5;text-transform:uppercase;letter-spacing:1px">Grooming detected</div><div style="font-size:9px;color:#3e4660;margin-top:2px">sarah_photo → emma_2012</div></div>
+        <div style="text-align:right"><div style="font-size:24px;font-weight:500;color:#ef4444;line-height:1;letter-spacing:-1px">89<span style="font-size:12px">%</span></div><div style="font-size:7px;color:#3e4660;text-transform:uppercase;letter-spacing:1px">confidence</div></div>
+      </div>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:5px">
+        <span style="font-size:7px;padding:2px 5px;border-radius:3px;background:rgba(239,68,68,0.08);color:#fca5a5">age inquiry</span>
+        <span style="font-size:7px;padding:2px 5px;border-radius:3px;background:rgba(239,68,68,0.08);color:#fca5a5">isolation</span>
+        <span style="font-size:7px;padding:2px 5px;border-radius:3px;background:rgba(239,68,68,0.08);color:#fca5a5">gift offering</span>
+        <span style="font-size:7px;padding:2px 5px;border-radius:3px;background:rgba(234,179,8,0.08);color:#d4a017">false age</span>
+      </div>
+      <div style="display:flex;gap:2px;margin-bottom:2px"><div style="flex:1;height:4px;border-radius:2px;background:#ef4444"></div><div style="flex:1;height:4px;border-radius:2px;background:#ef4444"></div><div style="flex:1;height:4px;border-radius:2px;background:#ef4444;opacity:0.35"></div><div style="flex:1;height:4px;border-radius:2px;background:#151a2a"></div><div style="flex:1;height:4px;border-radius:2px;background:#151a2a"></div></div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px"><span style="font-size:7px;color:#fca5a5">target</span><span style="font-size:7px;color:#fca5a5">trust</span><span style="font-size:7px;color:#ef4444;font-weight:500">isolate</span><span style="font-size:7px;color:#252d45">desens.</span><span style="font-size:7px;color:#252d45">control</span></div>
+      <div style="display:flex;gap:3px">
+        <div style="flex:1;background:rgba(239,68,68,0.06);border-radius:3px;padding:4px;text-align:center"><div style="font-size:12px;font-weight:500;color:#fca5a5">3</div><div style="font-size:6px;color:#3e4660;text-transform:uppercase">indicators</div></div>
+        <div style="flex:1;background:rgba(234,179,8,0.04);border-radius:3px;padding:4px;text-align:center"><div style="font-size:12px;font-weight:500;color:#eab308">2m</div><div style="font-size:6px;color:#3e4660;text-transform:uppercase">escalation</div></div>
+        <div style="flex:1;background:rgba(239,68,68,0.06);border-radius:3px;padding:4px;text-align:center"><div style="font-size:12px;font-weight:500;color:#fca5a5">3/5</div><div style="font-size:6px;color:#3e4660;text-transform:uppercase">stage</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+    <div class="sl" style="margin:0">Live timeline</div>
+    <div style="display:flex;gap:6px"><div style="display:flex;align-items:center;gap:2px"><div style="width:4px;height:4px;border-radius:50%;background:#22c55e"></div><span style="font-size:7px;color:#2a3050">safe</span></div><div style="display:flex;align-items:center;gap:2px"><div style="width:4px;height:4px;border-radius:50%;background:#eab308"></div><span style="font-size:7px;color:#2a3050">caution</span></div><div style="display:flex;align-items:center;gap:2px"><div style="width:4px;height:4px;border-radius:50%;background:#ef4444"></div><span style="font-size:7px;color:#2a3050">alert</span></div></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:2px">
+    <div style="display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:5px;background:#141720;font-size:10px">
+      <div style="width:5px;height:5px;border-radius:50%;background:#22c55e;flex-shrink:0"></div>
+      <span style="font-family:monospace;font-size:9px;color:#2a3050;min-width:40px">22:05</span>
+      <div style="width:12px;height:12px;border-radius:2px;background:#E4405F;display:flex;align-items:center;justify-content:center;font-size:6px;color:white;flex-shrink:0">Ig</div>
+      <span style="flex:1;color:#64748b">Normal feed browsing, no interactions</span>
+      <span style="font-size:8px;color:#22c55e">SAFE</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:5px;background:rgba(239,68,68,0.04);border:0.5px solid rgba(239,68,68,0.08);font-size:10px">
+      <div style="width:5px;height:5px;border-radius:50%;background:#ef4444;flex-shrink:0"></div>
+      <span style="font-family:monospace;font-size:9px;color:#2a3050;min-width:40px">22:04</span>
+      <div style="width:12px;height:12px;border-radius:2px;background:#E4405F;display:flex;align-items:center;justify-content:center;font-size:6px;color:white;flex-shrink:0">Ig</div>
+      <span style="flex:1;color:#f87171">Grooming — isolation + gift offering</span>
+      <span style="font-size:7px;padding:1px 5px;border-radius:2px;color:#ef4444;background:rgba(239,68,68,0.08);font-weight:500">ALERT</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:5px;background:rgba(234,179,8,0.02);border:0.5px solid rgba(234,179,8,0.06);font-size:10px">
+      <div style="width:5px;height:5px;border-radius:50%;background:#eab308;flex-shrink:0"></div>
+      <span style="font-family:monospace;font-size:9px;color:#2a3050;min-width:40px">22:03</span>
+      <div style="width:12px;height:12px;border-radius:2px;background:#E4405F;display:flex;align-items:center;justify-content:center;font-size:6px;color:white;flex-shrink:0">Ig</div>
+      <span style="flex:1;color:#a78b1b">New user asking personal questions</span>
+      <span style="font-size:7px;padding:1px 5px;border-radius:2px;color:#a78b1b;background:rgba(234,179,8,0.06)">CAUTION</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:5px;background:#141720;font-size:10px">
+      <div style="width:5px;height:5px;border-radius:50%;background:#22c55e;flex-shrink:0"></div>
+      <span style="font-family:monospace;font-size:9px;color:#2a3050;min-width:40px">22:02</span>
+      <div style="width:12px;height:12px;border-radius:2px;background:#111;display:flex;align-items:center;justify-content:center;font-size:6px;color:white;flex-shrink:0">Tk</div>
+      <span style="flex:1;color:#64748b">Dance videos, age-appropriate content</span>
+      <span style="font-size:8px;color:#22c55e">SAFE</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:5px;background:rgba(234,179,8,0.02);border:0.5px solid rgba(234,179,8,0.06);font-size:10px">
+      <div style="width:5px;height:5px;border-radius:50%;background:#eab308;flex-shrink:0"></div>
+      <span style="font-family:monospace;font-size:9px;color:#2a3050;min-width:40px">22:00</span>
+      <div style="width:12px;height:12px;border-radius:2px;background:#5865F2;display:flex;align-items:center;justify-content:center;font-size:6px;color:white;flex-shrink:0">Dc</div>
+      <span style="flex:1;color:#a78b1b">Cyberbullying pattern in #general</span>
+      <span style="font-size:7px;padding:1px 5px;border-radius:2px;color:#a78b1b;background:rgba(234,179,8,0.06)">CAUTION</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:5px;background:#141720;font-size:10px">
+      <div style="width:5px;height:5px;border-radius:50%;background:#22c55e;flex-shrink:0"></div>
+      <span style="font-family:monospace;font-size:9px;color:#2a3050;min-width:40px">21:58</span>
+      <div style="width:12px;height:12px;border-radius:2px;background:#5865F2;display:flex;align-items:center;justify-content:center;font-size:6px;color:white;flex-shrink:0">Dc</div>
+      <span style="flex:1;color:#64748b">Normal gaming chat in #minecraft</span>
+      <span style="font-size:8px;color:#22c55e">SAFE</span>
+    </div>
+  </div>
+</div>
+
+<div style="padding:12px 14px;background:#0a0c12">
+
+  <div class="sl">AI reasoning chain</div>
+  <div style="background:#111318;border-radius:6px;padding:9px;font-family:'JetBrains Mono',monospace;font-size:9px;line-height:1.8;color:#64748b;margin-bottom:9px">
+    <span style="color:#3e4660">STEP 1:</span> <span style="color:#94a3b8">Platform: Instagram direct messages</span><br>
+    <span style="color:#3e4660">STEP 2:</span> <span style="color:#94a3b8">Participants: sarah_photo, emma_2012</span><br>
+    <span style="color:#3e4660">STEP 3:</span> <span style="color:#94a3b8">Threat scan results:</span><br>
+    <span style="color:#fca5a5">&nbsp;&nbsp;→ "how old are you?" [age inquiry]</span><br>
+    <span style="color:#fca5a5">&nbsp;&nbsp;→ "im 14 too" [false age — profile shows adult]</span><br>
+    <span style="color:#fca5a5">&nbsp;&nbsp;→ "snap its private" [platform isolation]</span><br>
+    <span style="color:#fca5a5">&nbsp;&nbsp;→ "send u a giftcard" [material incentive]</span><br>
+    <span style="color:#3e4660">STEP 4:</span> <span style="color:#94a3b8">Cross-reference previous scans:</span><br>
+    <span style="color:#94a3b8">&nbsp;&nbsp;22:03 flagged CAUTION → 22:04 escalated</span><br>
+    <span style="color:#ef4444;font-weight:500">VERDICT: ALERT — grooming 3/5 — 89%</span>
+  </div>
+
+  <div class="sl">Why this matters</div>
+  <div style="border-left:2px solid rgba(239,68,68,0.3);padding:7px 10px;margin-bottom:9px;border-radius:0">
+    <div style="font-size:10px;color:#f87171;line-height:1.6">The user employed 4 grooming techniques in under 2 minutes: flattery, lying about age, attempting isolation to an unmonitored platform, and offering material incentives. This matches stage 3 of the recognized grooming progression.</div>
+  </div>
+
+  <div class="sl">Recommended action for parent</div>
+  <div style="background:rgba(139,92,246,0.04);border:0.5px solid rgba(139,92,246,0.08);border-radius:6px;padding:9px;margin-bottom:9px">
+    <div style="display:flex;gap:6px;margin-bottom:5px">
+      <div style="width:15px;height:15px;border-radius:50%;background:rgba(139,92,246,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><span style="font-size:8px;color:#a78bfa">1</span></div>
+      <div style="font-size:10px;color:#c4b5fd;line-height:1.4">Have a calm conversation with your child about this interaction</div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:5px">
+      <div style="width:15px;height:15px;border-radius:50%;background:rgba(139,92,246,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><span style="font-size:8px;color:#a78bfa">2</span></div>
+      <div style="font-size:10px;color:#c4b5fd;line-height:1.4">Ask who "sarah_photo" is — they may or may not know this person</div>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:5px">
+      <div style="width:15px;height:15px;border-radius:50%;background:rgba(139,92,246,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px"><span style="font-size:8px;color:#a78bfa">3</span></div>
+      <div style="font-size:10px;color:#c4b5fd;line-height:1.4">Block and report this user together with your child</div>
+    </div>
+    <div style="font-size:8px;color:#6d28d9;margin-top:5px;padding-top:5px;border-top:0.5px solid rgba(139,92,246,0.08)">No chat content was shared with you. Only AI-generated analysis is shown. Your child's privacy is preserved.</div>
+  </div>
+
+  <div style="background:rgba(37,99,235,0.04);border:0.5px solid rgba(37,99,235,0.08);border-radius:6px;padding:8px 9px;margin-bottom:9px">
+    <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">
+      <svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M14 2L7 9M14 2L10 14L7 9M14 2L2 6L7 9" stroke="#60a5fa" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span style="font-size:8px;color:#60a5fa;text-transform:uppercase;letter-spacing:1px">Telegram alert delivered</span>
+    </div>
+    <div style="font-size:9px;color:#94a3b8;line-height:1.4">"Suspicious contact on Instagram. Grooming behavior detected (89%). Review recommended."</div>
+    <div style="font-size:8px;color:#2a3050;margin-top:2px">Delivered 22:04:12 — read 22:06:41</div>
+  </div>
+
+  <div style="background:#111318;border-radius:5px;padding:7px 9px;display:flex;align-items:center;gap:6px">
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="#22c55e" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="#22c55e" stroke-width="1.3" stroke-linecap="round"/></svg>
+    <div style="flex:1"><div style="font-size:9px;color:#22c55e">Fully local — zero cloud dependency</div><div style="font-size:8px;color:#2a3050">Gemma 4 via Ollama | data sent to cloud: 0 bytes</div></div>
+    <span style="font-size:7px;padding:1px 5px;border-radius:3px;background:rgba(34,197,94,0.05);color:#16a34a;border:0.5px solid rgba(34,197,94,0.06)">Private</span>
+  </div>
+
+</div>
+
+</div>
+</div>

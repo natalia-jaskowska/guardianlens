@@ -22,7 +22,7 @@ import mss
 import mss.tools
 
 from guardlens.config import MonitorConfig
-from guardlens.demo import DEMO_SCENARIOS, render_demo_chat
+from guardlens.demo import DEMO_SCENARIO_SEQUENCE, render_demo_chat
 
 
 def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
@@ -77,15 +77,16 @@ def capture_loop(config: MonitorConfig) -> Iterator[Path]:
 def _demo_capture_loop(config: MonitorConfig) -> Iterator[Path]:
     """Yield synthetic Pillow chat screenshots forever.
 
-    Cycles through :data:`guardlens.demo.DEMO_SCENARIOS` so the dashboard
-    UI shows variety: SAFE, then GROOMING, then SAFE, then BULLYING, ...
+    Cycles through :data:`guardlens.demo.DEMO_SCENARIO_SEQUENCE` so the
+    dashboard UI shows variety across both **platforms** (Minecraft,
+    Discord, Instagram) and **scenarios** (safe, grooming, bullying).
     """
-    scenarios = itertools.cycle(DEMO_SCENARIOS)
+    sequence = itertools.cycle(DEMO_SCENARIO_SEQUENCE)
     while True:
-        scenario = next(scenarios)
+        platform, scenario = next(sequence)
         timestamp = int(time.time())
-        path = config.screenshots_dir / f"demo_{scenario}_{timestamp}.png"
-        yield render_demo_chat(path, scenario)
+        path = config.screenshots_dir / f"demo_{platform}_{scenario}_{timestamp}.png"
+        yield render_demo_chat(path, scenario, platform=platform)
         _prune_old_screenshots(config.screenshots_dir, keep_last_n=config.keep_last_n)
         time.sleep(config.capture_interval_seconds)
 
