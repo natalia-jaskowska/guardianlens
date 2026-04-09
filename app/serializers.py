@@ -341,6 +341,71 @@ def _format_elapsed(seconds: float) -> str:
     return f"{s // 86400}d ago"
 
 
+def build_alert_history(
+    rows: list[tuple[int, ScreenAnalysis]],
+) -> list[dict[str, Any]]:
+    """Convert a list of (id, ScreenAnalysis) tuples into card payloads.
+
+    Each card is a small summary dict the front-end uses to render an
+    item in the "Alert history" list. The full analysis (reasoning
+    chain, why this matters, recommended action, telegram, etc.) is
+    NOT included here — the JS fetches that on-demand from
+    ``/api/analysis/{id}`` when the user clicks a card.
+    """
+    out: list[dict[str, Any]] = []
+    now = datetime.now()
+    for analysis_id, analysis in rows:
+        cls = analysis.classification
+        level = cls.threat_level.value
+        severity = "alert" if level in ("alert", "critical") else "caution"
+        # Pick the first non-self sender as "user", fall back per platform
+        user = "unknown"
+        for msg in analysis.chat_messages or []:
+            sender = (msg.sender or "").strip()
+            if sender and sender.lower() not in _GENERIC_SENDERS:
+                user = sender.lstrip("@<").rstrip(">")
+                break
+        if user == "unknown":
+            key = _platform_key(analysis.platform)
+            user = _DEFAULT_USERNAMES.get(key, "unknown")
+
+        # One-line summary: a couple of indicator phrases + grooming stage if any
+        indicator_words = [s.split("(")[0].strip() for s in (cls.indicators_found or [])[:3]]
+        summary_bits: list[str] = []
+        if indicator_words:
+            summary_bits.append(", ".join(indicator_words[:2]))
+        if analysis.grooming_stage and analysis.grooming_stage.stage != GroomingStage.NONE:
+            try:
+                stage_idx = GROOMING_STAGE_ORDER.index(analysis.grooming_stage.stage) + 1
+                summary_bits.append(f"Stage {stage_idx}/5")
+            except ValueError:
+                pass
+        if not summary_bits:
+            summary_bits.append(cls.category.value.replace("_", " "))
+        summary = " — ".join(summary_bits)[:96]
+
+        elapsed_label = _format_elapsed((now - analysis.timestamp).total_seconds())
+
+        out.append(
+            {
+                "analysis_id": analysis_id,
+                "time_label": analysis.timestamp.strftime("%H:%M:%S"),
+                "time_ago": elapsed_label,
+                "platform": analysis.platform or "Unknown",
+                "platform_key": _platform_key(analysis.platform),
+                "threat_type": cls.category.value,
+                "threat_label": cls.category.value.replace("_", " ").title(),
+                "severity": severity,
+                "confidence": round(cls.confidence),
+                "user": user,
+                "summary": summary,
+                "indicators": [s[:24] for s in (cls.indicators_found or [])[:3]],
+                "telegram_sent": analysis.parent_alert is not None,
+            }
+        )
+    return out
+
+
 def serialize_scan_history(levels: list[str]) -> list[dict[str, str]]:
     """Convert raw threat levels into sparkline payload entries.
 

@@ -109,6 +109,22 @@ def create_app(config: GuardLensConfig) -> FastAPI:
     async def api_state() -> JSONResponse:
         return JSONResponse(state.build_state())
 
+    @app.get("/api/analysis/{analysis_id}")
+    async def api_analysis(analysis_id: int) -> JSONResponse:
+        """Return the full serialized analysis for one DB row.
+
+        Used by the dashboard's "click an alert history card to inspect"
+        flow — keeps the per-tick SSE payload small while still letting
+        the user load full reasoning chain / why this matters /
+        recommended action / telegram details on demand.
+        """
+        from app.serializers import serialize_analysis
+
+        analysis = state.database.analysis_by_id(analysis_id)
+        if analysis is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        return JSONResponse(serialize_analysis(analysis, history=state.session.recent()))
+
     @app.get("/api/stream")
     async def api_stream(request: Request) -> StreamingResponse:
         async def event_generator() -> AsyncIterator[bytes]:

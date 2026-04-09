@@ -229,6 +229,53 @@ class GuardLensDatabase:
         except (ValueError, TypeError):
             return None
 
+    def recent_alert_analyses(self, limit: int = 10) -> list[tuple[int, ScreenAnalysis]]:
+        """Reconstruct the N most recent alert/caution :class:`ScreenAnalysis` rows.
+
+        Used by the dashboard's "Alert history" list in the safe-state
+        right panel. Returns ``(analysis_id, ScreenAnalysis)`` tuples
+        ordered newest first so each card can wire to
+        ``/api/analysis/{id}`` for the click-to-inspect flow.
+        """
+        with self._lock:
+            rows = self._conn.execute(
+                """
+                SELECT id, raw_json FROM analyses
+                WHERE threat_level IN ('alert', 'critical', 'warning', 'caution')
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+        out: list[tuple[int, ScreenAnalysis]] = []
+        for row in rows:
+            try:
+                payload = _json.loads(row["raw_json"])
+                out.append((int(row["id"]), ScreenAnalysis.model_validate(payload)))
+            except (ValueError, TypeError):
+                continue
+        return out
+
+    def analysis_by_id(self, analysis_id: int) -> ScreenAnalysis | None:
+        """Reconstruct one :class:`ScreenAnalysis` from its DB row id.
+
+        Used by ``GET /api/analysis/{id}`` so the dashboard can fetch
+        full details for a specific past alert when the user clicks an
+        Alert history card.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT raw_json FROM analyses WHERE id = ?",
+                (analysis_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            payload = _json.loads(row["raw_json"])
+            return ScreenAnalysis.model_validate(payload)
+        except (ValueError, TypeError):
+            return None
+
     def recent_threat_levels(self, limit: int = 20) -> list[str]:
         """Return the most recent ``limit`` threat levels (oldest first).
 

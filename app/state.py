@@ -18,6 +18,7 @@ import time
 from typing import Any
 
 from app.serializers import (
+    build_alert_history,
     build_session_health,
     compute_safe_streak,
     empty_summary,
@@ -289,6 +290,8 @@ class AppState:
             last_alert=self.database.last_alert_summary(),
         )
 
+        alert_history = build_alert_history(self.database.recent_alert_analyses(limit=10))
+
         return {
             "monitoring": self.worker.is_running,
             "session_duration": format_session_duration(self.worker.session_seconds),
@@ -297,9 +300,10 @@ class AppState:
             "metrics": totals,
             "metric_sublabels": metric_sublabels(totals),
             "stat_boxes": stat_boxes(latest, history),
-            "scan_history": serialize_scan_history(self.database.recent_threat_levels(limit=20)),
+            "scan_history": serialize_scan_history(self.database.recent_threat_levels(limit=30)),
             "safe_streak": compute_safe_streak(history),
             "session_health": session_health,
+            "alert_history": alert_history,
             "summary": summary,
             "timeline": serialize_timeline(history),
             "latest": latest_payload,
