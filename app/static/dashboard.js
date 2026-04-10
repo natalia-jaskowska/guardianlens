@@ -36,10 +36,6 @@
     lastRefresh: document.getElementById("last-refresh"),
 
     statsLine: document.getElementById("stats-line"),
-    historicalAction: document.getElementById("historical-action"),
-    historicalActionBody: document.getElementById("historical-action-body"),
-    telegramSummary: document.getElementById("telegram-summary"),
-    telegramSummaryText: document.getElementById("telegram-summary-text"),
     historyLabel: document.getElementById("history-label"),
     alertHistory: document.getElementById("alert-history"),
 
@@ -216,7 +212,7 @@
     const a = state.latest;
     if (!a) {
       els.captureCard.className = "gl-capture gl-capture-safe";
-      els.captureScreen.innerHTML = '<div class="gl-capture-placeholder">Connecting to monitor stream\u2026</div>';
+      els.captureScreen.innerHTML = '<div class="gl-capture-placeholder"><div class="gl-skeleton gl-skeleton-block" style="width:100%;height:100%;position:absolute;inset:0"></div></div>';
       els.captureBarIcon.innerHTML = CAP_CHECK;
       setText(els.captureBarTitle, "Initializing");
       setText(els.captureBarSub, "");
@@ -294,13 +290,15 @@
     els.timeline.innerHTML = entries.map((e, i) => {
       const level = e.threat_level;
       const k = e.platform_key || pKey(e.platform);
-      const dotCls = `gl-timeline-dot gl-timeline-dot-${level}`;
       const badgeCls = level === "alert" || level === "critical" ? "gl-timeline-status-alert" :
                        level === "caution" || level === "warning" ? "gl-timeline-status-caution" :
                        "gl-timeline-status-safe";
       const time = e.time_label || "";
+      const iconInner = k !== "unknown"
+        ? `<img src="/static/icons/${k}.svg" alt="">`
+        : `<span class="gl-timeline-icon-letter">${(e.platform||"?").charAt(0).toUpperCase()}</span>`;
       return `<div class="gl-timeline-entry" data-tl-idx="${i}" title="${esc(e.reasoning||"")}">
-        <span class="${dotCls}"></span>
+        <span class="gl-timeline-icon" data-platform="${k}">${iconInner}</span>
         <span class="gl-timeline-platform gl-timeline-platform-${k}">${esc(e.platform||"Unknown")}</span>
         <span class="gl-timeline-time">${esc(time)}</span>
         <span class="gl-timeline-text">${esc(trunc(e.reasoning,55))}</span>
@@ -334,97 +332,80 @@
   // ----------------------------------------------------------------- right: SAFE overview
 
   function renderRightPanel(state) {
-    const h = state.session_health || {};
-    const alerts = h.alerts || 0;
     renderAlertHistory(state.alert_history || [], state.current_session_id);
-
-    // Action from latest alert
-    const la = state.latest_alert;
-    if (la && la.recommended_action && la.recommended_action.steps) {
-      const cat = la.category || "";
-      const color = cat === "grooming" ? "#E24B4A" : cat === "bullying" ? "#BA7517" : "#D85A30";
-      const bg = cat === "grooming" ? "#2a1a1a" : cat === "bullying" ? "#1f1a0f" : "#2a1a0f";
-      els.historicalActionBody.innerHTML = la.recommended_action.steps.map((s,i) =>
-        `<div class="gl-action-step"><span class="gl-action-num" style="background:${bg};color:${color}">${i+1}</span><span class="gl-action-text">${esc(s)}</span></div>`
-      ).join("");
-      els.historicalAction.style.display = "";
-      els.historicalAction.style.borderColor = color;
-    } else {
-      els.historicalAction.style.display = "none";
-    }
-
-    // Telegram summary
-    if (alerts > 0) {
-      setText(els.telegramSummaryText, `Telegram: ${alerts} alert${alerts===1?"":"s"} delivered`);
-      els.telegramSummary.style.display = "";
-    } else {
-      els.telegramSummary.style.display = "none";
-    }
   }
 
   function renderAlertHistory(history, sessionId) {
     if (!history.length) {
-      els.historyLabel.innerHTML = `Alert history (0)`;
-      els.alertHistory.innerHTML = '<div class="gl-history-empty">No alerts yet \u2014 your child is safe.</div>';
+      els.historyLabel.innerHTML = `Alerts <span class="gl-history-count">0</span>`;
+      els.alertHistory.innerHTML =
+        `<div class="gl-history-empty">
+          <div class="gl-history-empty-shield"><svg viewBox="0 0 80 90"><path fill="#1D9E75" d="M40 5 L72 20 L72 50 Q72 75 40 87 Q8 75 8 50 L8 20 Z"/><path fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M25 45 L35 55 L55 35"/></svg></div>
+          <div class="gl-history-empty-title">All clear</div>
+          <div class="gl-history-empty-sub">No threats detected yet.\nGuardianLens is actively monitoring.</div>
+        </div>`;
       return;
     }
-    // Split into new (unseen) and seen
     const newAlerts = history.filter(a => !uiState.seenAlerts.has(String(a.analysis_id)));
     const seenAlerts = history.filter(a => uiState.seenAlerts.has(String(a.analysis_id)));
     const newCount = newAlerts.length;
-    const counterHtml = newCount > 0 ? ` <span class="gl-history-counter">${newCount} new</span>` : "";
-    els.historyLabel.innerHTML = `Alert history (${history.length})${counterHtml}`;
+    const counterHtml = newCount > 0 ? `<span class="gl-history-counter">${newCount}</span>` : "";
+    els.historyLabel.innerHTML = `Alerts <span class="gl-history-count">${history.length}</span>${counterHtml}`;
 
     let html = "";
-    // New cards first
     html += newAlerts.map(a => renderAlertCard(a, false)).join("");
-    // Divider if both groups exist
     if (newAlerts.length > 0 && seenAlerts.length > 0) {
-      html += '<div class="gl-history-divider"></div>';
+      html += '<div class="gl-history-divider">Reviewed</div>';
     }
-    // Seen cards
     html += seenAlerts.map(a => renderAlertCard(a, true)).join("");
     els.alertHistory.innerHTML = html;
   }
 
   function renderAlertCard(a, seen) {
     const type = a.threat_type || "";
-    const color = type === "grooming" ? "#E24B4A" : type === "bullying" ? "#BA7517" : type === "inappropriate_content" ? "#D85A30" : "#E24B4A";
-    const bg = type === "grooming" ? "#2a1a1a" : type === "bullying" ? "#1f1a0f" : type === "inappropriate_content" ? "#2a1a0f" : "#1e1e32";
+    const threatKey = (type === "grooming" || type === "bullying" || type === "inappropriate_content") ? type : "other";
     let icon = CARD_ICON_DEFAULT;
     if (type === "grooming") icon = CARD_ICON_GROOMING;
     else if (type === "bullying") icon = CARD_ICON_BULLYING;
     else if (type === "inappropriate_content") icon = CARD_ICON_CONTENT;
 
     const stateClass = seen ? "gl-alert-card-seen" : "gl-alert-card-new";
-    const dotHtml = seen ? "" : `<div class="gl-alert-card-new-dot" style="background:${color}"></div>`;
-    const stageHint = type === "grooming" ? `<span class="gl-alert-card-stage" style="font-size:8px;color:#666">Stage 3/5</span>` : "";
 
-    let statusHtml;
-    if (seen) {
-      statusHtml = `<span class="gl-alert-card-seen-check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>seen</span>`;
-    } else {
-      statusHtml = `<span class="gl-alert-card-new-label" style="background:${bg};color:${color}">NEW</span>`;
-    }
+    const badgeHtml = seen
+      ? ""
+      : `<span class="gl-alert-card-badge">NEW</span>`;
 
-    const tagBg = seen ? "#1e1e32" : bg;
-    const tagColor = seen ? "#777" : color;
     const pills = (a.indicators||[]).slice(0,3).map(p =>
-      `<span class="gl-alert-card-pill" style="background:${tagBg};color:${tagColor}">${esc(p)}</span>`
+      `<span class="gl-alert-card-pill">${esc(p)}</span>`
     ).join("");
 
-    return `<div class="gl-alert-card ${stateClass}" style="border-color:${color}" data-analysis-id="${a.analysis_id}">
-      ${dotHtml}
-      <div class="gl-alert-card-row1">
-        <div class="gl-alert-card-titlebar">
-          <span class="gl-alert-card-icon">${icon}</span>
-          <span class="gl-alert-card-title" style="color:${color}">${esc(a.threat_label)} - ${a.confidence}%</span>
-          ${stageHint}${statusHtml}
-          <span class="gl-alert-card-time">${esc(a.time_ago)}</span>
-        </div>
+    // Grooming stage mini-bar
+    let stageHtml = "";
+    const stageIdx = a.grooming_stage_index || 0;
+    if (type === "grooming" && stageIdx > 0) {
+      let segs = "";
+      for (let i = 0; i < 5; i++) {
+        const cls = i < stageIdx - 1 ? "gl-alert-card-stage-seg-filled" :
+                    i === stageIdx - 1 ? "gl-alert-card-stage-seg-current" : "";
+        segs += `<div class="gl-alert-card-stage-seg ${cls}"></div>`;
+      }
+      stageHtml = `<div class="gl-alert-card-stage-mini">${segs}<span class="gl-alert-card-stage-label">${stageIdx}/5</span></div>`;
+    }
+
+    return `<div class="gl-alert-card ${stateClass}" data-threat="${threatKey}" data-analysis-id="${a.analysis_id}">
+      <div class="gl-alert-card-icon-wrap">${icon}</div>
+      <div class="gl-alert-card-top">
+        <span class="gl-alert-card-title">${esc(a.threat_label)}</span>
+        <span class="gl-alert-card-conf">${a.confidence}%</span>
+        ${badgeHtml}
       </div>
-      <div class="gl-alert-card-summary">${esc(a.user)} - ${esc(a.summary)}</div>
-      <div class="gl-alert-card-row3"><div class="gl-alert-card-pills">${pills}</div></div>
+      <span class="gl-alert-card-time">${esc(a.time_ago)}</span>
+      <div class="gl-alert-card-mid">
+        <span class="gl-alert-card-user">${esc(a.user)}</span>
+        <span class="gl-alert-card-sep">\u2022</span>
+        <span class="gl-alert-card-summary">${esc(a.summary)}</span>
+      </div>
+      <div class="gl-alert-card-bottom">${pills}${stageHtml}</div>
       <span class="gl-alert-card-arrow">\u203a</span>
     </div>`;
   }
@@ -518,7 +499,7 @@
     const priv = action.privacy_note ? `<div class="gl-action-privacy">${esc(action.privacy_note)}</div>` : "";
     els.recommendedAction.innerHTML = label + steps + priv;
     const dismissBtn = document.getElementById("action-dismiss");
-    if (dismissBtn) dismissBtn.addEventListener("click", (e) => { e.stopPropagation(); backToOverview(); });
+    if (dismissBtn) dismissBtn.addEventListener("click", (e) => { e.stopPropagation(); showOverview(); });
   }
 
   function renderTelegram(a) {
@@ -528,8 +509,8 @@
     els.telegramBlock.innerHTML = `
       <div class="gl-telegram-card">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-        <span class="gl-telegram-label">Telegram alert delivered - ${esc(at)}</span>
-        <span class="gl-telegram-sent-badge">Sent</span>
+        <span class="gl-telegram-label">Parent alert generated \u00b7 ${esc(at)}</span>
+        <span class="gl-telegram-sent-badge">Ready</span>
       </div>`;
   }
 
@@ -595,9 +576,22 @@
   // ----------------------------------------------------------------- bootstrap
 
   function connectStream() {
-    const src = new EventSource("/api/stream");
-    src.onmessage = (e) => { try { render(JSON.parse(e.data)); } catch(err) { console.error("SSE",err); } };
-    src.onerror = () => console.warn("SSE dropped, retrying...");
+    let retryDelay = 1000;
+    const maxDelay = 30000;
+    let src;
+
+    function connect() {
+      src = new EventSource("/api/stream");
+      src.onopen = () => { retryDelay = 1000; };
+      src.onmessage = (e) => { try { render(JSON.parse(e.data)); } catch(err) { console.error("SSE",err); } };
+      src.onerror = () => {
+        src.close();
+        console.warn(`SSE dropped, reconnecting in ${retryDelay/1000}s...`);
+        setTimeout(connect, retryDelay);
+        retryDelay = Math.min(retryDelay * 2, maxDelay);
+      };
+    }
+    connect();
   }
 
   document.addEventListener("DOMContentLoaded", () => {

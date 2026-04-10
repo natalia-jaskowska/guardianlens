@@ -404,6 +404,7 @@ def build_alert_history(
         # One-line summary: a couple of indicator phrases + grooming stage if any
         indicator_words = [s.split("(")[0].strip() for s in (cls.indicators_found or [])[:3]]
         summary_bits: list[str] = []
+        stage_idx = 0
         if indicator_words:
             summary_bits.append(", ".join(indicator_words[:2]))
         if analysis.grooming_stage and analysis.grooming_stage.stage != GroomingStage.NONE:
@@ -433,6 +434,7 @@ def build_alert_history(
                 "user": user,
                 "summary": summary,
                 "indicators": [s[:24] for s in (cls.indicators_found or [])[:3]],
+                "grooming_stage_index": stage_idx,
                 "telegram_sent": analysis.parent_alert is not None,
             }
         )

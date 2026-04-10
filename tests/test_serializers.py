@@ -7,6 +7,7 @@ from pathlib import Path
 
 from app.serializers import (
     GROOMING_STAGE_ORDER,
+    build_alert_history,
     empty_summary,
     format_session_duration,
     serialize_analysis,
@@ -14,6 +15,7 @@ from app.serializers import (
     serialize_timeline,
     session_totals,
 )
+
 from guardlens.schema import (
     AlertUrgency,
     GroomingStage,
@@ -143,3 +145,37 @@ def test_format_session_duration() -> None:
     assert format_session_duration(45) == "0m 45s"
     assert format_session_duration(872) == "14m 32s"
     assert format_session_duration(3661) == "1h 01m 01s"
+
+
+def test_build_alert_history_grooming_stage_index() -> None:
+    """Alert history cards include the real grooming_stage_index."""
+    alert_analysis = _analysis(ThreatLevel.ALERT)
+    rows = [(1, 1, alert_analysis)]
+    history = build_alert_history(rows)
+    assert len(history) == 1
+    card = history[0]
+    # Isolation is index 2 in the 0-based order → 1-based = 3
+    assert card["grooming_stage_index"] == 3
+    assert card["threat_type"] == "grooming"
+    assert card["analysis_id"] == 1
+
+
+def test_build_alert_history_no_grooming_stage_index() -> None:
+    """Alert history cards with no grooming stage default to 0."""
+    safe = _analysis(ThreatLevel.SAFE)
+    # Force it to look like an alert for the history builder
+    alert_no_grooming = safe.model_copy(
+        update={
+            "classification": ThreatClassification(
+                threat_level=ThreatLevel.ALERT,
+                category=ThreatCategory.BULLYING,
+                confidence=92.0,
+                reasoning="Repeated insults.",
+                indicators_found=["name-calling"],
+            ),
+        }
+    )
+    rows = [(2, 1, alert_no_grooming)]
+    history = build_alert_history(rows)
+    assert len(history) == 1
+    assert history[0]["grooming_stage_index"] == 0

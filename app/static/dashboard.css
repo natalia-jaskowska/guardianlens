@@ -39,7 +39,7 @@
   --info: #3b82f6;
   --purple: #7F77DD;
 
-  --font-main: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-main: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 
   /* Platform accent colors */
@@ -394,17 +394,6 @@ button { font-family: inherit; cursor: pointer; }
 .gl-capture-caution { border-color: rgba(186, 117, 23, 0.4); }
 .gl-capture-alert   { border-color: rgba(226, 75, 74, 0.4); }
 
-/* Capture header — "Latest capture" + LIVE inside the box */
-.gl-capture-header {
-  display: flex;
-  justify-content: space-between;
-  padding: 6px 10px;
-  font-size: 10px;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
 .gl-capture-screen {
   position: relative;
   flex: 1 1 auto;
@@ -636,30 +625,48 @@ button { font-family: inherit; cursor: pointer; }
 .gl-timeline-entry {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 0;
+  gap: 8px;
+  padding: 4px 2px;
   border-bottom: 1px solid var(--bg-secondary);
   font-size: 11px;
   cursor: pointer;
   transition: background 0.15s ease;
+  border-radius: 4px;
 }
 .gl-timeline-entry:hover {
   background: rgba(255, 255, 255, 0.03);
 }
-.gl-timeline-entry .gl-platform-badge { width: 0; height: 0; display: none; }
-
-/* Threat-level colored dot */
-.gl-timeline-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+/* Platform icon in timeline rows */
+.gl-timeline-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
-.gl-timeline-dot-safe       { background: var(--safe); }
-.gl-timeline-dot-caution,
-.gl-timeline-dot-warning    { background: var(--caution); }
-.gl-timeline-dot-alert,
-.gl-timeline-dot-critical   { background: var(--alert); }
+.gl-timeline-icon img {
+  width: 12px;
+  height: 12px;
+  display: block;
+  filter: brightness(0) invert(1);
+}
+.gl-timeline-icon-letter {
+  font-size: 9px;
+  font-weight: 600;
+  color: #fff;
+}
+/* Platform brand colors */
+.gl-timeline-icon[data-platform="discord"]    { background: var(--platform-discord); }
+.gl-timeline-icon[data-platform="minecraft"]  { background: var(--platform-minecraft); }
+.gl-timeline-icon[data-platform="tiktok"]     { background: var(--platform-tiktok); }
+.gl-timeline-icon[data-platform="instagram"]  { background: var(--platform-instagram); }
+.gl-timeline-icon[data-platform="roblox"]     { background: #e2231a; }
+.gl-timeline-icon[data-platform="snapchat"]   { background: #fffc00; }
+.gl-timeline-icon[data-platform="snapchat"] img { filter: brightness(0); }
+.gl-timeline-icon[data-platform="telegram"]   { background: #26a5e4; }
+.gl-timeline-icon[data-platform="unknown"]    { background: #334155; }
 
 /* Platform name — colored text to match dot */
 .gl-timeline-platform {
@@ -750,12 +757,6 @@ button { font-family: inherit; cursor: pointer; }
 .gl-legend-dot-alert { background: var(--alert); }
 
 /* ============================================================ 8. Right panel — safe overview */
-
-#right-safe {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
 
 /* Compact one-line monitoring stats */
 .gl-mini-line {
@@ -852,242 +853,363 @@ button { font-family: inherit; cursor: pointer; }
   margin-top: 2px;
 }
 
+/* ---- Alert history header ---- */
+
 .gl-history-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 .gl-history-label {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gl-history-count {
+  font-size: 10px;
   color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  background: var(--bg-card);
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 400;
+}
+.gl-history-counter {
+  background: var(--alert);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 8px;
+  min-width: 18px;
+  text-align: center;
 }
 .gl-history-hint {
   font-size: 9px;
-  color: var(--text-faint);
+  color: var(--text-ghost);
+  letter-spacing: 0.2px;
 }
+
+/* ---- Alert history container ---- */
 
 .gl-alert-history {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  margin-bottom: 10px;
-  max-height: 340px;
+  gap: 6px;
+  flex: 1 1 0;
   overflow-y: auto;
-}
-.gl-history-empty {
-  background: var(--bg-card);
-  border: 1px dashed var(--border);
-  border-radius: var(--radius);
-  padding: 12px;
-  text-align: center;
-  font-size: 11px;
-  color: var(--text-faint);
+  padding-right: 2px;
 }
 
-/* Alert cards — new/seen states */
+/* ---- Empty state ---- */
+
+.gl-history-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-dim);
+}
+.gl-history-empty-shield {
+  width: 40px;
+  height: 40px;
+  color: var(--safe);
+  opacity: 0.5;
+}
+.gl-history-empty-shield svg { width: 100%; height: 100%; display: block; }
+.gl-history-empty-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.gl-history-empty-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* ---- Group dividers ---- */
+
+.gl-history-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: 9px;
+  color: var(--text-ghost);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.gl-history-divider::before,
+.gl-history-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ============================================================ Alert cards */
+
 .gl-alert-card {
-  border-left: 3px solid;
-  padding: 8px 10px;
-  margin-bottom: 0;
+  display: grid;
+  grid-template-columns: 36px 1fr auto;
+  grid-template-rows: auto auto auto;
+  gap: 0 10px;
+  padding: 10px 12px;
   background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   position: relative;
 }
-.gl-alert-card:hover { background: #1a1a2e; }
-
-/* NEW (unread) — tinted bg + glow dot */
-.gl-alert-card-new { background: #16101a; }
-.gl-alert-card-new-dot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  animation: gl-glow 2s ease-in-out infinite;
+.gl-alert-card:hover {
+  background: #16162a;
+  border-color: #2a2a44;
+  transform: translateY(-1px);
 }
-@keyframes gl-glow { 0%,100%{opacity:1} 50%{opacity:.5} }
-.gl-alert-card-new-label {
-  font-size: 8px;
-  font-weight: 500;
-  padding: 1px 5px;
-  border-radius: 3px;
-  margin-left: 4px;
+.gl-alert-card:active {
+  transform: translateY(0);
 }
 
-/* SEEN (inspected) — dimmed */
-.gl-alert-card-seen { opacity: 0.65; }
-.gl-alert-card-seen:hover { opacity: 0.85; }
-.gl-alert-card-seen-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 8px;
-  color: var(--text-ghost);
-  margin-left: 4px;
-}
+/* ---- Icon container (left column, spans all rows) ---- */
 
-/* New count badge */
-.gl-history-counter {
-  background: var(--alert-bg);
-  color: var(--alert);
-  font-size: 9px;
-  font-weight: 500;
-  padding: 0 5px;
-  border-radius: 8px;
-  margin-left: 4px;
-}
-
-/* Divider between new and seen */
-.gl-history-divider {
-  height: 1px;
-  background: #1a1a28;
-  margin: 6px 0;
-}
-
-/* Grooming — red, prominent */
-.gl-alert-card-grooming { border-color: var(--alert); }
-/* Bullying — amber */
-.gl-alert-card-bullying { border-color: var(--caution); }
-/* Inappropriate content — orange */
-.gl-alert-card-inappropriate { border-color: var(--orange); }
-/* Caution severity */
-.gl-alert-card-caution { border-color: var(--caution); }
-/* Archived */
-.gl-alert-card-archived { opacity: 0.55; }
-.gl-alert-card-archived:hover { opacity: 0.85; }
-
-.gl-alert-card-row1 {
+.gl-alert-card-icon-wrap {
+  grid-row: 1 / -1;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 3px;
-}
-.gl-alert-card-titlebar {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.gl-alert-card-icon {
-  width: 14px;
-  height: 14px;
+  justify-content: center;
   flex-shrink: 0;
+  transition: all 0.2s;
 }
-.gl-alert-card-icon svg { width: 100%; height: 100%; display: block; }
-.gl-alert-card-platform { width: 0; height: 0; display: none; }
+.gl-alert-card-icon-wrap svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/* ---- Row 1: title + time ---- */
+
+.gl-alert-card-top {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
 .gl-alert-card-title {
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.gl-alert-card-grooming .gl-alert-card-title { color: var(--alert); }
-.gl-alert-card-bullying .gl-alert-card-title { color: var(--caution); }
-.gl-alert-card-inappropriate .gl-alert-card-title { color: var(--orange); }
-
-.gl-alert-card-time {
-  font-size: 9px;
-  color: var(--text-faint);
-}
-.gl-alert-card-summary {
+.gl-alert-card-conf {
   font-size: 10px;
-  color: #777;
-  margin-top: 2px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  opacity: 0.8;
 }
-.gl-alert-card-row3 {
+.gl-alert-card-badge {
+  font-size: 8px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.gl-alert-card-time {
+  grid-column: 3;
+  grid-row: 1;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-ghost);
+  white-space: nowrap;
+  align-self: start;
+  padding-top: 2px;
+}
+
+/* ---- Row 2: summary line ---- */
+
+.gl-alert-card-mid {
+  grid-column: 2 / 4;
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-wrap: wrap;
-  margin-top: 4px;
+  margin-top: 2px;
+  min-width: 0;
 }
-.gl-alert-card-pills {
+.gl-alert-card-user {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.gl-alert-card-sep {
+  color: var(--text-ghost);
+  font-size: 8px;
+  flex-shrink: 0;
+}
+.gl-alert-card-summary {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* ---- Row 3: pills + stage bar ---- */
+
+.gl-alert-card-bottom {
+  grid-column: 2 / 4;
   display: flex;
+  align-items: center;
   gap: 4px;
+  margin-top: 6px;
   flex-wrap: wrap;
 }
 .gl-alert-card-pill {
   font-size: 9px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: var(--border);
-  color: var(--text-muted);
+  padding: 2px 7px;
+  border-radius: 10px;
   white-space: nowrap;
-  max-width: 100%;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: opacity 0.2s;
 }
-.gl-alert-card-grooming .gl-alert-card-pill { background: var(--alert-bg); color: var(--alert); }
-.gl-alert-card-bullying .gl-alert-card-pill { background: var(--caution-bg); color: var(--caution); }
-.gl-alert-card-inappropriate .gl-alert-card-pill { background: var(--orange-bg); color: var(--orange); }
+.gl-alert-card-stage-mini {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.gl-alert-card-stage-seg {
+  width: 10px;
+  height: 3px;
+  border-radius: 1.5px;
+  background: var(--border);
+  transition: background 0.3s;
+}
+.gl-alert-card-stage-seg-filled {
+  background: var(--alert);
+}
+.gl-alert-card-stage-seg-current {
+  background: var(--alert);
+  opacity: 0.4;
+}
+.gl-alert-card-stage-label {
+  font-size: 8px;
+  font-family: var(--font-mono);
+  margin-left: 3px;
+}
+
+/* ---- Hover arrow ---- */
 
 .gl-alert-card-arrow {
-  margin-left: auto;
-  color: var(--text-faint);
-  font-size: 14px;
-  transition: color 0.2s;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 16px;
+  color: var(--text-ghost);
+  opacity: 0;
+  transition: all 0.2s;
 }
-.gl-alert-card:hover .gl-alert-card-arrow { color: #999; }
-
-/* Historical action */
-.gl-historical-dim {
-  background: var(--bg-card);
-  border-left: 3px solid var(--caution);
-  border-radius: 0;
-  padding: 10px 12px;
-  margin-top: 8px;
-}
-.gl-historical-label {
-  font-size: 11px;
+.gl-alert-card:hover .gl-alert-card-arrow {
+  opacity: 1;
   color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 8px;
-  font-weight: 500;
-}
-.gl-historical-body {
-  font-size: 11px;
-  color: #c0c0cc;
-  line-height: 1.6;
+  right: 8px;
 }
 
-.gl-telegram-summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  background: var(--bg-card);
-  border-radius: var(--radius);
-  margin-top: 10px;
-  font-size: 10px;
-  color: var(--text-faint);
-}
+/* ---- NEW state ---- */
 
-/* Privacy badge (bottom of right panel — now in nav, kept minimal) */
-.gl-privacy-badge {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: auto;
-  padding: 6px 8px;
-  background: var(--bg-card);
-  border-radius: var(--radius);
-  font-size: 10px;
-  color: var(--text-faint);
+.gl-alert-card-new {
+  border-color: transparent;
 }
-.gl-privacy-icon { display: none; }
-.gl-privacy-text { display: none; }
-.gl-privacy-pill { display: none; }
+.gl-alert-card-new::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.gl-alert-card-new:hover { transform: translateY(-1px); }
+
+/* ---- SEEN state ---- */
+
+.gl-alert-card-seen {
+  opacity: 0.55;
+  border-color: transparent;
+}
+.gl-alert-card-seen:hover {
+  opacity: 0.8;
+}
+.gl-alert-card-seen .gl-alert-card-icon-wrap { opacity: 0.7; }
+.gl-alert-card-seen .gl-alert-card-pill { opacity: 0.6; }
+
+/* ---- Threat-type color schemes ---- */
+
+/* Grooming — red */
+.gl-alert-card[data-threat="grooming"] { border-left: 3px solid var(--alert); }
+.gl-alert-card[data-threat="grooming"] .gl-alert-card-icon-wrap { background: var(--alert-bg); }
+.gl-alert-card[data-threat="grooming"] .gl-alert-card-icon-wrap svg { stroke: var(--alert); }
+.gl-alert-card[data-threat="grooming"] .gl-alert-card-title { color: var(--alert); }
+.gl-alert-card[data-threat="grooming"] .gl-alert-card-conf { color: var(--alert); }
+.gl-alert-card[data-threat="grooming"] .gl-alert-card-badge { background: var(--alert-bg); color: var(--alert); }
+.gl-alert-card[data-threat="grooming"] .gl-alert-card-pill { background: var(--alert-bg); color: var(--alert); }
+.gl-alert-card[data-threat="grooming"] .gl-alert-card-stage-label { color: var(--alert); }
+.gl-alert-card[data-threat="grooming"].gl-alert-card-new { background: #160d12; }
+.gl-alert-card[data-threat="grooming"].gl-alert-card-new::before { box-shadow: inset 0 0 20px rgba(226, 75, 74, 0.06); }
+
+/* Bullying — amber */
+.gl-alert-card[data-threat="bullying"] { border-left: 3px solid var(--caution); }
+.gl-alert-card[data-threat="bullying"] .gl-alert-card-icon-wrap { background: var(--caution-bg); }
+.gl-alert-card[data-threat="bullying"] .gl-alert-card-icon-wrap svg { stroke: var(--caution); }
+.gl-alert-card[data-threat="bullying"] .gl-alert-card-title { color: var(--caution); }
+.gl-alert-card[data-threat="bullying"] .gl-alert-card-conf { color: var(--caution); }
+.gl-alert-card[data-threat="bullying"] .gl-alert-card-badge { background: var(--caution-bg); color: var(--caution); }
+.gl-alert-card[data-threat="bullying"] .gl-alert-card-pill { background: var(--caution-bg); color: var(--caution); }
+.gl-alert-card[data-threat="bullying"].gl-alert-card-new { background: #14110d; }
+.gl-alert-card[data-threat="bullying"].gl-alert-card-new::before { box-shadow: inset 0 0 20px rgba(186, 117, 23, 0.06); }
+
+/* Inappropriate content — orange */
+.gl-alert-card[data-threat="inappropriate_content"] { border-left: 3px solid var(--orange); }
+.gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-icon-wrap { background: var(--orange-bg); }
+.gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-icon-wrap svg { stroke: var(--orange); }
+.gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-title { color: var(--orange); }
+.gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-conf { color: var(--orange); }
+.gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-badge { background: var(--orange-bg); color: var(--orange); }
+.gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-pill { background: var(--orange-bg); color: var(--orange); }
+.gl-alert-card[data-threat="inappropriate_content"].gl-alert-card-new { background: #16100d; }
+.gl-alert-card[data-threat="inappropriate_content"].gl-alert-card-new::before { box-shadow: inset 0 0 20px rgba(216, 90, 48, 0.06); }
+
+/* Default / other */
+.gl-alert-card[data-threat="other"] { border-left: 3px solid var(--purple); }
+.gl-alert-card[data-threat="other"] .gl-alert-card-icon-wrap { background: #1e1e32; }
+.gl-alert-card[data-threat="other"] .gl-alert-card-icon-wrap svg { stroke: var(--purple); }
+.gl-alert-card[data-threat="other"] .gl-alert-card-title { color: var(--purple); }
+.gl-alert-card[data-threat="other"] .gl-alert-card-conf { color: var(--purple); }
+.gl-alert-card[data-threat="other"] .gl-alert-card-badge { background: #1e1e32; color: var(--purple); }
+.gl-alert-card[data-threat="other"] .gl-alert-card-pill { background: #1e1e32; color: var(--purple); }
+
+
 
 /* ============================================================ 9. Right panel — full analysis */
-
-#right-analysis {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
 
 .gl-analysis-back {
   font-size: 11px;
@@ -1409,40 +1531,50 @@ button { font-family: inherit; cursor: pointer; }
 }
 .gl-fade-in { animation: gl-fade-in 0.4s ease-out; }
 
+
 /* ============================================================ 12. Footer */
 
 .gl-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 3px 14px;
+  padding: 5px 14px;
   background: var(--bg-footer);
   border-top: 1px solid var(--border);
-  font-size: 9px;
-  color: var(--text-ghost);
+  font-size: 10px;
+  color: var(--text-dim);
 }
 .gl-footer strong {
   color: var(--text-secondary);
   font-weight: 400;
 }
 .gl-footer-receipt {
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 .gl-footer-zero {
   color: var(--safe) !important;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 14px;
 }
 .gl-footer-check {
   color: var(--safe);
   font-weight: 700;
-  font-size: 11px;
+  font-size: 12px;
   vertical-align: -1px;
   margin-left: 1px;
   opacity: 0;
   transition: opacity 0.5s ease;
 }
 .gl-footer-check-visible { opacity: 1; }
+.gl-footer-lock-icon {
+  display: inline-flex;
+  color: var(--safe);
+  margin-right: 2px;
+}
 
 /* ============================================================ 13. Empty / loading */
 
@@ -1455,6 +1587,37 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: var(--radius);
   font-size: 11px;
 }
+
+/* Skeleton shimmer for loading states */
+@keyframes gl-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.gl-skeleton {
+  background: linear-gradient(90deg, var(--bg-card) 25%, #1a1a2e 50%, var(--bg-card) 75%);
+  background-size: 200% 100%;
+  animation: gl-shimmer 1.8s ease-in-out infinite;
+  border-radius: var(--radius);
+}
+.gl-skeleton-line {
+  height: 10px;
+  margin-bottom: 6px;
+  border-radius: 4px;
+}
+.gl-skeleton-line-short { width: 60%; }
+.gl-skeleton-line-medium { width: 80%; }
+.gl-skeleton-line-full { width: 100%; }
+.gl-skeleton-block {
+  height: 120px;
+  border-radius: var(--radius);
+}
+.gl-skeleton-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+/* Hide skeletons once data has loaded */
+body.loaded .gl-skeleton-initial { display: none; }
 
 /* ============================================================ 14. Reduced motion */
 
