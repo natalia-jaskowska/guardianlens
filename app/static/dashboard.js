@@ -412,7 +412,7 @@
     const showing = history.length;
     const totalHint = total > showing ? `<span class="gl-history-total">${showing} of ${total}</span>` : "";
     if (newCount > 0) {
-      els.historyLabel.innerHTML = `Alerts <span class="gl-history-counter">${newCount} new</span>${totalHint}`;
+      els.historyLabel.innerHTML = `Alerts <span class="gl-history-counter">${newCount} new</span><span class="gl-history-markread" id="mark-all-read">Mark all read</span>${totalHint}`;
     } else {
       els.historyLabel.innerHTML = `Alerts <span class="gl-history-allreviewed">all reviewed</span>${totalHint}`;
     }
@@ -507,7 +507,7 @@
     const platIcon = pk !== "unknown"
       ? `<span class="gl-detail-hero-plat" style="background:${PLATFORM_COLORS[pk]||"#334155"}"><img src="/static/icons/${pk}.svg" alt=""></span>`
       : "";
-    const meta = `${platIcon}${esc(conv.username||"\u2014")} \u203a child \u00b7 ${esc(a.platform||"Unknown")}`;
+    const meta = `${platIcon}${esc(conv.username||"\u2014")} \u00b7 ${esc(a.platform||"Unknown")}`;
 
     const pills = (a.indicator_pills||a.indicators||[]).slice(0,6).map(p => {
       const l = typeof p==="string"?p:p.label;
@@ -567,7 +567,7 @@
     const sec = document.getElementById("why-section");
     if (!t) { if (sec) sec.style.display="none"; return; }
     if (sec) sec.style.display="";
-    els.whyThisMatters.innerHTML = `<div class="gl-why-text">${esc(t)}</div>`;
+    els.whyThisMatters.innerHTML = `<div class="gl-why-text">${esc(t).replace(/\n/g, "<br>")}</div>`;
   }
 
   function renderFlagged(a) {
@@ -712,6 +712,16 @@
         }
       });
     }
+    // Mark all read button (event delegation — button is recreated on render)
+    document.addEventListener("click", (e) => {
+      if (e.target.id === "mark-all-read" || e.target.closest("#mark-all-read")) {
+        const history = (window.__lastState && window.__lastState.alert_history) || [];
+        history.forEach(a => uiState.seenAlerts.add(String(a.analysis_id)));
+        saveSeen(uiState.seenAlerts);
+        _lastHistoryKey = "";
+        render(window.__lastState || {});
+      }
+    });
     const node = document.getElementById("initial-state");
     if (node) try { render(JSON.parse(node.textContent)); } catch(_) {}
     connectStream();

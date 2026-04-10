@@ -415,7 +415,7 @@ def build_alert_history(
                 pass
         if not summary_bits:
             summary_bits.append(cls.category.value.replace("_", " "))
-        summary = " — ".join(summary_bits)[:96]
+        summary = " · ".join(summary_bits)[:96]
 
         elapsed_label = _format_elapsed((now - analysis.timestamp).total_seconds())
 
@@ -899,11 +899,11 @@ def generate_reasoning_chain(
     if flagged:
         steps.append({"label": "STEP 3", "text": "Threat scan results:", "type": "info"})
         for msg in flagged[:5]:
-            quote = msg.text if len(msg.text) <= 42 else msg.text[:39] + "..."
+            quote = msg.text
             steps.append(
                 {
                     "label": "",
-                    "text": f'→ "{quote}" [{msg.flag}]',
+                    "text": f'→ \u201c{quote}\u201d [{msg.flag}]',
                     "type": "flag",
                 }
             )
@@ -949,9 +949,10 @@ def generate_reasoning_chain(
             stage_str = f" {stage_idx}/5"
         except ValueError:
             stage_str = ""
+    cat_label = analysis.classification.category.value.replace("_", " ").upper()
     verdict_text = (
-        f"{analysis.classification.threat_level.value.upper()} — "
-        f"{analysis.classification.category.value}{stage_str} — "
+        f"{analysis.classification.threat_level.value.upper()} · "
+        f"{cat_label}{stage_str} · "
         f"{round(analysis.classification.confidence)}%"
     )
     steps.append({"label": "VERDICT", "text": verdict_text, "type": "verdict"})
@@ -960,50 +961,48 @@ def generate_reasoning_chain(
 
 
 def generate_why_this_matters(analysis: ScreenAnalysis) -> str:
-    """One-paragraph explanation rendered with a red left-border accent."""
+    """Human-readable explanation — lines separated by newlines for the UI."""
     cls = analysis.classification
     if cls.threat_level == ThreatLevel.SAFE:
         return ""
 
-    indicator_count = len(cls.indicators_found)
+    tags = _dedup_indicators(cls.indicators_found or [])
+    tag_list = ", ".join(tags[:4]).lower() if tags else "multiple risk signals"
 
     if cls.category == ThreatCategory.GROOMING:
-        stage_label = ""
+        stage_line = ""
         if (
             analysis.grooming_stage is not None
             and analysis.grooming_stage.stage != GroomingStage.NONE
         ):
             try:
                 stage_idx = GROOMING_STAGE_ORDER.index(analysis.grooming_stage.stage) + 1
-                stage_label = (
-                    f" This matches stage {stage_idx} of the recognized "
-                    f"grooming progression."
-                )
+                stage_line = f"\nThis conversation matches stage {stage_idx} of 5 in the recognized grooming pattern."
             except ValueError:
-                stage_label = ""
+                pass
         return (
-            f"The user employed {indicator_count} grooming techniques in a single "
-            f"conversation: flattery, lying about age, attempting isolation to an "
-            f"unmonitored platform, and offering material incentives.{stage_label}"
+            f"Someone is using grooming tactics on your child — {tag_list}."
+            f"\nThese are deliberate techniques used to build trust and lower a child's guard."
+            f"{stage_line}"
         )
 
     if cls.category == ThreatCategory.BULLYING:
         return (
-            f"Repeated targeted harassment with {indicator_count} indicators in a "
-            f"single conversation. Patterns include exclusion, personal attacks, and "
-            f"public humiliation — all hallmarks of sustained cyberbullying."
+            f"Your child is being targeted with {tag_list}."
+            f"\nThis is a pattern of sustained harassment, not a one-off argument."
+            f"\nRepeated exposure can seriously affect a child's wellbeing."
         )
 
     if cls.category == ThreatCategory.INAPPROPRIATE_CONTENT:
         return (
-            f"Content unsuitable for the child's age was detected. {indicator_count} "
-            f"explicit indicators were flagged in this capture."
+            f"Content unsuitable for your child's age was detected."
+            f"\nThis type of exposure can be harmful, especially without context or guidance."
         )
 
     if cls.category == ThreatCategory.PERSONAL_INFO_SHARING:
         return (
-            f"The child appears to be sharing personal information that could be used "
-            f"to identify them offline ({indicator_count} indicators)."
+            f"Your child may be sharing personal details that could identify them offline."
+            f"\nThis information could be used by someone with bad intentions."
         )
 
     return (
@@ -1035,27 +1034,27 @@ def generate_recommended_action(
 
     if cls.category == ThreatCategory.GROOMING:
         steps = [
-            "Have a calm conversation with your child about this interaction.",
-            f"Ask who {other_user} is — they may or may not know this person.",
+            "Have a calm, private conversation with your child about this interaction.",
+            f"Ask who {other_user} is. They may or may not know this person offline.",
             "Block and report this user together with your child.",
         ]
     elif cls.category == ThreatCategory.BULLYING:
         steps = [
-            "Check in with your child gently — ask how their day was.",
-            "Don't ask leading questions; let them volunteer the conversation.",
-            "If they confirm bullying, help them block and document the offenders.",
+            "Check in with your child gently. Ask how their day was.",
+            "Let them share at their own pace. Avoid leading questions.",
+            "If they confirm bullying, help them block and save evidence.",
         ]
     elif cls.category == ThreatCategory.PERSONAL_INFO_SHARING:
         steps = [
-            "Talk to your child about why personal info should stay private.",
+            "Talk to your child about keeping personal details private online.",
             "Review their privacy settings together on this platform.",
             "Make a habit of checking in weekly without judgment.",
         ]
     else:
         steps = [
             "Review the threat breakdown above carefully.",
-            "Check whether the pattern repeats in the next few minutes.",
-            "Take action only if the behavior continues.",
+            "Watch whether the pattern repeats in the next few scans.",
+            "Take action if the behavior continues.",
         ]
 
     return {"steps": steps, "privacy_note": privacy_note}

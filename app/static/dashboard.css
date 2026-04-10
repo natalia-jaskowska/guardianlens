@@ -912,6 +912,17 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 500;
   color: var(--alert);
 }
+.gl-history-markread {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-dim);
+  cursor: pointer;
+  margin-left: auto;
+  transition: color 0.15s;
+}
+.gl-history-markread:hover {
+  color: var(--text-primary);
+}
 .gl-history-allreviewed {
   font-size: 10px;
   font-weight: 400;
@@ -1592,6 +1603,8 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 12px;
   line-height: 1.7;
   color: var(--text-muted);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 .gl-reasoning-step-label {
   color: var(--text-dim);
@@ -1605,10 +1618,12 @@ button { font-family: inherit; cursor: pointer; }
 .gl-reasoning-step-flag {
   color: #f0a0a0;
   display: block;
-  padding: 3px 0 3px 12px;
+  padding: 4px 0 4px 12px;
   border-left: 2px solid rgba(226, 75, 74, 0.25);
   margin: 3px 0;
   font-size: 11px;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 .gl-reasoning-step-verdict {
   color: var(--alert);
