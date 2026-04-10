@@ -4,18 +4,15 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{{ title }}</title>
-    <meta name="description" content="On-device AI child safety monitor powered by Gemma 4." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/static/dashboard.css?v=18" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/static/dashboard.css?v=20" />
   </head>
   <body>
     <div id="shell" class="gl-shell">
-      <!-- ===================== HEADER ===================== -->
+
+      <!-- ====== HEADER ====== -->
       <header class="gl-header">
         <div class="gl-header-left">
           <svg class="gl-logo-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -23,11 +20,6 @@
             <circle cx="12" cy="11" r="2.5"/>
           </svg>
           <span class="gl-logo-text">GuardianLens</span>
-          <span class="gl-header-sep"></span>
-          <span class="gl-header-privacy">
-            <svg width="9" height="9" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke-linecap="round"/></svg>
-            On-device
-          </span>
         </div>
         <div class="gl-header-right">
           <div class="gl-header-status" id="header-status">
@@ -35,106 +27,83 @@
             <span>Connecting...</span>
           </div>
           <span class="gl-header-sep"></span>
-          <div class="gl-header-chip" id="header-duration">--:--</div>
-          <span class="gl-header-sep"></span>
           <div class="gl-header-chip gl-header-chip-model" id="header-model">{{ model_name }}</div>
         </div>
       </header>
 
-      <!-- ===================== MAIN ===================== -->
+      <!-- ====== MAIN ====== -->
       <main class="gl-main">
-        <!-- LEFT COLUMN ............................................. -->
-        <section class="gl-left">
-          <!-- Top row: capture + shield side by side -->
-          <div class="gl-top-grid">
-            <!-- Capture (left cell) -->
-            <div class="gl-section gl-section-capture">
-              <div class="gl-section-label">
-                <span>Latest capture</span>
-                <span class="gl-live-tag" id="capture-live-tag">
-                  <span class="gl-live-dot"></span>
-                  <span class="gl-live-text">LIVE</span>
-                </span>
-              </div>
-              <div class="gl-capture gl-capture-safe" id="capture-card">
-                <div class="gl-capture-screen" id="capture-screen">
-                  <div class="gl-capture-placeholder">
-                    <div class="gl-skeleton gl-skeleton-block" style="width:100%;height:100%;position:absolute;inset:0"></div>
-                  </div>
-                </div>
-                <div class="gl-capture-bar" id="capture-bar">
-                  <div class="gl-capture-bar-left">
-                    <div class="gl-capture-bar-icon" id="capture-bar-icon"></div>
-                    <div class="gl-capture-bar-textwrap">
-                      <div class="gl-capture-bar-title" id="capture-bar-title">Initializing</div>
-                      <div class="gl-capture-bar-sub" id="capture-bar-sub">—</div>
-                    </div>
-                  </div>
-                  <div class="gl-capture-bar-right">
-                    <span class="gl-capture-bar-time" id="capture-bar-time">--:--:--</span>
-                    <span class="gl-capture-bar-badge" id="capture-bar-badge" style="display:none"></span>
-                  </div>
-                </div>
+
+        <!-- LEFT — capture hero + stats + timeline -->
+        <section class="gl-content">
+
+          <!-- Capture hero -->
+          <div class="gl-capture gl-capture-safe" id="capture-card">
+            <div class="gl-capture-top">
+              <span class="gl-live-tag" id="capture-live-tag">
+                <span class="gl-live-dot"></span>
+                LIVE
+              </span>
+              <span class="gl-capture-time" id="capture-bar-time">--:--:--</span>
+            </div>
+            <div class="gl-capture-screen" id="capture-screen">
+              <div class="gl-capture-placeholder">
+                <div class="gl-skeleton gl-skeleton-block" style="width:100%;height:100%;position:absolute;inset:0"></div>
               </div>
             </div>
-
-            <!-- Status card (right cell) -->
-            <div class="gl-status-card" id="shield-hero">
-              <div class="gl-status-top">
-                <div class="gl-status-icon" id="shield-icon"></div>
-                <div class="gl-status-info">
-                  <div class="gl-status-title" id="shield-title">All clear</div>
-                  <div class="gl-status-sub" id="shield-sub">Monitoring active</div>
-                </div>
-              </div>
-              <div class="gl-status-metrics">
-                <div class="gl-status-metric" id="status-safe-pct">
-                  <span class="gl-status-metric-val">—</span>
-                  <span class="gl-status-metric-lbl">Safe</span>
-                </div>
-                <div class="gl-status-metric" id="status-platforms">
-                  <span class="gl-status-metric-val">0</span>
-                  <span class="gl-status-metric-lbl">Platforms</span>
-                </div>
-                <div class="gl-status-metric" id="status-alerts">
-                  <span class="gl-status-metric-val">0</span>
-                  <span class="gl-status-metric-lbl">Alerts</span>
-                </div>
-                <div class="gl-status-metric" id="status-response">
-                  <span class="gl-status-metric-val">—</span>
-                  <span class="gl-status-metric-lbl">Response</span>
-                </div>
-              </div>
-              <div class="gl-status-ribbon">
-                <div class="gl-ribbon" id="ribbon"></div>
-              </div>
+            <div class="gl-capture-bar" id="capture-bar">
+              <div class="gl-capture-bar-icon" id="capture-bar-icon"></div>
+              <div class="gl-capture-bar-title" id="capture-bar-title">Initializing</div>
+              <div class="gl-capture-bar-sub" id="capture-bar-sub"></div>
             </div>
           </div>
 
-          <!-- Timeline spans full width below -->
-          <div class="gl-section gl-section-grow">
-            <div class="gl-section-label">
+          <!-- Stats row — horizontal under capture -->
+          <div class="gl-stats-row">
+            <div class="gl-status-mini" id="shield-hero">
+              <div class="gl-status-icon" id="shield-icon"></div>
+              <div class="gl-status-title" id="shield-title">All clear</div>
+              <div class="gl-status-sub" id="shield-sub">Monitoring</div>
+            </div>
+            <div class="gl-stats-divider"></div>
+            <div class="gl-stat" id="status-safe-pct">
+              <span class="gl-stat-val">—</span>
+              <span class="gl-stat-lbl">Safe</span>
+            </div>
+            <div class="gl-stat" id="status-platforms">
+              <span class="gl-stat-val">0</span>
+              <span class="gl-stat-lbl">Platforms</span>
+            </div>
+            <div class="gl-stat" id="status-alerts">
+              <span class="gl-stat-val">0</span>
+              <span class="gl-stat-lbl">Alerts</span>
+            </div>
+            <div class="gl-stat" id="status-response">
+              <span class="gl-stat-val">—</span>
+              <span class="gl-stat-lbl">Response</span>
+            </div>
+          </div>
+
+          <!-- Timeline — fills remaining space -->
+          <div class="gl-timeline-wrap">
+            <div class="gl-timeline-label">
               <span>Timeline</span>
               <span class="gl-section-meta" id="last-refresh">--</span>
             </div>
             <div class="gl-timeline" id="timeline">
-              <div class="gl-skeleton-initial" style="padding:6px 0;display:flex;flex-direction:column;gap:8px">
+              <div class="gl-skeleton-initial" style="display:flex;flex-direction:column;gap:8px">
                 <div class="gl-skeleton gl-skeleton-line gl-skeleton-line-full"></div>
                 <div class="gl-skeleton gl-skeleton-line gl-skeleton-line-medium"></div>
                 <div class="gl-skeleton gl-skeleton-line gl-skeleton-line-full"></div>
-                <div class="gl-skeleton gl-skeleton-line gl-skeleton-line-short"></div>
-                <div class="gl-skeleton gl-skeleton-line gl-skeleton-line-medium"></div>
               </div>
             </div>
           </div>
+
         </section>
 
-        <!-- RIGHT COLUMN — three states managed by JS:
-             1. SAFE overview (default)        — #right-safe
-             2. FULL ANALYSIS (clicked or auto) — #right-analysis -->
-        <aside class="gl-side">
+        <!-- RIGHT — alerts or detail -->
+        <aside class="gl-sidebar">
 
-          <!-- STATE 1: Overview (alert history list only) -->
           <div id="overview-panel">
             <div class="gl-history-header">
               <span class="gl-history-label" id="history-label">Alerts</span>
@@ -148,15 +117,12 @@
             </div>
           </div>
 
-          <!-- STATE 2: Detail (back button + full analysis) -->
           <div id="detail-panel" style="display:none">
             <div class="gl-detail-back" id="analysis-back">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
               All alerts
             </div>
-
             <div class="gl-detail-hero" id="analysis-card"></div>
-
             <div class="gl-detail-section" id="capture-section" style="display:none">
               <div class="gl-detail-section-head">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
@@ -164,7 +130,6 @@
               </div>
               <div class="gl-detail-capture" id="detail-capture"></div>
             </div>
-
             <div class="gl-detail-section">
               <div class="gl-detail-section-head">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
@@ -172,7 +137,6 @@
               </div>
               <div class="gl-detail-reasoning" id="reasoning-chain"></div>
             </div>
-
             <div class="gl-detail-section" id="why-section">
               <div class="gl-detail-section-head">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/><circle cx="12" cy="12" r="10"/></svg>
@@ -180,7 +144,6 @@
               </div>
               <div class="gl-detail-why" id="why-this-matters"></div>
             </div>
-
             <div class="gl-detail-section" id="flagged-section" style="display:none">
               <div class="gl-detail-section-head">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
@@ -188,7 +151,6 @@
               </div>
               <div class="gl-detail-flagged" id="flagged-messages"></div>
             </div>
-
             <div class="gl-detail-section">
               <div class="gl-detail-section-head">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -196,17 +158,16 @@
               </div>
               <div class="gl-detail-action" id="recommended-action"></div>
             </div>
-
             <div class="gl-detail-privacy">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke-linecap="round"/></svg>
-              <span>All analysis runs on-device. No screenshots or chat data ever leave this machine. Remote alerts contain only AI-generated summaries.</span>
+              <span>All analysis runs on-device. No screenshots or chat data ever leave this machine.</span>
             </div>
           </div>
 
         </aside>
       </main>
 
-      <!-- ===================== FOOTER ===================== -->
+      <!-- ====== FOOTER ====== -->
       <footer class="gl-footer">
         <span class="gl-footer-left">
           <span id="footer-model">{{ model_name }}</span>
@@ -216,17 +177,15 @@
           local inference
         </span>
         <span class="gl-footer-right">
-          <svg class="gl-footer-lock" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke-linecap="round"/></svg>
-          <span class="gl-footer-zero-label">Cloud data:</span>
-          <strong class="gl-footer-zero" id="footer-bytes-zero">0 bytes</strong>
-          <span class="gl-footer-check" id="footer-bytes-check">&#10003;</span>
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke-linecap="round"/></svg>
+          On-device only
+          <span class="gl-footer-sep">&middot;</span>
+          All data stays on this machine
         </span>
       </footer>
     </div>
 
-    <!-- Initial state, server-rendered. The JS picks this up so the page
-         isn't blank for the first SSE round-trip. -->
     <script id="initial-state" type="application/json">{{ initial_state | tojson }}</script>
-    <script src="/static/dashboard.js?v=18" defer></script>
+    <script src="/static/dashboard.js?v=20" defer></script>
   </body>
 </html>

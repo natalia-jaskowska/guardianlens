@@ -692,6 +692,11 @@ _INDICATOR_TAGS: list[tuple[str, str]] = [
     ("threat", "Threats"),
     ("kill", "Threats"),
     ("bully", "Bullying"),
+    ("negative", "Harassment"),
+    ("harass", "Harassment"),
+    ("toxic", "Toxic behavior"),
+    ("hostile", "Hostility"),
+    ("aggress", "Aggression"),
     # Content
     ("explicit", "Explicit content"),
     ("inappropriate", "Inappropriate"),
@@ -723,14 +728,15 @@ def _clean_indicator(raw: str) -> str:
                 return tag
         elif keyword in norm:
             return tag
-    # Fallback: strip parenthetical, take first phrase
-    label = raw.split("(")[0].split(",")[0].strip().rstrip(".,;:-")
-    # Also strip after slash if long
-    if "/" in label and len(label) > 16:
+    # Fallback: strip parenthetical/quote, take first 2-3 words
+    label = raw.split("(")[0].split(",")[0].split('"')[0].strip().rstrip(".,;:-")
+    if "/" in label:
         label = label.split("/")[0].strip()
-    if len(label) > 18:
-        label = label[:16].rstrip() + "\u2026"
-    return label or raw[:16]
+    # Take first 3 words — always clean, never mid-word truncation
+    words = label.split()
+    if len(words) > 3:
+        label = " ".join(words[:3])
+    return label or raw.split()[0] if raw.split() else "Unknown"
 
 
 def _dedup_indicators(raw_indicators: list[str]) -> list[str]:

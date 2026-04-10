@@ -43,7 +43,7 @@ class MonitorConfig(BaseModel):
     capture_interval_seconds: float = Field(15.0, gt=0)
     monitor_index: int = 1
     screenshots_dir: Path = PROJECT_ROOT / "outputs" / "screenshots"
-    keep_last_n: int = 50
+    keep_last_n: int = 200
     demo_mode: bool = Field(
         False,
         description=(

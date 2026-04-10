@@ -13,7 +13,6 @@
   const els = {
     shell: document.getElementById("shell"),
     headerStatus: document.getElementById("header-status"),
-    headerDuration: document.getElementById("header-duration"),
     headerModel: document.getElementById("header-model"),
 
     shieldHero: document.getElementById("shield-hero"),
@@ -27,7 +26,6 @@
     captureBarTitle: document.getElementById("capture-bar-title"),
     captureBarSub: document.getElementById("capture-bar-sub"),
     captureBarTime: document.getElementById("capture-bar-time"),
-    captureBarBadge: document.getElementById("capture-bar-badge"),
 
     ribbon: document.getElementById("ribbon"),
     timeline: document.getElementById("timeline"),
@@ -131,6 +129,9 @@
       saveSeen(uiState.seenAlerts);
       uiState.selectedAnalysis = a;
       render(window.__lastState || {});
+      // Scroll sidebar to top so the hero card is visible
+      const sidebar = document.querySelector(".gl-sidebar");
+      if (sidebar) sidebar.scrollTo({ top: 0, behavior: "smooth" });
     } catch(_) {}
   }
 
@@ -139,6 +140,8 @@
     els.detailPanel.style.display = "none";
     els.overviewPanel.style.display = "";
     renderRightPanel(window.__lastState || {});
+    const sidebar = document.querySelector(".gl-sidebar");
+    if (sidebar) sidebar.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   // ----------------------------------------------------------------- shield hero (filled SVG, matching mockup)
@@ -173,20 +176,21 @@
     const pCount = h.platform_count || 0;
 
     let mode, icon, title, sub;
+    const dur = h.session_duration || "0m 00s";
     if (isAlert) {
       mode = "alert"; icon = SHIELD_ALERT;
       title = "Threat detected";
-      sub = "Click alert to inspect";
+      sub = `Session: ${dur}`;
     } else if (isCaution) {
       mode = "caution"; icon = SHIELD_CAUTION;
       title = "Watch closely";
-      sub = `Monitoring ${pCount} platform${pCount===1?"":"s"}`;
+      sub = `Session: ${dur}`;
     } else {
       mode = "safe"; icon = SHIELD_SAFE;
       title = "All clear";
-      sub = pCount > 0 ? `Monitoring ${pCount} platform${pCount===1?"":"s"}` : (streak >= 3 ? `${streak} safe in a row` : `${h.scans||0} scans`);
+      sub = `Session: ${dur}`;
     }
-    els.shieldHero.className = `gl-status-card gl-shield-${mode}`;
+    els.shieldHero.className = `gl-status-mini gl-shield-${mode}`;
     els.shieldIcon.innerHTML = icon;
     setText(els.shieldTitle, title);
     setText(els.shieldSub, sub);
@@ -200,20 +204,20 @@
     const safeCount = h.safe || 0;
     if (safePctEl) {
       const pct = scans > 0 ? Math.round(100 * safeCount / scans) : 0;
-      const val = safePctEl.querySelector(".gl-status-metric-val");
+      const val = safePctEl.querySelector(".gl-stat-val");
       val.textContent = scans > 0 ? `${pct}%` : "\u2014";
       val.style.color = pct >= 90 ? "var(--safe)" : pct >= 70 ? "var(--caution)" : pct > 0 ? "var(--alert)" : "";
     }
-    if (platsEl) platsEl.querySelector(".gl-status-metric-val").textContent = pCount;
+    if (platsEl) platsEl.querySelector(".gl-stat-val").textContent = pCount;
     if (alertsEl) {
       const aCount = h.alerts || 0;
-      const val = alertsEl.querySelector(".gl-status-metric-val");
+      const val = alertsEl.querySelector(".gl-stat-val");
       val.textContent = aCount;
       val.style.color = aCount > 0 ? "var(--alert)" : "";
     }
     if (respEl) {
       const avg = h.avg_inference_label || "\u2014";
-      respEl.querySelector(".gl-status-metric-val").textContent = avg.replace(" avg", "");
+      respEl.querySelector(".gl-stat-val").textContent = avg.replace(" avg", "");
     }
   }
 
@@ -229,7 +233,6 @@
     else { dotCls = "gl-dot gl-dot-safe"; label = "Active"; }
     els.headerStatus.className = `gl-header-status ${extra}`.trim();
     els.headerStatus.innerHTML = `<span class="${dotCls}"></span><span class="status-text">${esc(label)}</span>`;
-    setText(els.headerDuration, state.session_duration || "0m 00s");
     setText(els.headerModel, state.model_name || "");
   }
 
@@ -252,7 +255,6 @@
       setText(els.captureBarTitle, "Initializing");
       setText(els.captureBarSub, "");
       setText(els.captureBarTime, "--:--:--");
-      els.captureBarBadge.style.display = "none";
       return;
     }
     const level = a.threat_level || "safe";
@@ -261,11 +263,15 @@
     const mode = isAlert ? "alert" : isCaution ? "caution" : "safe";
     els.captureCard.className = `gl-capture gl-capture-${mode}`;
 
+    // Always store the screenshot URL for the lightbox
+    const screenshotSrc = a.screenshot_url ? `${a.screenshot_url}?t=${encodeURIComponent(a.timestamp||Date.now())}` : "";
+    els.captureScreen.dataset.screenshot = screenshotSrc;
+
     const hasChat = (a.chat_messages||[]).length > 0;
     if ((isAlert||isCaution) && hasChat) {
       els.captureScreen.innerHTML = renderChat(a);
     } else if (a.screenshot_url) {
-      els.captureScreen.innerHTML = `<img class="gl-capture-img" src="${a.screenshot_url}?t=${encodeURIComponent(a.timestamp||Date.now())}" alt="">`;
+      els.captureScreen.innerHTML = `<img class="gl-capture-img" src="${screenshotSrc}" alt="">`;
     } else {
       els.captureScreen.innerHTML = `<div class="gl-capture-placeholder">${esc(a.platform||"")}</div>`;
     }
@@ -273,18 +279,17 @@
     if (isAlert) {
       els.captureBarIcon.innerHTML = CAP_WARN;
       const lbl = (a.category_label||"Threat").trim();
-      const stg = a.stage_segments && a.stage_segments.current_index >= 0 ? ` - STAGE ${a.stage_segments.current_index+1}/5` : "";
-      setText(els.captureBarTitle, `${lbl} detected - ${a.confidence}%${stg}`);
+      const stg = a.stage_segments && a.stage_segments.current_index >= 0 ? ` \u00b7 Stage ${a.stage_segments.current_index+1}/5` : "";
+      setText(els.captureBarTitle, `${lbl} \u00b7 ${a.confidence}%${stg}`);
     } else if (isCaution) {
       els.captureBarIcon.innerHTML = CAP_EYE;
-      setText(els.captureBarTitle, `${(a.category_label||"Caution").trim()} - watch closely`);
+      setText(els.captureBarTitle, `${(a.category_label||"Caution").trim()} \u00b7 watch closely`);
     } else {
       els.captureBarIcon.innerHTML = CAP_CHECK;
-      setText(els.captureBarTitle, `All clear - No threats - ${a.platform||"Unknown"}`);
+      setText(els.captureBarTitle, `${a.platform||"Unknown"} \u00b7 No threats`);
     }
     setText(els.captureBarSub, "");
     setText(els.captureBarTime, a.time_label || "--:--:--");
-    els.captureBarBadge.style.display = "none";
   }
 
   function renderChat(a) {
@@ -309,6 +314,7 @@
   // ----------------------------------------------------------------- ribbon + timeline
 
   function renderRibbon(state) {
+    if (!els.ribbon) return;
     const hist = state.scan_history || [];
     const slots = 20;
     const padded = hist.slice(-slots);
@@ -624,7 +630,6 @@
     renderHeader(state);
     renderShield(state);
     renderCapture(state);
-    renderRibbon(state);
     renderTimeline(state);
 
     if (els.footerBytesCheck && state.metrics && state.metrics.screenshots > 0) {
@@ -672,21 +677,31 @@
     if (els.analysisBack) {
       els.analysisBack.addEventListener("click", showOverview);
     }
-    // Lightbox for captured screenshot
-    document.addEventListener("click", (e) => {
-      const frame = e.target.closest("#capture-frame");
-      if (!frame) return;
-      const img = frame.querySelector("img");
-      if (!img) return;
+    // Lightbox — reusable for any image click
+    function openLightbox(imgSrc) {
       const overlay = document.createElement("div");
       overlay.className = "gl-lightbox";
-      overlay.innerHTML = `<img src="${img.src}" alt=""><div class="gl-lightbox-hint">Click anywhere or press Esc to close</div><div class="gl-lightbox-close">\u00d7</div>`;
+      overlay.innerHTML = `<img src="${imgSrc}" alt=""><div class="gl-lightbox-hint">Click anywhere or press Esc to close</div><div class="gl-lightbox-close">\u00d7</div>`;
       document.body.appendChild(overlay);
       requestAnimationFrame(() => overlay.classList.add("gl-lightbox-open"));
       const close = () => { overlay.classList.remove("gl-lightbox-open"); setTimeout(() => overlay.remove(), 200); };
       overlay.addEventListener("click", close);
       document.addEventListener("keydown", function esc(ev) { if (ev.key === "Escape") { close(); document.removeEventListener("keydown", esc); } });
+    }
+    // Detail panel capture lightbox
+    document.addEventListener("click", (e) => {
+      const frame = e.target.closest("#capture-frame");
+      if (!frame) return;
+      const img = frame.querySelector("img");
+      if (img) openLightbox(img.src);
     });
+    // Main capture lightbox — always opens the real screenshot
+    if (els.captureScreen) {
+      els.captureScreen.addEventListener("click", () => {
+        const src = els.captureScreen.dataset.screenshot;
+        if (src) openLightbox(src);
+      });
+    }
     // Event delegation for alert history clicks — survives innerHTML re-renders
     if (els.alertHistory) {
       els.alertHistory.addEventListener("click", (e) => {

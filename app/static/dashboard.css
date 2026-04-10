@@ -80,7 +80,6 @@ button { font-family: inherit; cursor: pointer; }
   height: 100vh;
   overflow: hidden;
   background: var(--bg-primary);
-  border-radius: 12px;
   transition: box-shadow 0.5s ease;
 }
 .gl-shell.gl-alert-active {
@@ -89,56 +88,59 @@ button { font-family: inherit; cursor: pointer; }
 
 .gl-main {
   display: grid;
-  grid-template-columns: 55% 45%;
+  grid-template-columns: 1fr 1fr;
   gap: 0;
   min-height: 0;
   overflow: hidden;
 }
 
-.gl-left {
+/* LEFT — main content: capture hero + stats + timeline */
+.gl-content {
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 12px 16px;
+  padding: 16px 20px;
+  gap: 12px;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border-right: 1px solid var(--border);
 }
 
-/* 2-column top grid: capture (wider) | shield+ribbon */
-.gl-top-grid {
-  display: grid;
-  grid-template-columns: 1.3fr 0.7fr;
-  gap: 8px;
-  flex-shrink: 0;
+/* RIGHT — alerts panel */
+.gl-sidebar {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px;
+  min-width: 0;
   min-height: 0;
-}
-@media (max-width: 900px) {
-  .gl-top-grid { grid-template-columns: 1fr; }
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
 }
 
-/* Status card */
-.gl-status-card {
+/* ============================================================ 5. Capture hero */
+
+/* ============================================================ 5b. Stats row */
+
+.gl-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  display: flex;
-  flex-direction: column;
-  padding: 14px;
-  gap: 12px;
-  min-height: 0;
-  transition: border-color 0.4s, background 0.4s;
+  padding: 10px 0;
+  flex-shrink: 0;
 }
-
-.gl-status-top {
+.gl-status-mini {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  padding: 0 14px;
+  min-width: 0;
+  flex-shrink: 0;
 }
 .gl-status-icon {
-  width: 36px;
-  height: 40px;
+  width: 28px;
+  height: 32px;
   flex-shrink: 0;
 }
 .gl-status-icon svg {
@@ -146,79 +148,74 @@ button { font-family: inherit; cursor: pointer; }
   height: 100%;
   display: block;
 }
-.gl-status-info {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
 .gl-status-title {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.2px;
   transition: color 0.4s;
+  white-space: nowrap;
 }
 .gl-status-sub {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-dim);
+  white-space: nowrap;
 }
-
-/* Three metric counters */
-.gl-status-metrics {
-  display: flex;
-  gap: 0;
-  border-top: 1px solid var(--border);
-  padding-top: 10px;
+.gl-stats-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border);
+  flex-shrink: 0;
 }
-.gl-status-metric {
+.gl-stat {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1px;
+  min-width: 0;
 }
-.gl-status-metric:not(:last-child) {
-  border-right: 1px solid var(--border);
-}
-.gl-status-metric-val {
-  font-size: 18px;
+.gl-stat-val {
+  font-size: 16px;
   font-weight: 600;
   font-family: var(--font-mono);
   color: var(--text-primary);
   letter-spacing: -0.5px;
-  line-height: 1;
+  line-height: 1.1;
 }
-.gl-status-metric-lbl {
-  font-size: 9px;
+.gl-stat-lbl {
+  font-size: 8px;
   color: var(--text-ghost);
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-/* Ribbon at bottom of status card */
-.gl-status-ribbon {
-  width: 100%;
+  letter-spacing: 0.4px;
 }
 
 /* Shield state colors */
 .gl-shield-safe .gl-status-title { color: var(--safe); }
-.gl-shield-safe { border-color: rgba(29, 158, 117, 0.15); }
-
 .gl-shield-caution .gl-status-title { color: var(--caution); }
-.gl-shield-caution { border-color: rgba(186, 117, 23, 0.2); background: #14110d; }
-
 .gl-shield-alert .gl-status-title { color: var(--alert); }
-.gl-shield-alert { border-color: rgba(226, 75, 74, 0.2); background: #1a1018; }
 
-.gl-side {
-  background: transparent;
-  padding: 12px 16px;
+/* ============================================================ 5c. Timeline */
+
+.gl-timeline-wrap {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
+.gl-timeline-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  flex-shrink: 0;
+}
+
 #overview-panel {
   display: flex;
   flex-direction: column;
@@ -257,8 +254,8 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  height: 38px;
+  padding: 0 20px;
+  height: 44px;
   background: var(--bg-topbar);
   border-bottom: 1px solid var(--border);
   position: sticky;
@@ -291,8 +288,8 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .gl-logo-shield {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   color: var(--safe);
   flex-shrink: 0;
   transition: color 0.4s;
@@ -300,7 +297,7 @@ button { font-family: inherit; cursor: pointer; }
 .gl-shell.gl-alert-active .gl-logo-shield { color: var(--alert); }
 
 .gl-logo-text {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.2px;
@@ -386,18 +383,19 @@ button { font-family: inherit; cursor: pointer; }
 .gl-live-tag {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   font-size: 10px;
-  font-weight: 500;
-  color: var(--alert);
-  text-transform: none;
-  letter-spacing: 0;
+  font-weight: 600;
+  color: var(--safe);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 .gl-live-dot {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--alert);
+  background: var(--safe);
+  animation: pulse-dot 2s infinite;
   animation: pulse-dot 1.5s infinite;
 }
 .gl-live-text {
@@ -414,39 +412,63 @@ button { font-family: inherit; cursor: pointer; }
 
 /* --- Capture box --- */
 
-.gl-section-capture {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-}
-.gl-section-capture .gl-section-label { margin-top: 0; }
-
 .gl-capture {
-  background: var(--bg-secondary);
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 12px;
   overflow: hidden;
-  margin-top: 0;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 0;
-  transition: border-color 0.4s ease;
+  flex-shrink: 0;
+  transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 .gl-capture-safe    { border-color: var(--border); }
-.gl-capture-caution { border-color: rgba(186, 117, 23, 0.4); }
-.gl-capture-alert   { border-color: rgba(226, 75, 74, 0.4); }
+.gl-capture-caution { border-color: rgba(186, 117, 23, 0.35); box-shadow: 0 0 20px rgba(186, 117, 23, 0.06); }
+.gl-capture-alert   { border-color: rgba(226, 75, 74, 0.35); box-shadow: 0 0 20px rgba(226, 75, 74, 0.06); }
+
+.gl-capture-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+.gl-capture-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-ghost);
+}
 
 .gl-capture-screen {
   position: relative;
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 200px;
+  height: 300px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0a0a14;
+  background: #080810;
+  margin: 0 8px;
+  border-radius: 8px;
   overflow: hidden;
+  cursor: pointer;
+}
+.gl-capture-screen::after {
+  content: "Click to enlarge";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 8px 0;
+  text-align: center;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  background: linear-gradient(transparent, rgba(8, 8, 16, 0.95));
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 0 0 8px 8px;
+}
+.gl-capture-screen:hover::after {
+  opacity: 1;
 }
 .gl-capture-img {
   display: block;
@@ -559,24 +581,15 @@ button { font-family: inherit; cursor: pointer; }
 
 /* Capture status bar */
 .gl-capture-bar {
-  padding: 5px 10px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  border-top: 1px solid var(--border);
-  font-size: 10px;
-  transition: all 0.4s ease;
-}
-.gl-capture-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  flex: 1;
+  gap: 8px;
+  font-size: 12px;
 }
 .gl-capture-bar-icon {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -586,9 +599,8 @@ button { font-family: inherit; cursor: pointer; }
 .gl-capture-caution .gl-capture-bar-icon { color: var(--caution); }
 .gl-capture-alert .gl-capture-bar-icon { color: var(--alert); }
 
-.gl-capture-bar-textwrap { min-width: 0; }
 .gl-capture-bar-title {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -599,31 +611,9 @@ button { font-family: inherit; cursor: pointer; }
 .gl-capture-alert .gl-capture-bar-title { color: var(--alert); }
 
 .gl-capture-bar-sub {
-  font-size: 9px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.gl-capture-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.gl-capture-bar-time {
-  font-family: var(--font-mono);
   font-size: 10px;
-  color: var(--text-faint);
-}
-.gl-capture-bar-badge {
-  font-size: 9px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: var(--alert-bg);
-  color: var(--alert);
-  font-weight: 500;
-  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-left: auto;
 }
 
 /* --- Status ribbon --- */
@@ -662,7 +652,6 @@ button { font-family: inherit; cursor: pointer; }
   gap: 4px;
   flex: 1 1 0;
   min-height: 0;
-  max-height: 240px;
   overflow-y: auto;
   padding-right: 2px;
 }
@@ -1770,8 +1759,8 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
-  height: 28px;
+  padding: 0 20px;
+  height: 30px;
   background: var(--bg-footer);
   border-top: 1px solid var(--border);
   font-size: 10px;
@@ -1795,30 +1784,12 @@ button { font-family: inherit; cursor: pointer; }
   align-items: center;
   gap: 4px;
   font-size: 10px;
-  color: var(--text-dim);
-}
-.gl-footer-lock {
   color: var(--safe);
+}
+.gl-footer-right svg {
   flex-shrink: 0;
   opacity: 0.7;
 }
-.gl-footer-zero-label {
-  color: var(--text-ghost);
-}
-.gl-footer-zero {
-  color: var(--safe) !important;
-  font-weight: 700;
-  font-size: 11px;
-}
-.gl-footer-check {
-  color: var(--safe);
-  font-weight: 700;
-  font-size: 11px;
-  margin-left: 0;
-  opacity: 0;
-  transition: opacity 0.5s ease;
-}
-.gl-footer-check-visible { opacity: 1; }
 
 /* ============================================================ 13. Empty / loading */
 
