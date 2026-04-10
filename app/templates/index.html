@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/dashboard.css?v=25" />
+    <link rel="stylesheet" href="/static/dashboard.css?v=26" />
   </head>
   <body>
     <div id="shell" class="gl-shell">
@@ -64,12 +64,8 @@
             </div>
           </div>
 
-          <!-- Stats -->
+          <!-- Stats — single compact row -->
           <div class="gl-stats-wrap">
-            <div class="gl-stats-header">
-              <span class="gl-stats-title">Session</span>
-              <span class="gl-stats-duration" id="shield-sub">0m 00s</span>
-            </div>
             <div class="gl-stats-row">
               <div class="gl-stat" id="status-scans">
                 <span class="gl-stat-val">0</span>
@@ -90,6 +86,10 @@
               <div class="gl-stat" id="status-response">
                 <span class="gl-stat-val">—</span>
                 <span class="gl-stat-lbl">Response</span>
+              </div>
+              <div class="gl-stat" id="shield-sub">
+                <span class="gl-stat-val gl-stat-val-session">0:00</span>
+                <span class="gl-stat-lbl">Session</span>
               </div>
             </div>
           </div>
@@ -196,6 +196,6 @@
     </div>
 
     <script id="initial-state" type="application/json">{{ initial_state | tojson }}</script>
-    <script src="/static/dashboard.js?v=25" defer></script>
+    <script src="/static/dashboard.js?v=26" defer></script>
   </body>
 </html>

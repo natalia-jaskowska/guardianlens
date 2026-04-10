@@ -187,8 +187,12 @@
       title = "All clear";
       sub = `Session: ${dur}`;
     }
-    // Shield removed from capture card — only update session duration
-    setText(els.shieldSub, dur);
+    // Session duration in stats row
+    const sessionEl = els.shieldSub;
+    if (sessionEl) {
+      const valEl = sessionEl.querySelector(".gl-stat-val");
+      if (valEl) valEl.textContent = dur;
+    }
 
     // Populate metric counters
     const scansEl = document.getElementById("status-scans");
@@ -225,13 +229,13 @@
     const paused = state.paused;
     const latest = state.latest;
     const isAlert = latest && (latest.threat_level === "alert" || latest.threat_level === "critical");
-    let dotCls, label, extra = "";
-    if (paused) { dotCls = "gl-dot gl-dot-dim"; label = "Paused"; }
-    else if (!mon) { dotCls = "gl-dot gl-dot-dim"; label = "Stopped"; }
-    else if (isAlert) { dotCls = "gl-dot gl-dot-alert"; label = "Threat detected"; extra = "gl-header-status-alert"; }
-    else { dotCls = "gl-dot gl-dot-safe"; label = "Active"; }
+    let shieldColor, label, extra = "";
+    if (paused) { shieldColor = "var(--text-dim)"; label = "Paused"; }
+    else if (!mon) { shieldColor = "var(--text-dim)"; label = "Stopped"; }
+    else if (isAlert) { shieldColor = "var(--alert)"; label = "Threat detected"; extra = "gl-header-status-alert"; }
+    else { shieldColor = "var(--safe)"; label = "Active"; }
     els.headerStatus.className = `gl-header-status ${extra}`.trim();
-    els.headerStatus.innerHTML = `<span class="${dotCls}"></span><span class="status-text">${esc(label)}</span>`;
+    els.headerStatus.innerHTML = `<svg class="gl-header-shield" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${shieldColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 6v6c0 5.25 3.75 9.75 8 10 4.25-0.25 8-4.75 8-10V6l-8-4z"/></svg><span class="status-text" style="color:${shieldColor}">${esc(label)}</span>`;
     setText(els.headerModel, state.model_name || "");
 
     // LIVE tag + paused overlay
@@ -475,7 +479,7 @@
                     i === stageIdx - 1 ? "gl-alert-card-stage-seg-current" : "";
         segs += `<div class="gl-alert-card-stage-seg ${cls}"></div>`;
       }
-      stageHtml = `<div class="gl-alert-card-stage-mini">${segs}<span class="gl-alert-card-stage-label">${stageIdx}/5</span></div>`;
+      stageHtml = `<div class="gl-alert-card-stage-mini">${segs}<span class="gl-alert-card-stage-label">Stage ${stageIdx}/5</span></div>`;
     }
 
     return `<div class="gl-alert-card ${stateClass}" data-threat="${threatKey}" data-analysis-id="${a.analysis_id}">
