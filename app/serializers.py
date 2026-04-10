@@ -402,7 +402,7 @@ def build_alert_history(
             user = _DEFAULT_USERNAMES.get(key) or "—"
 
         # One-line summary: a couple of indicator phrases + grooming stage if any
-        indicator_words = [_clean_indicator(s) for s in (cls.indicators_found or [])[:3]]
+        indicator_words = [t for t in (_clean_indicator(s) for s in (cls.indicators_found or [])[:5]) if t is not None]
         summary_bits: list[str] = []
         stage_idx = 0
         if indicator_words:
@@ -728,24 +728,17 @@ def _clean_indicator(raw: str) -> str:
                 return tag
         elif keyword in norm:
             return tag
-    # Fallback: strip parenthetical/quote, take first 2-3 words
-    label = raw.split("(")[0].split(",")[0].split('"')[0].strip().rstrip(".,;:-")
-    if "/" in label:
-        label = label.split("/")[0].strip()
-    # Take first 3 words — always clean, never mid-word truncation
-    words = label.split()
-    if len(words) > 3:
-        label = " ".join(words[:3])
-    return label or raw.split()[0] if raw.split() else "Unknown"
+    # No known tag matched — return None to signal "skip this pill"
+    return None
 
 
 def _dedup_indicators(raw_indicators: list[str]) -> list[str]:
-    """Clean and deduplicate indicators — no repeated tags in pills."""
+    """Clean and deduplicate indicators — only recognized tags, no garbage."""
     seen: set[str] = set()
     out: list[str] = []
     for raw in raw_indicators:
         tag = _clean_indicator(raw)
-        if tag not in seen:
+        if tag is not None and tag not in seen:
             seen.add(tag)
             out.append(tag)
     return out
