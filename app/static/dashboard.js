@@ -429,7 +429,7 @@
     const showing = history.length;
     const totalHint = total > showing ? `<span class="gl-history-total">${showing} of ${total}</span>` : "";
     if (newCount > 0) {
-      els.historyLabel.innerHTML = `Alerts <span class="gl-history-counter">${newCount} new</span>${totalHint}<button class="gl-history-dismiss" id="mark-all-read">Dismiss all</button>`;
+      els.historyLabel.innerHTML = `Alerts <span class="gl-history-counter">${newCount} new</span><button class="gl-history-dismiss" id="mark-all-read">Dismiss all</button>${totalHint}`;
     } else {
       els.historyLabel.innerHTML = `Alerts <span class="gl-history-allreviewed">All reviewed</span>${totalHint}`;
     }
