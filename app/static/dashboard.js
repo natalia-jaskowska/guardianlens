@@ -33,7 +33,6 @@
     timeline: document.getElementById("timeline"),
     lastRefresh: document.getElementById("last-refresh"),
 
-    statsLine: document.getElementById("stats-line"),
     historyLabel: document.getElementById("history-label"),
     alertHistory: document.getElementById("alert-history"),
 
@@ -187,12 +186,35 @@
       title = "All clear";
       sub = pCount > 0 ? `Monitoring ${pCount} platform${pCount===1?"":"s"}` : (streak >= 3 ? `${streak} safe in a row` : `${h.scans||0} scans`);
     }
-    els.shieldHero.className = `gl-shield-hero gl-shield-${mode}`;
+    els.shieldHero.className = `gl-status-card gl-shield-${mode}`;
     els.shieldIcon.innerHTML = icon;
     setText(els.shieldTitle, title);
     setText(els.shieldSub, sub);
-    const dur = h.session_duration || "\u2014";
-    setText(els.statsLine, `${dur} active \u00b7 ${pCount} platform${pCount===1?"":"s"}`);
+
+    // Populate metric counters
+    const safePctEl = document.getElementById("status-safe-pct");
+    const platsEl = document.getElementById("status-platforms");
+    const alertsEl = document.getElementById("status-alerts");
+    const respEl = document.getElementById("status-response");
+    const scans = h.scans || 0;
+    const safeCount = h.safe || 0;
+    if (safePctEl) {
+      const pct = scans > 0 ? Math.round(100 * safeCount / scans) : 0;
+      const val = safePctEl.querySelector(".gl-status-metric-val");
+      val.textContent = scans > 0 ? `${pct}%` : "\u2014";
+      val.style.color = pct >= 90 ? "var(--safe)" : pct >= 70 ? "var(--caution)" : pct > 0 ? "var(--alert)" : "";
+    }
+    if (platsEl) platsEl.querySelector(".gl-status-metric-val").textContent = pCount;
+    if (alertsEl) {
+      const aCount = h.alerts || 0;
+      const val = alertsEl.querySelector(".gl-status-metric-val");
+      val.textContent = aCount;
+      val.style.color = aCount > 0 ? "var(--alert)" : "";
+    }
+    if (respEl) {
+      const avg = h.avg_inference_label || "\u2014";
+      respEl.querySelector(".gl-status-metric-val").textContent = avg.replace(" avg", "");
+    }
   }
 
   // ----------------------------------------------------------------- header
@@ -309,19 +331,26 @@
     els.timeline.innerHTML = entries.map((e, i) => {
       const level = e.threat_level;
       const k = e.platform_key || pKey(e.platform);
-      const badgeCls = level === "alert" || level === "critical" ? "gl-timeline-status-alert" :
-                       level === "caution" || level === "warning" ? "gl-timeline-status-caution" :
-                       "gl-timeline-status-safe";
+      const levelCls = level === "alert" || level === "critical" ? "alert" :
+                       level === "caution" || level === "warning" ? "caution" : "safe";
       const time = e.time_label || "";
       const iconInner = k !== "unknown"
         ? `<img src="/static/icons/${k}.svg" alt="">`
         : `<span class="gl-timeline-icon-letter">${(e.platform||"?").charAt(0).toUpperCase()}</span>`;
-      return `<div class="gl-timeline-entry" data-tl-idx="${i}" title="${esc(e.reasoning||"")}">
+      const isClickable = levelCls !== "safe";
+      return `<div class="gl-timeline-entry gl-timeline-entry-${levelCls}${isClickable?" gl-timeline-clickable":""}" data-tl-idx="${i}">
         <span class="gl-timeline-icon" data-platform="${k}">${iconInner}</span>
-        <span class="gl-timeline-platform gl-timeline-platform-${k}">${esc(e.platform||"Unknown")}</span>
-        <span class="gl-timeline-time">${esc(time)}</span>
-        <span class="gl-timeline-text">${esc(trunc(e.reasoning,55))}</span>
-        <span class="gl-timeline-status ${badgeCls}">${esc(level)}</span>
+        <div class="gl-timeline-body">
+          <div class="gl-timeline-row1">
+            <span class="gl-timeline-platform">${esc(e.platform||"Unknown")}</span>
+            <span class="gl-timeline-time">${esc(time)}</span>
+            <span class="gl-timeline-badge gl-timeline-badge-${levelCls}">${esc(level)}</span>
+          </div>
+          <div class="gl-timeline-row2">${levelCls === "safe"
+            ? "No threats detected"
+            : (e.indicators||[]).slice(0,3).map(p => `<span class="gl-timeline-tag gl-timeline-tag-${levelCls}">${esc(p)}</span>`).join("") || esc(trunc(e.reasoning,40))
+          }</div>
+        </div>
       </div>`;
     }).join("");
     // All timeline rows are clickable — alerts open detail, safe shows inline analysis
@@ -337,13 +366,8 @@
                       hist.find(a => a.time_label === entry.time_label);
         if (match && match.analysis_id) {
           selectAlert(match.analysis_id);
-        } else {
-          // Safe/caution entry — show inline detail from timeline data
-          uiState.selectedAnalysis = entry;
-          els.overviewPanel.style.display = "none";
-          els.detailPanel.style.display = "";
-          renderRightAnalysis(window.__lastState || {});
         }
+        // Safe entries — no detail to show, ignore click
       });
     });
   }
@@ -378,10 +402,13 @@
     const seenAlerts = history.filter(a => uiState.seenAlerts.has(String(a.analysis_id)));
     const newCount = newAlerts.length;
     const allSeen = newCount === 0;
+    const total = (window.__lastState && window.__lastState.alert_total) || history.length;
+    const showing = history.length;
+    const totalHint = total > showing ? `<span class="gl-history-total">${showing} of ${total}</span>` : "";
     if (newCount > 0) {
-      els.historyLabel.innerHTML = `Alerts <span class="gl-history-counter">${newCount} new</span>`;
+      els.historyLabel.innerHTML = `Alerts <span class="gl-history-counter">${newCount} new</span>${totalHint}`;
     } else {
-      els.historyLabel.innerHTML = `Alerts <span class="gl-history-allreviewed">all reviewed</span>`;
+      els.historyLabel.innerHTML = `Alerts <span class="gl-history-allreviewed">all reviewed</span>${totalHint}`;
     }
 
     let html = "";
@@ -653,7 +680,7 @@
       if (!img) return;
       const overlay = document.createElement("div");
       overlay.className = "gl-lightbox";
-      overlay.innerHTML = `<img src="${img.src}" alt=""><div class="gl-lightbox-close">\u00d7</div>`;
+      overlay.innerHTML = `<img src="${img.src}" alt=""><div class="gl-lightbox-hint">Click anywhere or press Esc to close</div><div class="gl-lightbox-close">\u00d7</div>`;
       document.body.appendChild(overlay);
       requestAnimationFrame(() => overlay.classList.add("gl-lightbox-open"));
       const close = () => { overlay.classList.remove("gl-lightbox-open"); setTimeout(() => overlay.remove(), 200); };

@@ -78,18 +78,36 @@
               </div>
             </div>
 
-            <!-- Shield + ribbon (right cell) -->
-            <div class="gl-shield-column">
-              <div class="gl-shield-hero gl-shield-safe" id="shield-hero">
-                <div class="gl-shield-icon" id="shield-icon"></div>
-                <div class="gl-shield-title" id="shield-title">All clear</div>
-                <div class="gl-shield-sub" id="shield-sub">Monitoring active</div>
+            <!-- Status card (right cell) -->
+            <div class="gl-status-card" id="shield-hero">
+              <div class="gl-status-top">
+                <div class="gl-status-icon" id="shield-icon"></div>
+                <div class="gl-status-info">
+                  <div class="gl-status-title" id="shield-title">All clear</div>
+                  <div class="gl-status-sub" id="shield-sub">Monitoring active</div>
+                </div>
               </div>
-              <div class="gl-ribbon-wrap">
-                <div class="gl-ribbon-label"><span>5m ago</span><span>now</span></div>
+              <div class="gl-status-metrics">
+                <div class="gl-status-metric" id="status-safe-pct">
+                  <span class="gl-status-metric-val">—</span>
+                  <span class="gl-status-metric-lbl">Safe</span>
+                </div>
+                <div class="gl-status-metric" id="status-platforms">
+                  <span class="gl-status-metric-val">0</span>
+                  <span class="gl-status-metric-lbl">Platforms</span>
+                </div>
+                <div class="gl-status-metric" id="status-alerts">
+                  <span class="gl-status-metric-val">0</span>
+                  <span class="gl-status-metric-lbl">Alerts</span>
+                </div>
+                <div class="gl-status-metric" id="status-response">
+                  <span class="gl-status-metric-val">—</span>
+                  <span class="gl-status-metric-lbl">Response</span>
+                </div>
+              </div>
+              <div class="gl-status-ribbon">
                 <div class="gl-ribbon" id="ribbon"></div>
               </div>
-              <div class="gl-stats-line" id="stats-line">— active · — platforms</div>
             </div>
           </div>
 

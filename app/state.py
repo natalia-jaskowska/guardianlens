@@ -292,7 +292,7 @@ class AppState:
             last_alert=self.database.last_alert_summary(session_id=session_id),
         )
 
-        alert_history = build_alert_history(self.database.recent_alert_analyses(limit=50))
+        alert_history = build_alert_history(self.database.recent_alert_analyses(limit=30))
 
         return {
             "monitoring": self.worker.is_running,
@@ -307,6 +307,7 @@ class AppState:
             "safe_streak": compute_safe_streak(history),
             "session_health": session_health,
             "alert_history": alert_history,
+            "alert_total": self.database.total_alert_count(),
             "summary": summary,
             # Timeline display is decoupled from SessionTracker's
             # in-memory window — that one is sized for the AI's

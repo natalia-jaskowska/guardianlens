@@ -425,6 +425,18 @@ class GuardLensDatabase:
             summary[row["threat_level"]] = int(row["n"])
         return summary
 
+    def total_alert_count(self) -> int:
+        """Total non-safe, non-none-category analyses across all sessions."""
+        with self._lock:
+            row = self._conn.execute(
+                """
+                SELECT COUNT(*) FROM analyses
+                WHERE threat_level IN ('alert', 'critical', 'warning', 'caution')
+                  AND category != 'none'
+                """,
+            ).fetchone()
+        return int(row[0]) if row else 0
+
     # ------------------------------------------------------------------ shutdown
 
     def close(self) -> None:

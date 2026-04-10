@@ -131,7 +131,7 @@ def main() -> int:
         # Faster default interval for demo mode so the UI feels live.
         # Respect an explicit --interval override if the user passed one.
         if args.interval is None:
-            config.monitor.capture_interval_seconds = 60.0
+            config.monitor.capture_interval_seconds = 180.0
     if args.watch_folder is not None:
         config.monitor.watch_folder = args.watch_folder.resolve()
         # Folder mode trumps demo mode if both flags are passed.
