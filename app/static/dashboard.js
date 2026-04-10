@@ -188,7 +188,7 @@
       sub = `Session: ${dur}`;
     }
     // Shield removed from capture card — only update session duration
-    setText(els.shieldSub, `Session: ${dur}`);
+    setText(els.shieldSub, dur);
 
     // Populate metric counters
     const scansEl = document.getElementById("status-scans");
@@ -233,6 +233,11 @@
     els.headerStatus.className = `gl-header-status ${extra}`.trim();
     els.headerStatus.innerHTML = `<span class="${dotCls}"></span><span class="status-text">${esc(label)}</span>`;
     setText(els.headerModel, state.model_name || "");
+
+    // LIVE tag + paused overlay
+    const liveTag = document.getElementById("capture-live-tag");
+    if (liveTag) liveTag.style.display = paused ? "none" : "";
+    els.captureCard.classList.toggle("gl-capture-paused", !!paused);
 
     // Pause button state
     const pauseBtn = document.getElementById("header-pause");
@@ -424,9 +429,9 @@
     const showing = history.length;
     const totalHint = total > showing ? `<span class="gl-history-total">${showing} of ${total}</span>` : "";
     if (newCount > 0) {
-      els.historyLabel.innerHTML = `Alerts <span class="gl-history-counter">${newCount} new</span><span class="gl-history-markread" id="mark-all-read">Mark all read</span>${totalHint}`;
+      els.historyLabel.innerHTML = `Alerts <span class="gl-history-counter">${newCount} new</span>${totalHint}<button class="gl-history-dismiss" id="mark-all-read">Dismiss all</button>`;
     } else {
-      els.historyLabel.innerHTML = `Alerts <span class="gl-history-allreviewed">all reviewed</span>${totalHint}`;
+      els.historyLabel.innerHTML = `Alerts <span class="gl-history-allreviewed">All reviewed</span>${totalHint}`;
     }
 
     let html = "";
@@ -695,6 +700,11 @@
       pauseBtn.addEventListener("click", async () => {
         const isPaused = pauseBtn.classList.contains("gl-paused");
         await fetch(isPaused ? "/api/resume" : "/api/pause", { method: "POST" });
+        // Fetch fresh state immediately so UI updates without waiting for SSE tick
+        try {
+          const r = await fetch("/api/state");
+          if (r.ok) render(await r.json());
+        } catch(_) {}
       });
     }
     // Lightbox — reusable for any image click
