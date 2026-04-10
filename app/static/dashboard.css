@@ -7,20 +7,21 @@
 /* ============================================================ 1. Tokens */
 
 :root {
-  --bg-primary: #0f0f1a;
-  --bg-secondary: #12121f;
-  --bg-card: #12121f;
-  --bg-topbar: #161625;
-  --bg-footer: #0c0c16;
-  --border: #1e1e32;
-  --border-subtle: rgba(30, 30, 50, 0.6);
+  --bg-primary: #0b0b14;
+  --bg-secondary: #10101c;
+  --bg-card: #13131f;
+  --bg-elevated: #16162a;
+  --bg-topbar: rgba(14, 14, 24, 0.8);
+  --bg-footer: #09090f;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-subtle: rgba(255, 255, 255, 0.03);
 
-  --text-primary: #e0e0e8;
-  --text-secondary: #c8c8d0;
-  --text-muted: #888;
+  --text-primary: #e8e8f0;
+  --text-secondary: #c0c0cc;
+  --text-muted: #8888;
   --text-dim: #666;
   --text-faint: #555;
-  --text-ghost: #444;
+  --text-ghost: #3a3a4a;
 
   --safe: #1D9E75;
   --safe-bg: #0f2e1f;
@@ -80,10 +81,12 @@ button { font-family: inherit; cursor: pointer; }
   height: 100vh;
   overflow: hidden;
   background: var(--bg-primary);
-  transition: box-shadow 0.5s ease;
+  background-image: radial-gradient(ellipse at 20% 0%, rgba(29, 158, 117, 0.03) 0%, transparent 50%),
+                    radial-gradient(ellipse at 80% 100%, rgba(127, 119, 221, 0.03) 0%, transparent 50%);
+  transition: all 0.5s ease;
 }
 .gl-shell.gl-alert-active {
-  box-shadow: inset 0 0 80px rgba(226, 75, 74, 0.08);
+  background-image: radial-gradient(ellipse at 50% 0%, rgba(226, 75, 74, 0.06) 0%, transparent 60%);
 }
 
 .gl-main {
@@ -98,8 +101,8 @@ button { font-family: inherit; cursor: pointer; }
 .gl-content {
   display: flex;
   flex-direction: column;
-  padding: 16px 20px;
-  gap: 12px;
+  padding: 20px 24px;
+  gap: 14px;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
@@ -109,11 +112,12 @@ button { font-family: inherit; cursor: pointer; }
 .gl-sidebar {
   display: flex;
   flex-direction: column;
-  padding: 16px 20px;
+  padding: 20px 20px;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
   border-left: 1px solid var(--border);
+  background: var(--bg-secondary);
 }
 
 /* ============================================================ 5. Capture hero */
@@ -152,14 +156,17 @@ button { font-family: inherit; cursor: pointer; }
   flex-direction: column;
   align-items: center;
   gap: 3px;
-  padding: 12px 4px 10px;
+  padding: 14px 4px 12px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  transition: border-color 0.2s;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s;
 }
 .gl-stat:hover {
-  border-color: #2a2a44;
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 .gl-stat-val {
   font-size: 20px;
@@ -239,15 +246,16 @@ button { font-family: inherit; cursor: pointer; }
   padding: 0 20px;
   height: 44px;
   background: var(--bg-topbar);
+  backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 10;
-  transition: background 0.5s ease, border-color 0.5s ease;
+  transition: all 0.5s ease;
 }
 .gl-shell.gl-alert-active .gl-header {
-  background: #1a1018;
-  border-bottom-color: #3a1525;
+  background: rgba(26, 16, 24, 0.8);
+  border-bottom-color: rgba(226, 75, 74, 0.15);
 }
 
 .gl-header-left {
@@ -425,11 +433,12 @@ button { font-family: inherit; cursor: pointer; }
 .gl-capture {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
   transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
 .gl-capture-paused .gl-capture-screen::before {
@@ -450,8 +459,8 @@ button { font-family: inherit; cursor: pointer; }
 .gl-capture-paused { border-color: var(--border) !important; opacity: 0.7; }
 
 .gl-capture-safe    { border-color: var(--border); }
-.gl-capture-caution { border-color: rgba(186, 117, 23, 0.35); box-shadow: 0 0 20px rgba(186, 117, 23, 0.06); }
-.gl-capture-alert   { border-color: rgba(226, 75, 74, 0.35); box-shadow: 0 0 20px rgba(226, 75, 74, 0.06); }
+.gl-capture-caution { border-color: rgba(186, 117, 23, 0.2); box-shadow: 0 4px 24px rgba(0,0,0,0.25), 0 0 24px rgba(186, 117, 23, 0.08); }
+.gl-capture-alert   { border-color: rgba(226, 75, 74, 0.2); box-shadow: 0 4px 24px rgba(0,0,0,0.25), 0 0 24px rgba(226, 75, 74, 0.08); }
 
 .gl-capture-top {
   display: flex;
@@ -723,8 +732,8 @@ button { font-family: inherit; cursor: pointer; }
 }
 .gl-timeline-clickable { cursor: pointer; }
 .gl-timeline-clickable:hover {
-  background: rgba(255, 255, 255, 0.03);
-  border-color: var(--border);
+  background: var(--bg-elevated);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* Threat-level left accent */
@@ -1079,16 +1088,17 @@ button { font-family: inherit; cursor: pointer; }
   grid-template-columns: 36px 1fr auto;
   grid-template-rows: auto auto auto;
   gap: 0 10px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 .gl-alert-card:hover {
-  background: #16162a;
+  background: var(--bg-elevated);
   border-color: #2a2a44;
   transform: translateY(-1px);
 }
@@ -1830,8 +1840,8 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  height: 30px;
+  padding: 0 24px;
+  height: 32px;
   background: var(--bg-footer);
   border-top: 1px solid var(--border);
   font-size: 10px;
