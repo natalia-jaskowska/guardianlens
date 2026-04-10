@@ -62,7 +62,7 @@ body {
   background: var(--bg-primary);
   color: var(--text-secondary);
   font-family: var(--font-main);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
@@ -177,7 +177,7 @@ button { font-family: inherit; cursor: pointer; }
   line-height: 1;
 }
 .gl-stat-lbl {
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-ghost);
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -287,7 +287,7 @@ button { font-family: inherit; cursor: pointer; }
 .gl-shell.gl-alert-active .gl-logo-shield { color: var(--alert); }
 
 .gl-logo-text {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
   letter-spacing: -0.2px;
@@ -311,8 +311,8 @@ button { font-family: inherit; cursor: pointer; }
 .gl-header-status {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 11px;
+  gap: 6px;
+  font-size: 12px;
   color: var(--text-muted);
   transition: color 0.4s;
 }
@@ -578,7 +578,7 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 8px;
+  font-size: 9px;
   color: var(--text-muted);
   flex-shrink: 0;
 }
@@ -636,7 +636,7 @@ button { font-family: inherit; cursor: pointer; }
   border: 1px solid rgba(226, 75, 74, 0.3);
 }
 .gl-capture-msg-flag-tag {
-  font-size: 8px;
+  font-size: 9px;
   color: var(--alert);
   font-weight: 500;
   margin-top: 1px;
@@ -664,8 +664,8 @@ button { font-family: inherit; cursor: pointer; }
 .gl-capture-alert .gl-capture-bar-icon { color: var(--alert); }
 
 .gl-capture-bar-title {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -783,9 +783,9 @@ button { font-family: inherit; cursor: pointer; }
   gap: 6px;
 }
 .gl-timeline-platform {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 .gl-timeline-time {
   font-family: var(--font-mono);
@@ -817,7 +817,7 @@ button { font-family: inherit; cursor: pointer; }
   flex-wrap: wrap;
 }
 .gl-timeline-tag {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   padding: 2px 8px;
   border-radius: 10px;
@@ -835,7 +835,7 @@ button { font-family: inherit; cursor: pointer; }
   height: 14px;
   border-radius: 3px;
   flex-shrink: 0;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 600;
   color: white;
   overflow: hidden;
@@ -959,7 +959,7 @@ button { font-family: inherit; cursor: pointer; }
   margin-bottom: 10px;
 }
 .gl-history-label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
   display: flex;
@@ -1135,7 +1135,7 @@ button { font-family: inherit; cursor: pointer; }
   min-width: 0;
 }
 .gl-alert-card-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -1149,7 +1149,7 @@ button { font-family: inherit; cursor: pointer; }
   letter-spacing: -0.5px;
 }
 .gl-alert-card-badge {
-  font-size: 8px;
+  font-size: 9px;
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 3px;
@@ -1211,7 +1211,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .gl-alert-card-sep {
   color: var(--text-ghost);
-  font-size: 8px;
+  font-size: 9px;
   flex-shrink: 0;
 }
 .gl-alert-card-platform-name {
@@ -1230,8 +1230,8 @@ button { font-family: inherit; cursor: pointer; }
   flex-wrap: wrap;
 }
 .gl-alert-card-pill {
-  font-size: 10px;
-  padding: 3px 9px;
+  font-size: 11px;
+  padding: 3px 10px;
   border-radius: 10px;
   white-space: nowrap;
   letter-spacing: 0.1px;
@@ -1259,7 +1259,7 @@ button { font-family: inherit; cursor: pointer; }
   opacity: 0.4;
 }
 .gl-alert-card-stage-label {
-  font-size: 8px;
+  font-size: 9px;
   font-family: var(--font-mono);
   margin-left: 3px;
 }
@@ -1425,9 +1425,9 @@ button { font-family: inherit; cursor: pointer; }
 .gl-detail-hero-icon svg { width: 22px; height: 22px; }
 .gl-detail-hero-titles { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .gl-detail-hero-title {
-  font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -0.3px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
 }
 .gl-detail-hero-meta {
   font-size: 12px;
