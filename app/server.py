@@ -150,6 +150,16 @@ def create_app(config: GuardLensConfig) -> FastAPI:
             headers=headers,
         )
 
+    @app.post("/api/pause")
+    async def api_pause() -> JSONResponse:
+        state.worker.pause()
+        return JSONResponse({"status": "paused"})
+
+    @app.post("/api/resume")
+    async def api_resume() -> JSONResponse:
+        state.worker.resume()
+        return JSONResponse({"status": "running"})
+
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}

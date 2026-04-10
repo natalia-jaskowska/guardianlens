@@ -191,12 +191,14 @@
     setText(els.shieldSub, `Session: ${dur}`);
 
     // Populate metric counters
+    const scansEl = document.getElementById("status-scans");
     const safePctEl = document.getElementById("status-safe-pct");
     const platsEl = document.getElementById("status-platforms");
     const alertsEl = document.getElementById("status-alerts");
     const respEl = document.getElementById("status-response");
     const scans = h.scans || 0;
     const safeCount = h.safe || 0;
+    if (scansEl) scansEl.querySelector(".gl-stat-val").textContent = scans;
     if (safePctEl) {
       const pct = scans > 0 ? Math.round(100 * safeCount / scans) : 0;
       const val = safePctEl.querySelector(".gl-stat-val");
@@ -220,15 +222,30 @@
 
   function renderHeader(state) {
     const mon = state.monitoring;
+    const paused = state.paused;
     const latest = state.latest;
     const isAlert = latest && (latest.threat_level === "alert" || latest.threat_level === "critical");
     let dotCls, label, extra = "";
-    if (!mon) { dotCls = "gl-dot gl-dot-dim"; label = "Stopped"; }
+    if (paused) { dotCls = "gl-dot gl-dot-dim"; label = "Paused"; }
+    else if (!mon) { dotCls = "gl-dot gl-dot-dim"; label = "Stopped"; }
     else if (isAlert) { dotCls = "gl-dot gl-dot-alert"; label = "Threat detected"; extra = "gl-header-status-alert"; }
     else { dotCls = "gl-dot gl-dot-safe"; label = "Active"; }
     els.headerStatus.className = `gl-header-status ${extra}`.trim();
     els.headerStatus.innerHTML = `<span class="${dotCls}"></span><span class="status-text">${esc(label)}</span>`;
     setText(els.headerModel, state.model_name || "");
+
+    // Pause button state
+    const pauseBtn = document.getElementById("header-pause");
+    if (pauseBtn) {
+      const lbl = pauseBtn.querySelector(".gl-pause-label");
+      if (paused) {
+        pauseBtn.classList.add("gl-paused");
+        if (lbl) lbl.textContent = "Resume";
+      } else {
+        pauseBtn.classList.remove("gl-paused");
+        if (lbl) lbl.textContent = "Pause";
+      }
+    }
   }
 
   // ----------------------------------------------------------------- capture
@@ -671,6 +688,14 @@
   document.addEventListener("DOMContentLoaded", () => {
     if (els.analysisBack) {
       els.analysisBack.addEventListener("click", showOverview);
+    }
+    // Pause/Resume button
+    const pauseBtn = document.getElementById("header-pause");
+    if (pauseBtn) {
+      pauseBtn.addEventListener("click", async () => {
+        const isPaused = pauseBtn.classList.contains("gl-paused");
+        await fetch(isPaused ? "/api/resume" : "/api/pause", { method: "POST" });
+      });
     }
     // Lightbox — reusable for any image click
     function openLightbox(imgSrc) {

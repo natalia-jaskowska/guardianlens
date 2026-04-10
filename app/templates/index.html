@@ -27,6 +27,12 @@
             <span>Connecting...</span>
           </div>
           <span class="gl-header-sep"></span>
+          <button class="gl-header-pause" id="header-pause" title="Pause monitoring">
+            <svg class="gl-pause-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+            <svg class="gl-resume-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:none"><polygon points="5,3 19,12 5,21"/></svg>
+            <span class="gl-pause-label">Pause</span>
+          </button>
+          <span class="gl-header-sep"></span>
           <div class="gl-header-chip gl-header-chip-model" id="header-model">{{ model_name }}</div>
         </div>
       </header>
@@ -60,6 +66,10 @@
 
           <!-- Stats row — horizontal under capture -->
           <div class="gl-stats-row">
+            <div class="gl-stat" id="status-scans">
+              <span class="gl-stat-val">0</span>
+              <span class="gl-stat-lbl">Scans</span>
+            </div>
             <div class="gl-stat" id="status-safe-pct">
               <span class="gl-stat-val">—</span>
               <span class="gl-stat-lbl">Safe</span>

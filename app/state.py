@@ -64,8 +64,11 @@ class MonitorWorker:
         self._database = database
         self._queue: queue.Queue[ScreenAnalysis] = queue.Queue()
         self._stop_event = threading.Event()
+        self._pause_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._started_at: float | None = None
+        self._paused_at: float | None = None
+        self._paused_total: float = 0.0
         self._latest: ScreenAnalysis | None = None
         self._latest_alert: ScreenAnalysis | None = None
         self._lock = threading.Lock()
@@ -86,15 +89,38 @@ class MonitorWorker:
         self._database.end_session()
         logger.info("Monitor thread stop requested.")
 
+    def pause(self) -> None:
+        if self._pause_event.is_set():
+            return
+        self._pause_event.set()
+        self._paused_at = time.monotonic()
+        logger.info("Monitor paused.")
+
+    def resume(self) -> None:
+        if not self._pause_event.is_set():
+            return
+        if self._paused_at is not None:
+            self._paused_total += time.monotonic() - self._paused_at
+            self._paused_at = None
+        self._pause_event.clear()
+        logger.info("Monitor resumed.")
+
+    @property
+    def is_paused(self) -> bool:
+        return self._pause_event.is_set()
+
     @property
     def session_seconds(self) -> float:
         if self._started_at is None:
             return 0.0
-        return time.monotonic() - self._started_at
+        elapsed = time.monotonic() - self._started_at - self._paused_total
+        if self._paused_at is not None:
+            elapsed -= time.monotonic() - self._paused_at
+        return max(0.0, elapsed)
 
     @property
     def is_running(self) -> bool:
-        return self._thread is not None and not self._stop_event.is_set()
+        return self._thread is not None and not self._stop_event.is_set() and not self._pause_event.is_set()
 
     # ------------------------------------------------------------------ drain
 
@@ -157,6 +183,11 @@ class MonitorWorker:
 
     def _run(self) -> None:
         for screenshot_path in capture_loop(self._config.monitor):
+            if self._stop_event.is_set():
+                break
+            # Wait while paused — check every second for stop/resume
+            while self._pause_event.is_set() and not self._stop_event.is_set():
+                time.sleep(1)
             if self._stop_event.is_set():
                 break
             try:
@@ -296,6 +327,7 @@ class AppState:
 
         return {
             "monitoring": self.worker.is_running,
+            "paused": self.worker.is_paused,
             "session_duration": format_session_duration(self.worker.session_seconds),
             "model_name": self.config.ollama.inference_model,
             "db_path": str(self.config.database.path),
