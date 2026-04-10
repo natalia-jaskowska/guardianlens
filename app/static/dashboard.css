@@ -1,195 +1,169 @@
-/* GuardianLens dashboard — vanilla CSS for the FastAPI front-end.
+/* GuardianLens dashboard — matched to v2 clickable alerts mockup.
  *
- * Design tokens, typography, layout, and components are derived from
- * CONTEXT_UI.md + the guardlens_minimal_clean / guardlens_safe_with_alert_history
- * mockups. The dashboard has two right-panel states managed in JS:
- *
- *   1. SAFE overview      (default) — All clear card + alert history list
- *   2. FULL ANALYSIS      (clicked or auto on new alert) — full reasoning,
- *                         flagged messages, recommended action, telegram
- *
- * Sections:
- *   1. Tokens
- *   2. Reset + base
- *   3. Layout grid
- *   4. Header
- *   5. Metric cards
- *   6. Section labels
- *   7. Capture (simple) + heartbeat + timeline (left column)
- *   8. Right panel — safe overview
- *   9. Right panel — full analysis
- *  10. Reasoning chain / Why / Recommended action / Telegram (shared)
- *  11. Status dots + animations
- *  12. Privacy badge + footer
- *  13. Platform badges
- *  14. Wow alert state
+ * Dark purple-tinted theme. Compact layout, dense information display.
+ * Shield hero, status ribbon, platform-colored timeline, alert persistence.
  */
 
 /* ============================================================ 1. Tokens */
 
 :root {
-  --bg-primary: #0c0e14;
-  --bg-secondary: #141720;
-  --bg-tertiary: #0a0c12;
-  --bg-elevated: #111318;
-  --border: rgba(255, 255, 255, 0.05);
-  --border-strong: rgba(255, 255, 255, 0.1);
-  --shadow-soft: 0 1px 0 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  --bg-primary: #0f0f1a;
+  --bg-secondary: #12121f;
+  --bg-card: #12121f;
+  --bg-topbar: #161625;
+  --bg-footer: #0c0c16;
+  --border: #1e1e32;
+  --border-subtle: rgba(30, 30, 50, 0.6);
 
-  --text-primary: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --text-dim: #475569;
-  --text-faint: #3e4660;
-  --text-ghost: #2a3050;
+  --text-primary: #e0e0e8;
+  --text-secondary: #c8c8d0;
+  --text-muted: #888;
+  --text-dim: #666;
+  --text-faint: #555;
+  --text-ghost: #444;
 
-  --safe: #22c55e;
-  --safe-bg: rgba(34, 197, 94, 0.06);
-  --safe-border: rgba(34, 197, 94, 0.15);
+  --safe: #1D9E75;
+  --safe-bg: #0f2e1f;
 
-  --caution: #eab308;
-  --caution-text: #a78b1b;
-  --caution-bg: rgba(234, 179, 8, 0.04);
-  --caution-border: rgba(234, 179, 8, 0.1);
+  --caution: #BA7517;
+  --caution-bg: #2e1f0f;
+  --caution-bg-light: #1f1a0f;
 
-  --alert: #ef4444;
-  --alert-text: #fca5a5;
-  --alert-bg: rgba(239, 68, 68, 0.04);
-  --alert-border: rgba(239, 68, 68, 0.1);
-  --alert-text-dim: #f87171;
+  --alert: #E24B4A;
+  --alert-bg: #2a1a1a;
+  --alert-bg-light: #1a1018;
+
+  --orange: #D85A30;
+  --orange-bg: #2a1a0f;
 
   --info: #3b82f6;
-  --info-bg: rgba(37, 99, 235, 0.05);
-  --info-border: rgba(37, 99, 235, 0.12);
-  --info-text: #60a5fa;
+  --purple: #7F77DD;
 
-  --purple: #8b5cf6;
-  --purple-bg: rgba(139, 92, 246, 0.08);
-  --purple-border: rgba(139, 92, 246, 0.2);
-  --purple-text: #c4b5fd;
+  --font-main: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
 
-  --brand: #2563eb;
+  /* Platform accent colors */
+  --platform-discord: #7F77DD;
+  --platform-minecraft: #639922;
+  --platform-tiktok: #D4537E;
+  --platform-instagram: #D85A30;
+  --platform-other: #888;
 
-  --font-main: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
-
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 20px;
-  --space-2xl: 24px;
-
-  --radius-sm: 4px;
-  --radius-md: 6px;
+  --radius: 6px;
   --radius-lg: 8px;
-  --radius-xl: 14px;
 }
 
 /* ============================================================ 2. Reset + base */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-html,
-body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
 body {
   background: var(--bg-primary);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-family: var(--font-main);
-  font-size: 18px;
-  font-weight: 400;
+  font-size: 12px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
 }
-img {
-  max-width: 100%;
-  display: block;
-}
-button {
-  font-family: inherit;
-  cursor: pointer;
-}
-strong {
-  font-weight: 500;
-  color: var(--text-primary);
-}
-.gl-mono {
-  font-family: var(--font-mono);
-}
+img { max-width: 100%; display: block; }
+button { font-family: inherit; cursor: pointer; }
 
-/* Slim scrollbars */
-::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: var(--radius-sm);
-  border: 2px solid transparent;
-  background-clip: padding-box;
-}
-::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+::-webkit-scrollbar-thumb { background: #2a2a40; border-radius: 3px; }
 
 /* ============================================================ 3. Layout */
 
 .gl-shell {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--bg-primary);
-  transition: background 0.6s ease, border-color 0.6s ease;
-  border: 1px solid transparent;
+  border-radius: 12px;
+  transition: box-shadow 0.5s ease;
+}
+.gl-shell.gl-alert-active {
+  box-shadow: inset 0 0 80px rgba(226, 75, 74, 0.08);
 }
 
 .gl-main {
-  /* 65% / 35% split per the redesign spec — left column owns the
-   * dominant horizontal space, right column is a fixed-ish stat panel. */
   display: grid;
-  grid-template-columns: minmax(0, 65fr) minmax(0, 35fr);
+  grid-template-columns: 55% 45%;
   gap: 0;
-  padding: 0;
   min-height: 0;
+  overflow: hidden;
 }
 
 .gl-left {
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
-  padding: 12px 14px;
+  gap: 0;
+  padding: 12px 16px;
   min-width: 0;
   min-height: 0;
-  border-right: 0.5px solid var(--border);
+  overflow: hidden;
+  border-right: 1px solid var(--border);
 }
-/* The capture section is the hero — anchored to ~42% of viewport
- * height with a hard floor so the screenshot has presence. The
- * heartbeat is thin (its own intrinsic height) and the timeline
- * picks up whatever's left via .gl-section-grow. */
-.gl-left > .gl-section-capture {
-  flex: 0 0 auto;
-  height: 42vh;
-  min-height: 290px;
+
+/* 2-column top grid: capture (wider) | shield+ribbon */
+.gl-top-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 0.7fr;
+  gap: 8px;
+  flex-shrink: 0;
+  min-height: 0;
+}
+@media (max-width: 900px) {
+  .gl-top-grid { grid-template-columns: 1fr; }
+}
+
+/* Shield column — card with background */
+.gl-shield-column {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
-}
-.gl-left > .gl-section-capture .gl-capture {
-  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  gap: 6px;
   min-height: 0;
-  max-height: 100%;
+}
+
+/* Ribbon wrapper inside shield card */
+.gl-ribbon-wrap {
+  margin-top: auto;
+  width: 100%;
+  padding-top: 8px;
+}
+.gl-ribbon-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  color: var(--text-ghost);
+  margin-bottom: 2px;
+}
+
+/* Stats line at bottom of shield card */
+.gl-stats-line {
+  font-size: 10px;
+  color: var(--text-faint);
+  padding: 2px 0;
+  text-align: center;
+  border-top: 1px solid #1a1a28;
+  margin-top: 6px;
+  width: 100%;
 }
 
 .gl-side {
-  background: var(--bg-tertiary);
-  padding: 12px 14px;
+  background: transparent;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
   min-width: 0;
+  overflow-y: auto;
 }
 
 /* ============================================================ 4. Header */
@@ -198,17 +172,19 @@ strong {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 48px;
   padding: 8px 16px;
-  border-bottom: 0.5px solid var(--border);
-  background: rgba(12, 14, 20, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: border-bottom-color 0.6s ease;
+  background: var(--bg-topbar);
+  border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 10;
+  transition: background 0.5s ease, border-color 0.5s ease;
 }
+.gl-shell.gl-alert-active .gl-header {
+  background: #1a1018;
+  border-bottom-color: #3a1525;
+}
+
 .gl-header-left {
   display: flex;
   align-items: center;
@@ -217,168 +193,141 @@ strong {
 .gl-header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  color: var(--text-dim);
+  gap: 6px;
+  font-size: 11px;
 }
-.gl-logo-mark {
-  width: 24px;
-  height: 24px;
-  border-radius: var(--radius-md);
-  background: var(--brand);
-  display: grid;
-  place-items: center;
-  color: white;
+
+.gl-logo-shield {
+  width: 18px;
+  height: 18px;
+  color: var(--safe);
+  flex-shrink: 0;
+  transition: color 0.4s;
 }
-.gl-logo-mark svg {
-  width: 12px;
-  height: 12px;
-}
+.gl-shell.gl-alert-active .gl-logo-shield { color: var(--alert); }
+
 .gl-logo-text {
-  font-size: 18px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
 }
-.gl-tag {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+
+.gl-logo-lock {
+  width: 12px;
+  height: 12px;
   color: var(--text-dim);
-  padding: 2px 6px;
-  border: 0.5px solid #1a2030;
-  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  margin-left: -2px;
 }
+
 .gl-header-status {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 14px;
+  gap: 6px;
+  font-size: 11px;
   color: var(--text-muted);
-  transition: color 0.3s ease;
+  transition: color 0.4s;
 }
 .gl-header-status-alert {
   color: var(--alert) !important;
-  font-weight: 600;
+}
+.gl-header-status-alert .gl-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
 }
 .gl-header-meta {
-  font-size: 14px;
-  color: var(--text-dim);
+  font-size: 11px;
+  color: var(--text-faint);
   font-family: var(--font-mono);
 }
 
-/* Streak badge — always green. Background bumped from 0.06 to 0.18
- * so the badge reads as visibly green-toned, not as a faint outlined
- * pill that could be misread as alarming next to the alert metrics. */
+/* Streak badge */
 .gl-streak {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
-  color: #22c55e !important;
-  background: rgba(34, 197, 94, 0.18) !important;
-  border: 0.5px solid rgba(34, 197, 94, 0.38) !important;
-  padding: 3px 9px;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
+  font-size: 10px;
+  color: var(--safe) !important;
+  background: var(--safe-bg) !important;
+  border: 1px solid rgba(29, 158, 117, 0.3) !important;
+  padding: 2px 7px;
+  border-radius: var(--radius);
+  font-weight: 500;
 }
 .gl-streak-dot {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: #22c55e !important;
+  background: var(--safe) !important;
 }
-.gl-streak-hidden {
-  display: none !important;
-}
-.gl-streak #header-streak-text {
-  color: #22c55e !important;
-}
+.gl-streak-hidden { display: none !important; }
+.gl-streak #header-streak-text { color: var(--safe) !important; }
 
-/* ============================================================ 5. Metric cards */
+/* ============================================================ 5. Shield hero */
 
-.gl-metrics {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 7px;
-}
-.gl-metric-card {
-  background: var(--bg-secondary);
-  border: 0.5px solid var(--border);
-  border-radius: 7px;
-  padding: 11px 13px;
-  transition: border-color 0.3s ease, transform 0.3s ease;
-}
-.gl-metric-card-caution {
-  background: rgba(234, 179, 8, 0.04);
-  border: 0.5px solid rgba(234, 179, 8, 0.1);
-}
-.gl-metric-card-alert {
-  background: rgba(239, 68, 68, 0.04);
-  border: 0.5px solid rgba(239, 68, 68, 0.1);
-}
-.gl-metric-label {
-  font-size: 13px;
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-}
-.gl-metric-card-caution .gl-metric-label { color: #6b5a10; }
-.gl-metric-card-alert .gl-metric-label { color: #6b2020; }
-.gl-metric-value {
-  font-size: 28px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
-  margin-top: 1px;
-  line-height: 1.1;
-}
-.gl-metric-value-safe { color: var(--safe); }
-.gl-metric-value-caution { color: var(--caution); }
-.gl-metric-value-alert { color: var(--alert); }
-.gl-metric-sublabel {
-  font-size: 13px;
-  color: var(--text-dim);
-  margin-top: 2px;
-}
-.gl-metric-card-caution .gl-metric-sublabel { color: #4a3d10; }
-.gl-metric-card-alert .gl-metric-sublabel { color: #4a1515; }
-
-/* Mini sparkline inside Screenshots card */
-.gl-sparkline {
+.gl-shield-hero {
   display: flex;
-  align-items: flex-end;
-  gap: 1px;
-  height: 16px;
-  margin-top: 3px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.4s ease;
 }
-.gl-spark-bar {
-  width: 3px;
-  border-radius: 1px 1px 0 0;
-  background: #1a2030;
-  transition: height 0.4s ease;
-}
-.gl-spark-bar-safe { background: var(--safe); }
-.gl-spark-bar-caution { background: var(--caution); }
-.gl-spark-bar-alert { background: var(--alert); }
 
-/* ============================================================ 6. Section labels */
+.gl-shield-icon {
+  width: 48px;
+  height: 54px;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+.gl-shield-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.gl-shield-title {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.4s;
+}
+.gl-shield-sub {
+  font-size: 10px;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.gl-shield-safe .gl-shield-title { color: var(--safe); }
+.gl-shield-caution .gl-shield-title { color: var(--caution); }
+.gl-shield-alert .gl-shield-title { color: var(--alert); }
+.gl-shield-alert .gl-shield-icon {
+  animation: shield-pulse 2s ease-in-out infinite;
+}
+
+@keyframes shield-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+/* ============================================================ 6. Section labels + LIVE tag */
 
 .gl-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
+  flex-shrink: 0;
 }
 .gl-section-grow {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
+  overflow: hidden;
 }
 .gl-section-label {
-  font-size: 13px;
-  color: var(--text-faint);
+  font-size: 10px;
+  color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 1.2px;
-  margin: 0 0 5px 0;
+  letter-spacing: 0.3px;
+  margin: 12px 0 6px 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -391,157 +340,148 @@ strong {
   letter-spacing: normal;
 }
 
-/* Livestream-style indicator: pulsing red dot + "LIVE" label, used
- * next to the "Latest capture" section title so the user can tell at
- * a glance that the feed is live. */
 .gl-live-tag {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 7px 2px 6px;
-  border-radius: 999px;
-  background: rgba(239, 68, 68, 0.10);
-  border: 0.5px solid rgba(239, 68, 68, 0.30);
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--alert);
   text-transform: none;
   letter-spacing: 0;
 }
 .gl-live-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background: #ef4444;
-  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
-  animation: gl-live-pulse 1.6s ease-out infinite;
+  background: var(--alert);
+  animation: pulse-dot 1.5s infinite;
 }
 .gl-live-text {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: #ef4444;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--alert);
 }
-@keyframes gl-live-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55); }
-  70%  { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
-/* ============================================================ 7. Capture (big framed view) + heartbeat */
+/* ============================================================ 7. Capture + ribbon + timeline */
 
-/* The capture is the dominant element of the left column — a tall
- * framed view of what the child is looking at right now. One container
- * with a single colored border (green / yellow / red) holds the
- * screen area and a caption-style status bar. */
+/* --- Capture box --- */
+
+.gl-section-capture {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.gl-section-capture .gl-section-label { margin-top: 0; }
+
 .gl-capture {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-top: 0;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  max-height: 100%;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  border: 1px solid rgba(34, 197, 94, 0.30);
-  background: var(--bg-secondary);
-  transition: border-color 0.4s ease, box-shadow 0.4s ease;
+  transition: border-color 0.4s ease;
 }
-.gl-capture-safe    { border-color: rgba(34, 197, 94, 0.30); }
-.gl-capture-caution { border-color: rgba(234, 179, 8, 0.40); box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.10); }
-.gl-capture-alert {
-  border-color: rgba(239, 68, 68, 0.55);
-  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.18), 0 0 24px rgba(239, 68, 68, 0.10);
-  animation: gl-capture-pulse 2.4s ease-in-out infinite;
-}
-@keyframes gl-capture-pulse {
-  0%, 100% { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.18), 0 0 24px rgba(239, 68, 68, 0.08); }
-  50%      { box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.30), 0 0 32px rgba(239, 68, 68, 0.18); }
+.gl-capture-safe    { border-color: var(--border); }
+.gl-capture-caution { border-color: rgba(186, 117, 23, 0.4); }
+.gl-capture-alert   { border-color: rgba(226, 75, 74, 0.4); }
+
+/* Capture header — "Latest capture" + LIVE inside the box */
+.gl-capture-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
-/* Screen area — flex grow so it takes most of the container. The
- * fixed min-height anchors the capture to ~280px even when it just
- * shows the placeholder, so the layout doesn't jump as content lands. */
 .gl-capture-screen {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
+  height: 200px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0f1320;
+  background: #0a0a14;
   overflow: hidden;
 }
-/* Image fills the available screen area while preserving aspect ratio.
- * Never cropped — empty space gets the dark background instead. */
 .gl-capture-img {
   display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  filter: brightness(1.12) contrast(1.04) saturate(1.05);
+  object-position: center top;
 }
 .gl-capture-placeholder {
-  margin: auto;
-  padding: 40px 0;
-  font-size: 15px;
-  color: var(--text-faint);
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-ghost);
+  font-size: 11px;
+  padding: 20px;
 }
 
-/* Inline fake-browser chat (alert state). The bubbles are sized to be
- * legible in a 1080p video recording — minimum 11px text. */
+/* Inline chat for alert state */
 .gl-capture-chat {
   width: 100%;
   height: 100%;
+  padding: 8px 12px;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(180deg, #161a26 0%, #0f1320 100%);
+  gap: 3px;
+  font-size: 11px;
+  background: #0a0a14;
 }
 .gl-capture-chat-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.025);
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.05);
+  gap: 6px;
+  padding: 0 0 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
 }
 .gl-capture-chat-avatar {
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.08);
-  display: grid;
-  place-items: center;
+  background: #3a3a5c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  color: var(--text-muted);
   flex-shrink: 0;
 }
-.gl-capture-chat-avatar img {
-  width: 12px;
-  height: 12px;
-}
-.gl-capture-chat-titles {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
+.gl-capture-chat-avatar img { width: 10px; height: 10px; }
+.gl-capture-chat-titles { display: flex; flex-direction: column; min-width: 0; }
 .gl-capture-chat-username {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 500;
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .gl-capture-chat-status {
-  font-size: 13px;
+  font-size: 9px;
   color: var(--safe);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 .gl-capture-chat-status::before {
   content: "";
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: var(--safe);
 }
@@ -549,276 +489,250 @@ strong {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 8px 11px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 .gl-capture-msg {
   display: flex;
-  flex-direction: column;
-  max-width: 78%;
+  gap: 6px;
+  align-items: flex-start;
 }
-.gl-capture-msg-them { align-self: flex-start; align-items: flex-start; }
-.gl-capture-msg-me   { align-self: flex-end;   align-items: flex-end;   }
+.gl-capture-msg-them { align-self: flex-start; }
+.gl-capture-msg-me   { align-self: flex-start; margin-left: 26px; }
 .gl-capture-msg-bubble {
-  font-size: 15px;
-  line-height: 1.42;
-  padding: 7px 11px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-secondary);
-  border: 0.5px solid rgba(255, 255, 255, 0.05);
+  background: var(--border);
+  border-radius: 0 6px 6px 6px;
+  padding: 3px 7px;
+  font-size: 10px;
+  color: #b0b0c0;
+  max-width: 80%;
   word-wrap: break-word;
 }
 .gl-capture-msg-me .gl-capture-msg-bubble {
-  background: rgba(59, 130, 246, 0.18);
-  border-color: rgba(59, 130, 246, 0.30);
-  color: #dbeafe;
+  background: #252540;
+  border-radius: 6px 0 6px 6px;
 }
 .gl-capture-msg-flagged .gl-capture-msg-bubble {
-  border: 1px solid rgba(239, 68, 68, 0.65);
-  background: rgba(239, 68, 68, 0.10);
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.20);
-  color: #fecaca;
+  background: rgba(226, 75, 74, 0.12);
+  border: 1px solid rgba(226, 75, 74, 0.3);
 }
 .gl-capture-msg-flag-tag {
-  font-size: 11px;
-  color: var(--alert-text);
-  margin-top: 3px;
+  font-size: 8px;
+  color: var(--alert);
+  font-weight: 500;
+  margin-top: 1px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
 }
 
-/* Status bar — caption strip at the bottom of the framed view. One
- * row, left = icon + label + sub, right = timestamp + optional badge. */
+/* Capture status bar */
 .gl-capture-bar {
+  padding: 5px 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 12px;
-  background: rgba(34, 197, 94, 0.08);
-  border-top: 0.5px solid rgba(34, 197, 94, 0.20);
-  transition: background 0.4s ease, border-color 0.4s ease;
-}
-.gl-capture-caution .gl-capture-bar {
-  background: rgba(234, 179, 8, 0.10);
-  border-top-color: rgba(234, 179, 8, 0.28);
-}
-.gl-capture-alert .gl-capture-bar {
-  background: rgba(239, 68, 68, 0.13);
-  border-top-color: rgba(239, 68, 68, 0.40);
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  transition: all 0.4s ease;
 }
 .gl-capture-bar-left {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 6px;
   min-width: 0;
+  flex: 1;
 }
 .gl-capture-bar-icon {
-  width: 20px;
-  height: 20px;
+  width: 12px;
+  height: 12px;
   display: grid;
   place-items: center;
-  color: var(--safe);
   flex-shrink: 0;
 }
+.gl-capture-bar-icon svg { width: 100%; height: 100%; display: block; }
+.gl-capture-safe .gl-capture-bar-icon { color: var(--safe); }
 .gl-capture-caution .gl-capture-bar-icon { color: var(--caution); }
-.gl-capture-alert   .gl-capture-bar-icon { color: var(--alert); }
-.gl-capture-bar-icon svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
+.gl-capture-alert .gl-capture-bar-icon { color: var(--alert); }
+
 .gl-capture-bar-textwrap { min-width: 0; }
 .gl-capture-bar-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--safe);
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.gl-capture-caution .gl-capture-bar-title { color: var(--caution); }
-.gl-capture-alert   .gl-capture-bar-title { color: var(--alert); }
-.gl-capture-bar-sub {
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.2;
-  margin-top: 1px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
-}
-.gl-capture-bar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.gl-capture-bar-time {
-  font-family: var(--font-mono);
-  font-size: 14px;
-  color: var(--text-faint);
-}
-.gl-capture-bar-badge {
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 10px;
-  background: rgba(239, 68, 68, 0.18);
-  color: var(--alert-text);
-  border: 0.5px solid rgba(239, 68, 68, 0.40);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-weight: 600;
-}
-
-/* Threat heartbeat — thin horizontal bar chart of the last 30 scans.
- * 30px container per the redesign spec; the dramatic ratio spread
- * (safe ~12%, caution ~50%, alert 100%) reads as heart-monitor spikes
- * even at this height because alert bars span the full container. */
-.gl-heartbeat {
-  display: flex;
-  align-items: flex-end;
-  gap: 1px;
-  height: 30px;
-  margin-bottom: 3px;
-}
-.gl-heartbeat-bar {
-  flex: 1;
-  min-height: 2px;
-  border-radius: 1px 1px 0 0;
-  background: #1a2030;
-  transition: height 0.4s ease, background 0.4s ease;
-}
-.gl-heartbeat-bar-safe { background: var(--safe); }
-.gl-heartbeat-bar-caution { background: var(--caution); box-shadow: 0 0 4px rgba(234, 179, 8, 0.45); }
-.gl-heartbeat-bar-alert { background: var(--alert); box-shadow: 0 0 6px rgba(239, 68, 68, 0.55); }
-.gl-heartbeat-axis {
-  display: flex;
-  justify-content: space-between;
   font-size: 10px;
-  color: var(--text-ghost);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.gl-capture-safe .gl-capture-bar-title { color: var(--safe); }
+.gl-capture-caution .gl-capture-bar-title { color: var(--caution); }
+.gl-capture-alert .gl-capture-bar-title { color: var(--alert); }
 
-/* ============================================================ Timeline (left column) */
-
-.gl-timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 300px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-.gl-timeline-entry {
-  background: var(--bg-secondary);
-  border: 0.5px solid transparent;
-  border-radius: 5px;
-  padding: 4px 8px;
-  display: grid;
-  grid-template-columns: auto auto auto 1fr auto;
-  align-items: center;
-  gap: 5px;
-  font-size: 14px;
-  transition: background-color 0.3s ease, border-color 0.3s ease;
-}
-.gl-timeline-entry .gl-platform-badge { width: 11px; height: 11px; }
-.gl-timeline-entry .gl-platform-badge img { width: 7px; height: 7px; }
-.gl-timeline-time {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: #2a3050;
-  min-width: 38px;
-}
-.gl-timeline-text {
-  font-size: 14px;
+.gl-capture-bar-sub {
+  font-size: 9px;
   color: var(--text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.gl-timeline-status {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+.gl-capture-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
-.gl-timeline-status-safe { color: var(--safe); }
-.gl-timeline-status-caution,
-.gl-timeline-status-warning {
-  color: var(--caution-text);
-  background: rgba(234, 179, 8, 0.08);
+.gl-capture-bar-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.gl-capture-bar-badge {
+  font-size: 9px;
   padding: 1px 5px;
-  border-radius: 2px;
-  font-weight: 500;
-}
-.gl-timeline-status-alert,
-.gl-timeline-status-critical {
+  border-radius: 3px;
+  background: var(--alert-bg);
   color: var(--alert);
-  background: rgba(239, 68, 68, 0.08);
-  padding: 1px 5px;
-  border-radius: 2px;
   font-weight: 500;
+  text-transform: uppercase;
 }
-.gl-timeline-entry-safe { background: var(--bg-secondary); }
-.gl-timeline-entry-safe .gl-timeline-text { color: var(--text-dim); }
-.gl-timeline-entry-caution,
-.gl-timeline-entry-warning {
-  background: rgba(234, 179, 8, 0.02);
-  border-color: rgba(234, 179, 8, 0.06);
-}
-.gl-timeline-entry-caution .gl-timeline-text,
-.gl-timeline-entry-warning .gl-timeline-text { color: var(--caution-text); }
-.gl-timeline-entry-alert,
-.gl-timeline-entry-critical {
-  background: rgba(239, 68, 68, 0.04);
-  border-color: rgba(239, 68, 68, 0.1);
-  cursor: pointer;
-  animation: gl-slide-in-alert 0.5s ease-out;
-}
-.gl-timeline-entry-alert .gl-timeline-text,
-.gl-timeline-entry-critical .gl-timeline-text { color: var(--alert-text-dim); }
 
-/* Inline platform badge in timeline rows */
+/* --- Status ribbon --- */
+
+.gl-ribbon {
+  height: 5px;
+  border-radius: 3px;
+  display: flex;
+  gap: 1px;
+  overflow: hidden;
+}
+.gl-ribbon-seg {
+  flex: 1;
+  border-radius: 2px;
+  min-width: 0;
+  transition: background 0.3s ease;
+}
+.gl-ribbon-seg-safe    { background: var(--safe); }
+.gl-ribbon-seg-caution { background: var(--caution); }
+.gl-ribbon-seg-alert   { background: var(--alert); }
+.gl-ribbon-seg-empty   { background: var(--border); }
+
+.gl-ribbon-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--text-faint);
+  margin-top: 3px;
+}
+
+/* --- Timeline --- */
+
+.gl-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.gl-timeline-entry {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--bg-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.gl-timeline-entry:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.gl-timeline-entry .gl-platform-badge { width: 0; height: 0; display: none; }
+
+/* Threat-level colored dot */
+.gl-timeline-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.gl-timeline-dot-safe       { background: var(--safe); }
+.gl-timeline-dot-caution,
+.gl-timeline-dot-warning    { background: var(--caution); }
+.gl-timeline-dot-alert,
+.gl-timeline-dot-critical   { background: var(--alert); }
+
+/* Platform name — colored text to match dot */
+.gl-timeline-platform {
+  font-size: 10px;
+  font-weight: 500;
+  min-width: 52px;
+}
+.gl-timeline-platform-discord    { color: var(--platform-discord); }
+.gl-timeline-platform-minecraft  { color: var(--platform-minecraft); }
+.gl-timeline-platform-tiktok     { color: var(--platform-tiktok); }
+.gl-timeline-platform-instagram  { color: var(--platform-instagram); }
+.gl-timeline-platform-unknown    { color: var(--platform-other); }
+
+.gl-timeline-text {
+  color: var(--text-muted);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+.gl-timeline-status {
+  font-size: 9px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+.gl-timeline-status-safe { background: var(--safe-bg); color: var(--safe); }
+.gl-timeline-status-caution,
+.gl-timeline-status-warning { background: var(--caution-bg); color: var(--caution); }
+.gl-timeline-status-alert,
+.gl-timeline-status-critical { background: var(--alert-bg); color: var(--alert); }
+
+.gl-timeline-time {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-faint);
+}
+
+/* Platform badges (for alert cards) */
 .gl-platform-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
   flex-shrink: 0;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 600;
   color: white;
   overflow: hidden;
 }
 .gl-platform-badge img {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   filter: brightness(0) invert(1);
 }
-.gl-platform-badge-instagram { background: #E4405F; }
-.gl-platform-badge-tiktok { background: #111; }
-.gl-platform-badge-discord { background: #5865F2; }
-.gl-platform-badge-minecraft { background: #3d8b3d; }
+.gl-platform-badge-instagram { background: var(--platform-instagram); }
+.gl-platform-badge-tiktok { background: var(--platform-tiktok); }
+.gl-platform-badge-discord { background: var(--platform-discord); }
+.gl-platform-badge-minecraft { background: var(--platform-minecraft); }
 .gl-platform-badge-roblox { background: #e2231a; }
 .gl-platform-badge-snapchat { background: #fffc00; }
 .gl-platform-badge-snapchat img { filter: brightness(0); }
 .gl-platform-badge-telegram { background: #26a5e4; }
-.gl-platform-badge-unknown {
-  background: #334155;
-  color: #94a3b8;
-}
+.gl-platform-badge-unknown { background: #334155; color: #94a3b8; }
 
 .gl-legend {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-family: var(--font-main);
   text-transform: none;
   letter-spacing: normal;
@@ -827,14 +741,10 @@ strong {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-ghost);
 }
-.gl-legend-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-}
+.gl-legend-dot { width: 4px; height: 4px; border-radius: 50%; }
 .gl-legend-dot-safe { background: var(--safe); }
 .gl-legend-dot-caution { background: var(--caution); }
 .gl-legend-dot-alert { background: var(--alert); }
@@ -847,9 +757,43 @@ strong {
   gap: 0;
 }
 
+/* Compact one-line monitoring stats */
+.gl-mini-line {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+  padding: 0;
+}
+
+/* Alert hero box — shown at top of right panel when threats detected */
+.gl-alert-hero {
+  background: var(--alert-bg-light);
+  border: 1px solid #3a1525;
+  border-radius: var(--radius-lg);
+  padding: 12px;
+  margin-bottom: 10px;
+  text-align: center;
+  transition: opacity 0.3s ease;
+}
+.gl-alert-hero-icon {
+  display: block;
+  margin: 0 auto 4px;
+}
+.gl-alert-hero-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--alert);
+}
+.gl-alert-hero-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* All clear card (hidden in mockup, but kept for compatibility) */
 .gl-allclear {
-  background: var(--bg-elevated);
-  border: 0.5px solid transparent;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 12px;
   margin-bottom: 10px;
@@ -857,74 +801,53 @@ strong {
   transition: background 0.3s ease, border-color 0.3s ease;
 }
 .gl-allclear-icon {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   margin: 0 auto 4px;
   display: block;
 }
-.gl-allclear-icon svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.gl-allclear-title {
-  font-size: 18px;
-  font-weight: 500;
-}
-.gl-allclear-sub {
-  font-size: 13px;
-  margin-top: 2px;
-}
+.gl-allclear-icon svg { width: 100%; height: 100%; display: block; }
+.gl-allclear-title { font-size: 13px; font-weight: 500; }
+.gl-allclear-sub { font-size: 10px; margin-top: 2px; }
 
-/* SAFE — green check */
-.gl-allclear-safe { background: rgba(34, 197, 94, 0.06); border-color: rgba(34, 197, 94, 0.18); }
-.gl-allclear-safe .gl-allclear-icon { color: #22c55e; }
+.gl-allclear-safe { background: var(--safe-bg); border-color: rgba(29, 158, 117, 0.3); }
+.gl-allclear-safe .gl-allclear-icon { color: var(--safe); }
 .gl-allclear-safe .gl-allclear-title { color: var(--safe); }
 .gl-allclear-safe .gl-allclear-sub { color: #2a5a2a; }
 
-/* CAUTION — yellow eye */
-.gl-allclear-caution { background: rgba(234, 179, 8, 0.08); border-color: rgba(234, 179, 8, 0.22); }
+.gl-allclear-caution { background: var(--caution-bg); border-color: rgba(186, 117, 23, 0.3); }
 .gl-allclear-caution .gl-allclear-icon { color: var(--caution); }
 .gl-allclear-caution .gl-allclear-title { color: var(--caution); }
-.gl-allclear-caution .gl-allclear-sub { color: var(--caution-text); }
+.gl-allclear-caution .gl-allclear-sub { color: var(--caution); }
 
-/* ALERT — red warning triangle */
 .gl-allclear-alert {
-  background: rgba(239, 68, 68, 0.10);
-  border-color: rgba(239, 68, 68, 0.35);
-  animation: gl-allclear-pulse 2.4s ease-in-out infinite;
+  background: var(--alert-bg);
+  border-color: rgba(226, 75, 74, 0.3);
 }
 .gl-allclear-alert .gl-allclear-icon { color: var(--alert); }
 .gl-allclear-alert .gl-allclear-title { color: var(--alert); font-weight: 600; }
-.gl-allclear-alert .gl-allclear-sub { color: var(--alert-text-dim); }
-
-@keyframes gl-allclear-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.0); }
-  50%      { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.10); }
-}
+.gl-allclear-alert .gl-allclear-sub { color: var(--alert); }
 
 .gl-mini-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 5px;
+  gap: 8px;
   margin-bottom: 10px;
 }
 .gl-mini-stat {
-  background: var(--bg-elevated);
-  border-radius: 5px;
-  padding: 7px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 10px;
   text-align: center;
 }
 .gl-mini-stat-value {
-  font-size: 21px;
+  font-size: 18px;
   font-weight: 500;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-feature-settings: "tnum" 1;
+  color: var(--text-primary);
 }
 .gl-mini-stat-label {
-  font-size: 10px;
-  color: var(--text-faint);
+  font-size: 9px;
+  color: var(--text-dim);
   text-transform: uppercase;
   margin-top: 2px;
 }
@@ -933,72 +856,111 @@ strong {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 .gl-history-label {
-  font-size: 13px;
-  color: var(--text-faint);
+  font-size: 11px;
+  color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 1.2px;
+  letter-spacing: 0.4px;
 }
 .gl-history-hint {
-  font-size: 11px;
+  font-size: 9px;
   color: var(--text-faint);
 }
 
 .gl-alert-history {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
   margin-bottom: 10px;
-  max-height: 280px;
+  max-height: 340px;
   overflow-y: auto;
-  padding-right: 2px;
 }
 .gl-history-empty {
-  background: var(--bg-elevated);
-  border: 0.5px dashed var(--border-strong);
-  border-radius: 5px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
   padding: 12px;
   text-align: center;
-  font-size: 13px;
+  font-size: 11px;
   color: var(--text-faint);
 }
 
-/* Individual alert card in history list. Alpha bumped from 0.03/0.04
- * (essentially invisible) to 0.12/0.30 — still subtle enough to layer
- * but unmistakably colored on the dark background. */
+/* Alert cards — new/seen states */
 .gl-alert-card {
-  background: rgba(239, 68, 68, 0.12);
-  border: 0.5px solid rgba(239, 68, 68, 0.30);
-  border-radius: 5px;
-  padding: 7px 9px;
+  border-left: 3px solid;
+  padding: 8px 10px;
+  margin-bottom: 0;
+  background: var(--bg-card);
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: all 0.2s;
+  position: relative;
 }
-.gl-alert-card:hover {
-  background: rgba(239, 68, 68, 0.18);
-  border-color: rgba(239, 68, 68, 0.45);
+.gl-alert-card:hover { background: #1a1a2e; }
+
+/* NEW (unread) — tinted bg + glow dot */
+.gl-alert-card-new { background: #16101a; }
+.gl-alert-card-new-dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  animation: gl-glow 2s ease-in-out infinite;
 }
-.gl-alert-card-caution {
-  background: rgba(234, 179, 8, 0.10);
-  border-color: rgba(234, 179, 8, 0.28);
+@keyframes gl-glow { 0%,100%{opacity:1} 50%{opacity:.5} }
+.gl-alert-card-new-label {
+  font-size: 8px;
+  font-weight: 500;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
 }
-.gl-alert-card-caution:hover {
-  background: rgba(234, 179, 8, 0.16);
-  border-color: rgba(234, 179, 8, 0.40);
+
+/* SEEN (inspected) — dimmed */
+.gl-alert-card-seen { opacity: 0.65; }
+.gl-alert-card-seen:hover { opacity: 0.85; }
+.gl-alert-card-seen-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 8px;
+  color: var(--text-ghost);
+  margin-left: 4px;
 }
-/* Cards from previous monitoring runs are dimmed so this session's
- * events stay visually dominant. The time_ago label still tells the
- * full story; the dim is just secondary reinforcement. */
-.gl-alert-card-archived {
-  opacity: 0.55;
-  filter: saturate(0.6);
+
+/* New count badge */
+.gl-history-counter {
+  background: var(--alert-bg);
+  color: var(--alert);
+  font-size: 9px;
+  font-weight: 500;
+  padding: 0 5px;
+  border-radius: 8px;
+  margin-left: 4px;
 }
-.gl-alert-card-archived:hover {
-  opacity: 0.85;
-  filter: saturate(0.85);
+
+/* Divider between new and seen */
+.gl-history-divider {
+  height: 1px;
+  background: #1a1a28;
+  margin: 6px 0;
 }
+
+/* Grooming — red, prominent */
+.gl-alert-card-grooming { border-color: var(--alert); }
+/* Bullying — amber */
+.gl-alert-card-bullying { border-color: var(--caution); }
+/* Inappropriate content — orange */
+.gl-alert-card-inappropriate { border-color: var(--orange); }
+/* Caution severity */
+.gl-alert-card-caution { border-color: var(--caution); }
+/* Archived */
+.gl-alert-card-archived { opacity: 0.55; }
+.gl-alert-card-archived:hover { opacity: 0.85; }
+
 .gl-alert-card-row1 {
   display: flex;
   align-items: center;
@@ -1008,93 +970,116 @@ strong {
 .gl-alert-card-titlebar {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
-.gl-alert-card-platform {
-  width: 11px;
-  height: 11px;
+.gl-alert-card-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
-.gl-alert-card-platform img {
-  width: 7px;
-  height: 7px;
-}
+.gl-alert-card-icon svg { width: 100%; height: 100%; display: block; }
+.gl-alert-card-platform { width: 0; height: 0; display: none; }
 .gl-alert-card-title {
-  font-size: 14px;
-  color: var(--alert-text);
+  font-size: 12px;
   font-weight: 500;
 }
-.gl-alert-card-caution .gl-alert-card-title { color: var(--caution-text); font-weight: 400; }
+.gl-alert-card-grooming .gl-alert-card-title { color: var(--alert); }
+.gl-alert-card-bullying .gl-alert-card-title { color: var(--caution); }
+.gl-alert-card-inappropriate .gl-alert-card-title { color: var(--orange); }
+
 .gl-alert-card-time {
-  font-size: 11px;
+  font-size: 9px;
   color: var(--text-faint);
 }
 .gl-alert-card-summary {
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.3;
+  font-size: 10px;
+  color: #777;
+  margin-top: 2px;
 }
 .gl-alert-card-row3 {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 4px;
+  flex-wrap: wrap;
   margin-top: 4px;
 }
 .gl-alert-card-pills {
   display: flex;
-  gap: 2px;
+  gap: 4px;
   flex-wrap: wrap;
 }
 .gl-alert-card-pill {
   font-size: 9px;
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 3px;
-  background: rgba(239, 68, 68, 0.08);
-  color: var(--alert-text);
+  background: var(--border);
+  color: var(--text-muted);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.gl-alert-card-caution .gl-alert-card-pill {
-  background: rgba(234, 179, 8, 0.08);
-  color: var(--caution-text);
-}
-.gl-alert-card-arrow {
-  font-size: 11px;
-  color: var(--text-dim);
-  margin-left: auto;
-}
+.gl-alert-card-grooming .gl-alert-card-pill { background: var(--alert-bg); color: var(--alert); }
+.gl-alert-card-bullying .gl-alert-card-pill { background: var(--caution-bg); color: var(--caution); }
+.gl-alert-card-inappropriate .gl-alert-card-pill { background: var(--orange-bg); color: var(--orange); }
 
-/* Dimmed historical action card under the alert history list */
+.gl-alert-card-arrow {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 14px;
+  transition: color 0.2s;
+}
+.gl-alert-card:hover .gl-alert-card-arrow { color: #999; }
+
+/* Historical action */
 .gl-historical-dim {
-  background: var(--bg-elevated);
-  border-radius: var(--radius-md);
-  padding: 8px 10px;
-  margin-bottom: 10px;
-  opacity: 0.55;
+  background: var(--bg-card);
+  border-left: 3px solid var(--caution);
+  border-radius: 0;
+  padding: 10px 12px;
+  margin-top: 8px;
 }
 .gl-historical-label {
   font-size: 11px;
-  color: var(--text-faint);
+  color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 4px;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+  font-weight: 500;
 }
 .gl-historical-body {
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 11px;
+  color: #c0c0cc;
   line-height: 1.6;
 }
 
-/* Telegram summary one-liner under historical action */
 .gl-telegram-summary {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 8px;
-  background: #0e1018;
-  border-radius: var(--radius-sm);
-  margin-bottom: 8px;
-  opacity: 0.55;
-  font-size: 11px;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  margin-top: 10px;
+  font-size: 10px;
   color: var(--text-faint);
 }
+
+/* Privacy badge (bottom of right panel — now in nav, kept minimal) */
+.gl-privacy-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.gl-privacy-icon { display: none; }
+.gl-privacy-text { display: none; }
+.gl-privacy-pill { display: none; }
 
 /* ============================================================ 9. Right panel — full analysis */
 
@@ -1105,111 +1090,115 @@ strong {
 }
 
 .gl-analysis-back {
-  background: var(--bg-elevated);
-  border: 0.5px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 6px 10px;
-  font-size: 14px;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-  width: fit-content;
-  transition: background 0.2s ease, color 0.2s ease;
+  font-size: 11px;
+  color: var(--purple);
+  cursor: pointer;
+  margin-bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  background: none;
+  border: none;
 }
-.gl-analysis-back:hover {
-  background: #1a1d27;
-  color: var(--text-primary);
-}
+.gl-analysis-back:hover { color: #AFA9EC; }
 
 .gl-analysis-live-banner {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: rgba(239, 68, 68, 0.06);
-  border: 0.5px solid rgba(239, 68, 68, 0.16);
-  border-radius: var(--radius-md);
+  background: rgba(226, 75, 74, 0.06);
+  border: 1px solid rgba(226, 75, 74, 0.2);
+  border-radius: var(--radius);
   padding: 6px 10px;
   margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--alert-text);
+  font-size: 11px;
+  color: var(--alert);
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.3px;
 }
 
-/* Alert summary card at the top of the analysis state */
-.gl-analysis-card {
-  background: var(--alert-bg);
-  border: 0.5px solid var(--alert-border);
-  border-radius: var(--radius-lg);
-  padding: 11px;
-  margin-bottom: 10px;
+/* New alert notification banner */
+.gl-new-alert-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(226, 75, 74, 0.06);
+  border: 1px solid rgba(226, 75, 74, 0.2);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--alert);
 }
-.gl-analysis-card-caution {
-  background: var(--caution-bg);
-  border-color: var(--caution-border);
+.gl-new-alert-btn {
+  margin-left: auto;
+  background: rgba(226, 75, 74, 0.12);
+  border: 1px solid rgba(226, 75, 74, 0.3);
+  border-radius: var(--radius);
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--alert);
+  cursor: pointer;
+}
+.gl-new-alert-btn:hover { background: rgba(226, 75, 74, 0.2); }
+
+/* Analysis card */
+.gl-analysis-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 10px;
+  margin-bottom: 8px;
 }
 .gl-analysis-card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 6px;
+  align-items: center;
+  margin-bottom: 4px;
 }
-.gl-analysis-card-titles {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
+.gl-analysis-card-titles { display: flex; flex-direction: column; gap: 2px; }
 .gl-analysis-card-title {
-  font-size: 15px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--alert-text);
-  font-weight: 500;
-}
-.gl-analysis-card-caution .gl-analysis-card-title { color: var(--caution-text); }
-.gl-analysis-card-meta {
   font-size: 13px;
-  color: var(--text-faint);
-  font-family: var(--font-mono);
-}
-.gl-analysis-card-confidence {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  font-family: var(--font-mono);
-  line-height: 1;
-}
-.gl-analysis-card-conf-value {
-  font-size: 34px;
   font-weight: 500;
   color: var(--alert);
-  letter-spacing: -0.5px;
+}
+.gl-analysis-card-caution .gl-analysis-card-title { color: var(--caution); }
+.gl-analysis-card-meta {
+  font-size: 10px;
+  color: #777;
+}
+.gl-analysis-card-confidence {
+  text-align: right;
+}
+.gl-analysis-card-conf-value {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--alert);
 }
 .gl-analysis-card-caution .gl-analysis-card-conf-value { color: var(--caution); }
 .gl-analysis-card-conf-label {
-  font-size: 10px;
-  color: var(--text-faint);
+  font-size: 9px;
+  color: var(--text-dim);
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-top: 2px;
-  font-family: var(--font-main);
+  font-weight: 400;
 }
 .gl-analysis-card-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 3px;
-  margin: 6px 0;
+  gap: 4px;
+  margin: 8px 0;
 }
 .gl-analysis-card-pill {
-  font-size: 10px;
-  padding: 2px 5px;
-  border-radius: 2px;
-  background: rgba(239, 68, 68, 0.08);
-  color: var(--alert-text);
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--alert-bg);
+  color: var(--alert);
 }
 .gl-analysis-card-caution .gl-analysis-card-pill {
-  background: rgba(234, 179, 8, 0.08);
-  color: var(--caution-text);
+  background: var(--caution-bg);
+  color: var(--caution);
 }
 .gl-analysis-card-stagebar {
   display: flex;
@@ -1220,191 +1209,179 @@ strong {
   flex: 1;
   height: 3px;
   border-radius: 1.5px;
-  background: #151a2a;
+  background: var(--border);
 }
 .gl-analysis-stage-seg-active { background: var(--alert); }
 .gl-analysis-stage-seg-current { background: var(--alert); opacity: 0.35; }
 
-/* Flagged messages numbered list */
+/* Flagged messages */
 .gl-flagged-messages {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 10px;
+  gap: 4px;
+  margin-bottom: 8px;
 }
 .gl-flagged-msg {
-  display: grid;
-  grid-template-columns: 18px 1fr;
-  gap: 8px;
-  background: var(--bg-elevated);
-  border-left: 2px solid rgba(239, 68, 68, 0.4);
-  border-radius: 0 4px 4px 0;
-  padding: 7px 9px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 8px 10px;
 }
-.gl-flagged-msg-num {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--alert);
-  display: grid;
-  place-items: center;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: var(--font-mono);
-}
-.gl-flagged-msg-body {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
+.gl-flagged-msg-num { display: none; }
+.gl-flagged-msg-body { display: flex; flex-direction: column; gap: 2px; }
 .gl-flagged-msg-quote {
-  font-size: 14px;
-  color: var(--text-primary);
+  font-size: 11px;
+  color: var(--alert);
+  font-weight: 500;
   font-style: italic;
-  font-family: var(--font-mono);
 }
 .gl-flagged-msg-explanation {
-  font-size: 13px;
-  color: var(--text-muted);
+  font-size: 10px;
+  color: var(--text-dim);
   line-height: 1.4;
 }
 
-/* ============================================================ 10. Reasoning chain / Why / Action / Telegram */
+/* ============================================================ 10. Reasoning / Why / Action / Telegram */
 
 .gl-reasoning-chain {
-  background: var(--bg-elevated);
-  border: 0.5px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  padding: 9px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.8;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-family: monospace;
+  font-size: 10px;
+  line-height: 1.6;
   color: var(--text-muted);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
-.gl-reasoning-step-label {
-  color: var(--text-faint);
-  text-transform: uppercase;
-}
+.gl-reasoning-step-label { color: var(--text-dim); }
 .gl-reasoning-step-text { color: var(--text-secondary); }
-.gl-reasoning-step-flag { color: var(--alert-text); }
-.gl-reasoning-step-verdict {
-  color: var(--alert);
-  font-weight: 500;
-}
+.gl-reasoning-step-flag { color: var(--alert); }
+.gl-reasoning-step-verdict { color: var(--alert); font-weight: 500; }
 
 .gl-why {
-  background: rgba(239, 68, 68, 0.06);
-  border: 0.5px solid rgba(239, 68, 68, 0.18);
-  border-left-width: 2px;
-  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border-radius: var(--radius);
   padding: 8px 10px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .gl-why-text {
-  font-size: 14px;
-  color: var(--alert-text-dim);
-  line-height: 1.6;
+  font-size: 11px;
+  color: #999;
+  line-height: 1.5;
 }
 .gl-why .gl-empty {
-  font-size: 13px;
+  font-size: 11px;
   padding: 0;
   border: none;
   background: transparent;
   color: var(--text-muted);
 }
 
+/* Action panel — colored left border based on threat type */
 .gl-action {
-  background: var(--purple-bg);
-  border: 0.5px solid var(--purple-border);
-  border-radius: var(--radius-md);
-  padding: 9px;
-  margin-bottom: 10px;
+  background: var(--bg-card);
+  border-left: 3px solid var(--alert);
+  border-radius: 0;
+  padding: 10px 12px;
+  margin-top: 10px;
+  margin-bottom: 8px;
 }
+.gl-action-grooming { border-left-color: var(--alert); }
+.gl-action-bullying { border-left-color: var(--caution); }
+.gl-action-inappropriate { border-left-color: var(--orange); }
+.gl-action-other { border-left-color: var(--purple); }
+
+.gl-action-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gl-action-dismiss {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.gl-action-dismiss:hover { color: var(--text-primary); }
+
 .gl-action-step {
   display: flex;
-  gap: 8px;
-  margin-bottom: 7px;
   align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 .gl-action-step:last-of-type { margin-bottom: 0; }
 .gl-action-num {
-  width: 26px;
-  height: 26px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
-  background: rgba(139, 92, 246, 0.22);
-  border: 1px solid rgba(139, 92, 246, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 10px;
+  font-weight: 500;
   flex-shrink: 0;
-  margin-top: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #c4b5fd;
+  /* Colors set by JS based on category */
+  background: var(--alert-bg);
+  color: var(--alert);
 }
 .gl-action-text {
-  font-size: 14px;
-  color: var(--purple-text);
+  font-size: 13px;
+  color: #c0c0cc;
   line-height: 1.4;
 }
 .gl-action-privacy {
-  font-size: 11px;
-  color: #6d28d9;
-  margin-top: 5px;
-  padding-top: 5px;
-  border-top: 0.5px solid rgba(139, 92, 246, 0.1);
+  font-size: 9px;
+  color: var(--text-faint);
+  margin-top: 6px;
   line-height: 1.4;
 }
 .gl-action .gl-empty {
-  font-size: 13px;
+  font-size: 11px;
   padding: 0;
   border: none;
   background: transparent;
   color: var(--text-muted);
 }
 
+/* Telegram card */
 .gl-telegram-card {
-  background: var(--info-bg);
-  border: 0.5px solid var(--info-border);
-  border-radius: var(--radius-md);
-  padding: 8px 9px;
-  margin-bottom: 10px;
-}
-.gl-telegram-header {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 3px;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 8px;
+  background: var(--safe-bg);
+  border-radius: var(--radius);
+  font-size: 11px;
+  color: var(--safe);
 }
+.gl-telegram-header { display: contents; }
 .gl-telegram-icon {
-  width: 9px;
-  height: 9px;
+  width: 14px;
+  height: 14px;
   flex-shrink: 0;
-  filter: brightness(0) saturate(100%) invert(67%) sepia(43%) saturate(917%)
-    hue-rotate(187deg) brightness(99%) contrast(94%);
+  filter: none;
 }
 .gl-telegram-label {
   font-size: 11px;
-  color: var(--info-text);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  font-weight: 500;
+  color: var(--safe);
 }
-.gl-telegram-message {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-  font-style: italic;
+.gl-telegram-sent-badge {
+  margin-left: auto;
+  font-size: 9px;
+  color: #0F6E56;
 }
-.gl-telegram-meta {
-  font-size: 11px;
-  color: var(--text-ghost);
-  margin-top: 2px;
-  font-family: var(--font-mono);
-}
+.gl-telegram-message { display: none; }
+.gl-telegram-meta { display: none; }
 
 /* ============================================================ 11. Status dots + animations */
 
@@ -1415,32 +1392,16 @@ strong {
   display: inline-block;
   flex-shrink: 0;
 }
-.gl-dot-safe { background: var(--safe); animation: gl-pulse-soft 2s infinite; }
+.gl-dot-safe { background: var(--safe); animation: pulse-dot 2s infinite; }
 .gl-dot-caution,
-.gl-dot-warning { background: var(--caution); animation: gl-pulse-soft 2s infinite; }
+.gl-dot-warning { background: var(--caution); animation: pulse-dot 2s infinite; }
 .gl-dot-alert,
-.gl-dot-critical { background: var(--alert); animation: gl-pulse-alert 1.5s infinite; }
+.gl-dot-critical { background: var(--alert); animation: pulse-dot 1.5s infinite; }
 .gl-dot-dim { background: var(--text-dim); }
 
-@keyframes gl-pulse-soft {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
-}
-@keyframes gl-pulse-alert {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.45); }
-  50% { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
-}
 @keyframes gl-slide-in-alert {
-  from {
-    opacity: 0;
-    transform: translateX(-12px);
-    background: rgba(239, 68, 68, 0.18);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-    background: var(--alert-bg);
-  }
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 @keyframes gl-fade-in {
   from { opacity: 0; transform: translateY(4px); }
@@ -1448,75 +1409,40 @@ strong {
 }
 .gl-fade-in { animation: gl-fade-in 0.4s ease-out; }
 
-/* ============================================================ 12. Privacy badge + footer */
-
-.gl-privacy-badge {
-  background: var(--bg-elevated);
-  border-radius: 5px;
-  padding: 7px 9px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: auto;
-}
-.gl-privacy-icon {
-  width: 11px;
-  height: 11px;
-  display: grid;
-  place-items: center;
-  color: var(--safe);
-  flex-shrink: 0;
-}
-.gl-privacy-icon svg {
-  width: 11px;
-  height: 11px;
-}
-.gl-privacy-text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.gl-privacy-title {
-  font-size: 13px;
-  color: var(--safe);
-}
-.gl-privacy-subtitle {
-  font-size: 11px;
-  color: var(--text-ghost);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.gl-privacy-pill {
-  margin-left: 0;
-  font-size: 10px;
-  color: #16a34a;
-  background: rgba(34, 197, 94, 0.05);
-  border: 0.5px solid rgba(34, 197, 94, 0.06);
-  padding: 1px 5px;
-  border-radius: var(--radius-sm);
-  flex-shrink: 0;
-}
+/* ============================================================ 12. Footer */
 
 .gl-footer {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 8px 16px;
-  border-top: 0.5px solid var(--border);
-  background: var(--bg-tertiary);
-  font-size: 14px;
-  color: var(--text-dim);
+  justify-content: space-between;
+  padding: 3px 14px;
+  background: var(--bg-footer);
+  border-top: 1px solid var(--border);
+  font-size: 9px;
+  color: var(--text-ghost);
 }
 .gl-footer strong {
   color: var(--text-secondary);
-  font-weight: 500;
+  font-weight: 400;
 }
 .gl-footer-receipt {
-  font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 10px;
 }
+.gl-footer-zero {
+  color: var(--safe) !important;
+  font-weight: 700;
+  font-size: 12px;
+}
+.gl-footer-check {
+  color: var(--safe);
+  font-weight: 700;
+  font-size: 11px;
+  vertical-align: -1px;
+  margin-left: 1px;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.gl-footer-check-visible { opacity: 1; }
 
 /* ============================================================ 13. Empty / loading */
 
@@ -1524,22 +1450,18 @@ strong {
   padding: 12px;
   text-align: center;
   color: var(--text-muted);
-  background: var(--bg-secondary);
-  border: 0.5px dashed var(--border-strong);
-  border-radius: var(--radius-md);
-  font-size: 14px;
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  font-size: 11px;
 }
 
-/* ============================================================ 14. Wow alert state */
+/* ============================================================ 14. Reduced motion */
 
-.gl-shell.gl-alert-active {
-  background: radial-gradient(circle at 50% -30%, #1a0e12 0%, #0c0809 60%);
-  border-color: rgba(239, 68, 68, 0.12);
-}
-.gl-shell.gl-alert-active .gl-header {
-  border-bottom-color: rgba(239, 68, 68, 0.35);
-  background: rgba(20, 8, 10, 0.85);
-}
-.gl-shell.gl-alert-active .gl-side {
-  border-left: 0.5px solid rgba(239, 68, 68, 0.18);
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

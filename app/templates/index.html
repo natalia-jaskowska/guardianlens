@@ -11,21 +11,22 @@
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/static/dashboard.css" />
+    <link rel="stylesheet" href="/static/dashboard.css?v=17" />
   </head>
   <body>
     <div id="shell" class="gl-shell">
       <!-- ===================== HEADER ===================== -->
       <header class="gl-header">
         <div class="gl-header-left">
-          <div class="gl-logo-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2L4 6v6c0 5.25 3.75 9.75 8 10 4.25-0.25 8-4.75 8-10V6l-8-4z"/>
-              <circle cx="12" cy="11" r="2.5"/>
-            </svg>
-          </div>
-          <div class="gl-logo-text">GuardianLens</div>
-          <span class="gl-tag">on-device safety monitor</span>
+          <svg class="gl-logo-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L4 6v6c0 5.25 3.75 9.75 8 10 4.25-0.25 8-4.75 8-10V6l-8-4z"/>
+            <circle cx="12" cy="11" r="2.5"/>
+          </svg>
+          <span class="gl-logo-text">GuardianLens</span>
+          <svg class="gl-logo-lock" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3">
+            <rect x="3" y="7" width="10" height="7" rx="1.5"/>
+            <path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke-linecap="round"/>
+          </svg>
         </div>
         <div class="gl-header-right">
           <div class="gl-header-status" id="header-status">
@@ -45,79 +46,53 @@
       <main class="gl-main">
         <!-- LEFT COLUMN ............................................. -->
         <section class="gl-left">
-          <!-- Metrics row (horizontal across the top) -->
-          <div class="gl-metrics" id="metrics">
-            <div class="gl-metric-card">
-              <div class="gl-metric-label">Screenshots</div>
-              <div class="gl-metric-value" id="metric-screenshots">0</div>
-              <div class="gl-sparkline" id="metric-sparkline"></div>
-              <div class="gl-metric-sublabel" id="metric-screenshots-sub">warming up</div>
-            </div>
-            <div class="gl-metric-card">
-              <div class="gl-metric-label">Safe</div>
-              <div class="gl-metric-value gl-metric-value-safe" id="metric-safe">0</div>
-              <div class="gl-metric-sublabel" id="metric-safe-sub">0% of scans</div>
-            </div>
-            <div class="gl-metric-card gl-metric-card-caution">
-              <div class="gl-metric-label">Caution</div>
-              <div class="gl-metric-value gl-metric-value-caution" id="metric-caution">0</div>
-              <div class="gl-metric-sublabel" id="metric-caution-sub">0% of scans</div>
-            </div>
-            <div class="gl-metric-card gl-metric-card-alert">
-              <div class="gl-metric-label">Alerts</div>
-              <div class="gl-metric-value gl-metric-value-alert" id="metric-alerts">0</div>
-              <div class="gl-metric-sublabel" id="metric-alerts-sub">no active threats</div>
-            </div>
-          </div>
-
-          <!-- Latest capture — big framed view of what the child is
-               looking at right now. Hero of the left column at ~42vh.
-               The container is one component with a colored border
-               (green = safe, yellow = caution, red = alert). Inside: a
-               tall screen area (image OR inline chat render for alerts)
-               and a thin status bar below acting as a caption. Section
-               label has only "Latest capture" — all the timestamp /
-               context lives inside the bar so the screen area gets
-               every pixel of vertical space. -->
-          <div class="gl-section gl-section-capture">
-            <div class="gl-section-label">
-              <span>Latest capture</span>
-              <span class="gl-live-tag" id="capture-live-tag">
-                <span class="gl-live-dot"></span>
-                <span class="gl-live-text">LIVE</span>
-              </span>
-            </div>
-            <div class="gl-capture gl-capture-safe" id="capture-card">
-              <div class="gl-capture-screen" id="capture-screen">
-                <div class="gl-capture-placeholder">Connecting to monitor stream…</div>
+          <!-- Top row: capture + shield side by side -->
+          <div class="gl-top-grid">
+            <!-- Capture (left cell) -->
+            <div class="gl-section gl-section-capture">
+              <div class="gl-section-label">
+                <span>Latest capture</span>
+                <span class="gl-live-tag" id="capture-live-tag">
+                  <span class="gl-live-dot"></span>
+                  <span class="gl-live-text">LIVE</span>
+                </span>
               </div>
-              <div class="gl-capture-bar" id="capture-bar">
-                <div class="gl-capture-bar-left">
-                  <div class="gl-capture-bar-icon" id="capture-bar-icon"></div>
-                  <div class="gl-capture-bar-textwrap">
-                    <div class="gl-capture-bar-title" id="capture-bar-title">Initializing</div>
-                    <div class="gl-capture-bar-sub" id="capture-bar-sub">—</div>
+              <div class="gl-capture gl-capture-safe" id="capture-card">
+                <div class="gl-capture-screen" id="capture-screen">
+                  <div class="gl-capture-placeholder">Connecting to monitor stream…</div>
+                </div>
+                <div class="gl-capture-bar" id="capture-bar">
+                  <div class="gl-capture-bar-left">
+                    <div class="gl-capture-bar-icon" id="capture-bar-icon"></div>
+                    <div class="gl-capture-bar-textwrap">
+                      <div class="gl-capture-bar-title" id="capture-bar-title">Initializing</div>
+                      <div class="gl-capture-bar-sub" id="capture-bar-sub">—</div>
+                    </div>
+                  </div>
+                  <div class="gl-capture-bar-right">
+                    <span class="gl-capture-bar-time" id="capture-bar-time">--:--:--</span>
+                    <span class="gl-capture-bar-badge" id="capture-bar-badge" style="display:none"></span>
                   </div>
                 </div>
-                <div class="gl-capture-bar-right">
-                  <span class="gl-capture-bar-time" id="capture-bar-time">--:--:--</span>
-                  <span class="gl-capture-bar-badge" id="capture-bar-badge" style="display:none"></span>
-                </div>
               </div>
             </div>
-          </div>
 
-          <!-- Threat heartbeat: thin horizontal bar chart of last 30 scans -->
-          <div class="gl-section">
-            <div class="gl-section-label">Threat heartbeat</div>
-            <div class="gl-heartbeat" id="heartbeat"></div>
-            <div class="gl-heartbeat-axis">
-              <span>5 min ago</span>
-              <span>now</span>
+            <!-- Shield + ribbon (right cell) -->
+            <div class="gl-shield-column">
+              <div class="gl-shield-hero gl-shield-safe" id="shield-hero">
+                <div class="gl-shield-icon" id="shield-icon"></div>
+                <div class="gl-shield-title" id="shield-title">All clear</div>
+                <div class="gl-shield-sub" id="shield-sub">Monitoring active</div>
+              </div>
+              <div class="gl-ribbon-wrap">
+                <div class="gl-ribbon-label"><span>5m ago</span><span>now</span></div>
+                <div class="gl-ribbon" id="ribbon"></div>
+              </div>
+              <div class="gl-stats-line" id="stats-line">— active · — platforms</div>
             </div>
           </div>
 
-          <!-- Live timeline -->
+          <!-- Timeline spans full width below -->
           <div class="gl-section gl-section-grow">
             <div class="gl-section-label">
               <span>Timeline</span>
@@ -141,30 +116,8 @@
              2. FULL ANALYSIS (clicked or auto) — #right-analysis -->
         <aside class="gl-side">
 
-          <!-- ============= STATE 1: SAFE OVERVIEW ============= -->
-          <div id="right-safe">
-            <!-- Big status card. The icon, title and color are swapped
-                 by JS depending on the current alert state — see
-                 renderAllClear() in dashboard.js. -->
-            <div class="gl-allclear" id="allclear-card">
-              <div class="gl-allclear-icon" id="allclear-icon"></div>
-              <div class="gl-allclear-title" id="allclear-title">All clear</div>
-              <div class="gl-allclear-sub" id="allclear-sub">12 safe in a row</div>
-            </div>
-
-            <!-- 2 mini stat boxes -->
-            <div class="gl-mini-stats">
-              <div class="gl-mini-stat">
-                <div class="gl-mini-stat-value" id="mini-stat-monitored">—</div>
-                <div class="gl-mini-stat-label">monitored</div>
-              </div>
-              <div class="gl-mini-stat">
-                <div class="gl-mini-stat-value" id="mini-stat-platforms">—</div>
-                <div class="gl-mini-stat-label">platforms</div>
-              </div>
-            </div>
-
-            <!-- Alert history list -->
+          <!-- STATE 1: Overview (alert list + action + telegram) -->
+          <div id="overview-panel">
             <div class="gl-history-header">
               <span class="gl-history-label" id="history-label">Alert history (0)</span>
               <span class="gl-history-hint">click any to inspect</span>
@@ -173,95 +126,43 @@
               <div class="gl-history-empty">No alerts yet — your child is safe.</div>
             </div>
 
-            <!-- Dimmed historical action from latest alert -->
             <div class="gl-historical-dim" id="historical-action" style="display:none">
-              <div class="gl-historical-label">Action from latest alert</div>
+              <div class="gl-historical-label">Recommended action for parent</div>
               <div class="gl-historical-body" id="historical-action-body"></div>
             </div>
 
-            <!-- Dimmed Telegram summary -->
             <div class="gl-telegram-summary" id="telegram-summary" style="display:none">
-              <svg width="9" height="9" viewBox="0 0 16 16" fill="none">
-                <path d="M14 2L7 9M14 2L10 14L7 9M14 2L2 6L7 9" stroke="#3e4660" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
               <span id="telegram-summary-text">—</span>
-              <svg width="9" height="9" viewBox="0 0 16 16" fill="none" style="margin-left:auto">
-                <path d="M3 8L6 11L11 5" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </div>
-
-            <!-- Privacy badge -->
-            <div class="gl-privacy-badge">
-              <div class="gl-privacy-icon" aria-hidden="true">
-                <svg viewBox="0 0 16 16" fill="none">
-                  <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="#22c55e" stroke-width="1.3"/>
-                  <path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="#22c55e" stroke-width="1.3" stroke-linecap="round"/>
-                </svg>
-              </div>
-              <div class="gl-privacy-text">
-                <div class="gl-privacy-title">Fully local &middot; zero cloud</div>
-                <div class="gl-privacy-subtitle">Ollama on-device &middot; cloud: 0 bytes</div>
-              </div>
-              <span class="gl-privacy-pill">Private</span>
+              <span style="margin-left:auto;font-size:8px;color:#0F6E56">Sent</span>
             </div>
           </div>
 
-          <!-- ============= STATE 2/3: FULL ANALYSIS ============= -->
-          <div id="right-analysis" style="display:none">
-            <!-- Back button (only visible after manual click) -->
-            <button class="gl-analysis-back" id="analysis-back" type="button" style="display:none">
-              ← Back to overview
-            </button>
+          <!-- STATE 2: Detail (back button + full analysis) -->
+          <div id="detail-panel" style="display:none">
+            <div class="gl-analysis-back" id="analysis-back">&larr; Back to overview</div>
 
-            <!-- Live alert banner (only visible when auto-triggered) -->
-            <div class="gl-analysis-live-banner" id="analysis-live-banner" style="display:none">
-              <span class="gl-dot gl-dot-alert"></span>
-              <span>LIVE ALERT — auto-detected</span>
-            </div>
-
-            <!-- Alert summary card -->
-            <div class="gl-section-label" id="analysis-timestamp-label">Alert detail</div>
             <div class="gl-analysis-card" id="analysis-card"></div>
 
-            <!-- AI reasoning chain -->
             <div class="gl-section-label">AI reasoning chain</div>
             <div class="gl-reasoning-chain" id="reasoning-chain">
               <div class="gl-empty">No reasoning yet.</div>
             </div>
 
-            <!-- Why this matters -->
             <div class="gl-section-label">Why this matters</div>
             <div class="gl-why" id="why-this-matters">
               <div class="gl-empty">—</div>
             </div>
 
-            <!-- Flagged messages numbered list -->
             <div class="gl-section-label" id="flagged-label" style="display:none">Flagged messages</div>
             <div class="gl-flagged-messages" id="flagged-messages" style="display:none"></div>
 
-            <!-- Recommended action -->
             <div class="gl-section-label">Recommended action for parent</div>
             <div class="gl-action" id="recommended-action">
               <div class="gl-empty">—</div>
             </div>
 
-            <!-- Telegram delivery -->
             <div id="telegram-block"></div>
-
-            <!-- Privacy badge (also in analysis state) -->
-            <div class="gl-privacy-badge">
-              <div class="gl-privacy-icon" aria-hidden="true">
-                <svg viewBox="0 0 16 16" fill="none">
-                  <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="#22c55e" stroke-width="1.3"/>
-                  <path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="#22c55e" stroke-width="1.3" stroke-linecap="round"/>
-                </svg>
-              </div>
-              <div class="gl-privacy-text">
-                <div class="gl-privacy-title">Fully local &middot; zero cloud</div>
-                <div class="gl-privacy-subtitle">Ollama on-device &middot; cloud: 0 bytes</div>
-              </div>
-              <span class="gl-privacy-pill">Private</span>
-            </div>
           </div>
 
         </aside>
@@ -274,7 +175,9 @@
           via Ollama &middot; local inference
         </span>
         <span class="gl-footer-receipt">
-          bytes sent to cloud: <strong>0</strong> &middot; storage:
+          bytes sent to cloud: <strong class="gl-footer-zero" id="footer-bytes-zero">0</strong>
+          <span class="gl-footer-check" id="footer-bytes-check">&#10003;</span>
+          &middot; storage:
           <span class="gl-mono" id="footer-db">{{ db_path }}</span>
         </span>
       </footer>
@@ -283,6 +186,6 @@
     <!-- Initial state, server-rendered. The JS picks this up so the page
          isn't blank for the first SSE round-trip. -->
     <script id="initial-state" type="application/json">{{ initial_state | tojson }}</script>
-    <script src="/static/dashboard.js" defer></script>
+    <script src="/static/dashboard.js?v=17" defer></script>
   </body>
 </html>
