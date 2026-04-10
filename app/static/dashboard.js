@@ -15,9 +15,6 @@
     headerStatus: document.getElementById("header-status"),
     headerModel: document.getElementById("header-model"),
 
-    shieldHero: document.getElementById("shield-hero"),
-    shieldIcon: document.getElementById("shield-icon"),
-    shieldTitle: document.getElementById("shield-title"),
     shieldSub: document.getElementById("shield-sub"),
 
     captureCard: document.getElementById("capture-card"),
@@ -190,10 +187,8 @@
       title = "All clear";
       sub = `Session: ${dur}`;
     }
-    els.shieldHero.className = `gl-status-mini gl-shield-${mode}`;
-    els.shieldIcon.innerHTML = icon;
-    setText(els.shieldTitle, title);
-    setText(els.shieldSub, sub);
+    // Shield removed from capture card — only update session duration
+    setText(els.shieldSub, `Session: ${dur}`);
 
     // Populate metric counters
     const safePctEl = document.getElementById("status-safe-pct");
@@ -473,7 +468,7 @@
         <span class="gl-alert-card-plat" data-platform="${a.platform_key||"unknown"}">${a.platform_key && a.platform_key !== "unknown" ? `<img src="/static/icons/${a.platform_key}.svg" alt="">` : ""}</span>
         <span class="gl-alert-card-user">${esc(a.user)}</span>
         <span class="gl-alert-card-sep">\u2022</span>
-        <span class="gl-alert-card-summary">${esc(a.summary)}</span>
+        <span class="gl-alert-card-platform-name">${esc(a.platform||"Unknown")}</span>
       </div>
       <div class="gl-alert-card-bottom">${pills}${stageHtml}</div>
       <span class="gl-alert-card-arrow">\u203a</span>

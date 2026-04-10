@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/dashboard.css?v=20" />
+    <link rel="stylesheet" href="/static/dashboard.css?v=24" />
   </head>
   <body>
     <div id="shell" class="gl-shell">
@@ -60,12 +60,6 @@
 
           <!-- Stats row — horizontal under capture -->
           <div class="gl-stats-row">
-            <div class="gl-status-mini" id="shield-hero">
-              <div class="gl-status-icon" id="shield-icon"></div>
-              <div class="gl-status-title" id="shield-title">All clear</div>
-              <div class="gl-status-sub" id="shield-sub">Monitoring</div>
-            </div>
-            <div class="gl-stats-divider"></div>
             <div class="gl-stat" id="status-safe-pct">
               <span class="gl-stat-val">—</span>
               <span class="gl-stat-lbl">Safe</span>
@@ -82,6 +76,7 @@
               <span class="gl-stat-val">—</span>
               <span class="gl-stat-lbl">Response</span>
             </div>
+            <div class="gl-stats-session" id="shield-sub">Session: 0m 00s</div>
           </div>
 
           <!-- Timeline — fills remaining space -->
@@ -186,6 +181,6 @@
     </div>
 
     <script id="initial-state" type="application/json">{{ initial_state | tojson }}</script>
-    <script src="/static/dashboard.js?v=20" defer></script>
+    <script src="/static/dashboard.js?v=24" defer></script>
   </body>
 </html>
