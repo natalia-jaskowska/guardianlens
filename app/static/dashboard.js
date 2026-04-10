@@ -355,6 +355,20 @@
       els.timeline.innerHTML = '<div class="gl-empty">Waiting for the first capture...</div>';
       return;
     }
+    // Compute escalation runs — mark entries that are part of a worsening sequence
+    // Entries are newest-first, so we scan bottom-up (oldest to newest) to find progression
+    const levelNum = (l) => l === "safe" ? 0 : (l === "caution" || l === "warning") ? 1 : 2;
+    const escalation = new Array(entries.length).fill(false);
+    // Walk oldest→newest (end→start of array)
+    for (let i = entries.length - 2; i >= 0; i--) {
+      const curr = levelNum(entries[i].threat_level);
+      const prev = levelNum(entries[i + 1].threat_level);
+      if (curr > 0 && prev > 0 && curr >= prev) {
+        escalation[i] = true;
+        escalation[i + 1] = true;
+      }
+    }
+
     els.timeline.innerHTML = entries.map((e, i) => {
       const level = e.threat_level;
       const k = e.platform_key || pKey(e.platform);
@@ -365,7 +379,12 @@
         ? `<img src="/static/icons/${k}.svg" alt="">`
         : `<span class="gl-timeline-icon-letter">${(e.platform||"?").charAt(0).toUpperCase()}</span>`;
       const isClickable = levelCls !== "safe";
-      return `<div class="gl-timeline-entry gl-timeline-entry-${levelCls}${isClickable?" gl-timeline-clickable":""}" data-tl-idx="${i}">
+      const escCls = escalation[i] ? " gl-timeline-escalation" : "";
+      // Is this the first entry in an escalation run? (entry above is not escalating)
+      const escStart = escalation[i] && (i === 0 || !escalation[i - 1]);
+      const escStartCls = escStart ? " gl-timeline-esc-start" : "";
+      return `<div class="gl-timeline-entry gl-timeline-entry-${levelCls}${isClickable?" gl-timeline-clickable":""}${escCls}${escStartCls}" data-tl-idx="${i}">
+        <div class="gl-timeline-esc-bar"></div>
         <span class="gl-timeline-icon" data-platform="${k}">${iconInner}</span>
         <div class="gl-timeline-body">
           <div class="gl-timeline-row1">

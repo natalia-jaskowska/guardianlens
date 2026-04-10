@@ -725,6 +725,47 @@ button { font-family: inherit; cursor: pointer; }
 .gl-timeline-entry-alert  { border-left: 3px solid var(--alert); }
 .gl-timeline-entry-caution { border-left: 3px solid var(--caution); }
 
+/* Escalation connector — red gradient bar connecting consecutive worsening entries */
+.gl-timeline-esc-bar {
+  display: none;
+}
+.gl-timeline-escalation {
+  position: relative;
+}
+.gl-timeline-escalation .gl-timeline-esc-bar {
+  display: block;
+  position: absolute;
+  left: -1px;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(to top, var(--caution), var(--alert));
+  border-radius: 2px;
+  z-index: 1;
+}
+.gl-timeline-esc-start .gl-timeline-esc-bar {
+  top: 50%;
+  border-radius: 2px 2px 0 0;
+}
+.gl-timeline-esc-start::before {
+  content: "ESCALATING";
+  position: absolute;
+  left: 8px;
+  top: -1px;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--alert);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.7;
+  z-index: 2;
+}
+/* Override the left border — escalation bar replaces it */
+.gl-timeline-escalation.gl-timeline-entry-alert,
+.gl-timeline-escalation.gl-timeline-entry-caution {
+  border-left-color: transparent;
+}
+
 /* Platform icon */
 .gl-timeline-icon {
   width: 28px;
