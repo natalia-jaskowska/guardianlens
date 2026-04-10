@@ -728,8 +728,15 @@ def _clean_indicator(raw: str) -> str:
                 return tag
         elif keyword in norm:
             return tag
-    # No known tag matched — return None to signal "skip this pill"
-    return None
+    # No known tag — clean raw text into a display-friendly label
+    label = raw.split("(")[0].split(",")[0].split('"')[0].strip().rstrip(".,;:-")
+    if "/" in label:
+        label = label.split("/")[0].strip()
+    # Take first 3 words, Title Case
+    words = label.split()[:3]
+    if not words:
+        return None
+    return " ".join(w.capitalize() for w in words)
 
 
 def _dedup_indicators(raw_indicators: list[str]) -> list[str]:
