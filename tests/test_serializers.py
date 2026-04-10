@@ -71,7 +71,7 @@ def test_serialize_analysis_safe() -> None:
     assert payload["is_alert"] is False
     assert payload["grooming_stage"] is None
     assert payload["parent_alert"] is None
-    assert payload["indicators"] == ["asked age", "proposed Discord DM", "offered free items"]
+    assert payload["indicators"] == ["Age inquiry", "Platform switch", "Gift offer"]
 
 
 def test_serialize_analysis_alert_with_stage_and_parent_alert() -> None:

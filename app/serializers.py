@@ -77,7 +77,7 @@ def serialize_analysis(
         ),
         "confidence": round(cls.confidence, 0),
         "reasoning": cls.reasoning,
-        "indicators": list(cls.indicators_found),
+        "indicators": _dedup_indicators(cls.indicators_found or []),
         "is_alert": cls.threat_level in ALERT_LEVELS,
         "chat_messages": [
             {"sender": m.sender, "text": m.text, "flag": m.flag}
@@ -402,7 +402,7 @@ def build_alert_history(
             user = _DEFAULT_USERNAMES.get(key) or "—"
 
         # One-line summary: a couple of indicator phrases + grooming stage if any
-        indicator_words = [s.split("(")[0].strip() for s in (cls.indicators_found or [])[:3]]
+        indicator_words = [_clean_indicator(s) for s in (cls.indicators_found or [])[:3]]
         summary_bits: list[str] = []
         stage_idx = 0
         if indicator_words:
@@ -423,6 +423,7 @@ def build_alert_history(
             {
                 "analysis_id": analysis_id,
                 "session_id": session_id,
+                "timestamp": analysis.timestamp.isoformat(),
                 "time_label": analysis.timestamp.strftime("%H:%M:%S"),
                 "time_ago": elapsed_label,
                 "platform": analysis.platform or "Unknown",
@@ -433,7 +434,7 @@ def build_alert_history(
                 "confidence": round(cls.confidence),
                 "user": user,
                 "summary": summary,
-                "indicators": [s[:24] for s in (cls.indicators_found or [])[:3]],
+                "indicators": _dedup_indicators(cls.indicators_found or [])[:4],
                 "grooming_stage_index": stage_idx,
                 "telegram_sent": analysis.parent_alert is not None,
             }
@@ -632,6 +633,116 @@ _EXPLANATIONS: dict[str, str] = {
     "age inquiry": "gathering personal info to assess vulnerability",
     "age": "gathering personal info to assess vulnerability",
 }
+
+
+_INDICATOR_TAGS: list[tuple[str, str]] = [
+    # Most specific phrases first — order matters (first match wins)
+    ("false age", "False age"),
+    ("false claim", "False age"),
+    ("age confirmation", "False age"),
+    ("lying about age", "False age"),
+    ("pretend to be", "False age"),
+    ("name-calling", "Name-calling"),
+    ("self-harm", "Self-harm"),
+    ("nobody likes", "Exclusion"),
+    ("don't tell", "Secrecy"),
+    ("keep the conversation secret", "Secrecy"),
+    ("our secret", "Secrecy"),
+    ("free skin", "Gift offer"),
+    ("currency", "Gift offer"),
+    ("incentive", "Gift offer"),
+    ("personal info", "Personal info"),
+    ("private photo", "Photo request"),
+    ("send me a photo", "Photo request"),
+    # Platform switch / isolation
+    ("unmonitored", "Isolation"),
+    ("private platform", "Isolation"),
+    ("move to", "Platform switch"),
+    ("moving to", "Platform switch"),
+    ("discord", "Platform switch"),
+    ("snapchat", "Platform switch"),
+    ("isolat", "Isolation"),
+    ("private", "Isolation"),
+    # Grooming
+    ("secre", "Secrecy"),
+    ("asking about", "Personal info"),
+    ("age and school", "Age inquiry"),
+    ("age", "Age inquiry"),
+    ("school", "Age inquiry"),
+    ("location", "Personal info"),
+    ("gift", "Gift offer"),
+    ("offer", "Gift offer"),
+    ("compliment", "Flattery"),
+    ("flatter", "Flattery"),
+    ("pretty", "Flattery"),
+    ("mature", "Flattery"),
+    ("image request", "Image request"),
+    ("photo", "Photo request"),
+    ("selfie", "Photo request"),
+    ("send me", "Photo request"),
+    ("meet", "Meeting request"),
+    ("address", "Personal info"),
+    ("location", "Personal info"),
+    # Bullying
+    ("insult", "Insults"),
+    ("exclusion", "Exclusion"),
+    ("mock", "Mocking"),
+    ("humiliat", "Humiliation"),
+    ("embarrass", "Humiliation"),
+    ("threat", "Threats"),
+    ("kill", "Threats"),
+    ("bully", "Bullying"),
+    # Content
+    ("explicit", "Explicit content"),
+    ("inappropriate", "Inappropriate"),
+    ("sexual", "Sexual content"),
+    ("nudity", "Nudity"),
+    ("violence", "Violence"),
+    # Scam
+    ("scam", "Scam"),
+    ("phishing", "Phishing"),
+    ("suspicious link", "Suspicious link"),
+]
+
+
+def _clean_indicator(raw: str) -> str:
+    """Map a verbose model indicator to a short tag for pill display.
+
+    'Asking about age and school' → 'Age inquiry'
+    'Suggesting moving to a private, unmonitored platform' → 'Isolation'
+    'Name-calling/Insults ("ur so ugly")' → 'Name-calling'
+    """
+    import re
+
+    norm = raw.lower()
+    for keyword, tag in _INDICATOR_TAGS:
+        # Use word-start boundary for short keywords to avoid false matches
+        # (e.g. "age" in "image", "age" in "messages")
+        if len(keyword) <= 4:
+            if re.search(r"\b" + re.escape(keyword), norm):
+                return tag
+        elif keyword in norm:
+            return tag
+    # Fallback: strip parenthetical, take first phrase
+    label = raw.split("(")[0].split(",")[0].strip().rstrip(".,;:-")
+    # Also strip after slash if long
+    if "/" in label and len(label) > 16:
+        label = label.split("/")[0].strip()
+    if len(label) > 18:
+        label = label[:16].rstrip() + "\u2026"
+    return label or raw[:16]
+
+
+def _dedup_indicators(raw_indicators: list[str]) -> list[str]:
+    """Clean and deduplicate indicators — no repeated tags in pills."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for raw in raw_indicators:
+        tag = _clean_indicator(raw)
+        if tag not in seen:
+            seen.add(tag)
+            out.append(tag)
+    return out
 
 
 def _indicator_explanation(indicator: str) -> str:

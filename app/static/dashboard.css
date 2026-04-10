@@ -163,7 +163,39 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
   overflow-y: auto;
+}
+#overview-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+#detail-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+/* Privacy seal — bottom of detail panel */
+.gl-detail-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 10px 12px;
+  background: var(--safe-bg);
+  border: 1px solid rgba(29, 158, 117, 0.15);
+  border-radius: var(--radius-lg);
+  font-size: 11px;
+  color: var(--safe);
+  line-height: 1.5;
+}
+.gl-detail-privacy svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--safe);
+  opacity: 0.7;
 }
 
 /* ============================================================ 4. Header */
@@ -172,7 +204,8 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 16px;
+  padding: 0 16px;
+  height: 38px;
   background: var(--bg-topbar);
   border-bottom: 1px solid var(--border);
   position: sticky;
@@ -193,13 +226,20 @@ button { font-family: inherit; cursor: pointer; }
 .gl-header-right {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
+  gap: 0;
+}
+
+.gl-header-sep {
+  width: 1px;
+  height: 14px;
+  background: var(--border);
+  margin: 0 10px;
+  flex-shrink: 0;
 }
 
 .gl-logo-shield {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   color: var(--safe);
   flex-shrink: 0;
   transition: color 0.4s;
@@ -208,25 +248,36 @@ button { font-family: inherit; cursor: pointer; }
 
 .gl-logo-text {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
+  letter-spacing: -0.2px;
 }
 
-.gl-logo-lock {
-  width: 12px;
-  height: 12px;
-  color: var(--text-dim);
+.gl-header-privacy {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  color: var(--safe);
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+.gl-header-privacy svg {
   flex-shrink: 0;
-  margin-left: -2px;
+  color: var(--safe);
+  opacity: 0.7;
 }
 
 .gl-header-status {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   font-size: 11px;
   color: var(--text-muted);
   transition: color 0.4s;
+}
+.gl-header-status .status-text {
+  font-weight: 500;
 }
 .gl-header-status-alert {
   color: var(--alert) !important;
@@ -234,33 +285,17 @@ button { font-family: inherit; cursor: pointer; }
 .gl-header-status-alert .gl-dot {
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
-.gl-header-meta {
-  font-size: 11px;
-  color: var(--text-faint);
-  font-family: var(--font-mono);
-}
 
-/* Streak badge */
-.gl-streak {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.gl-header-chip {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  letter-spacing: -0.3px;
+}
+.gl-header-chip-model {
+  color: var(--text-ghost);
   font-size: 10px;
-  color: var(--safe) !important;
-  background: var(--safe-bg) !important;
-  border: 1px solid rgba(29, 158, 117, 0.3) !important;
-  padding: 2px 7px;
-  border-radius: var(--radius);
-  font-weight: 500;
 }
-.gl-streak-dot {
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--safe) !important;
-}
-.gl-streak-hidden { display: none !important; }
-.gl-streak #header-streak-text { color: var(--safe) !important; }
 
 /* ============================================================ 5. Shield hero */
 
@@ -736,25 +771,6 @@ button { font-family: inherit; cursor: pointer; }
 .gl-platform-badge-telegram { background: #26a5e4; }
 .gl-platform-badge-unknown { background: #334155; color: #94a3b8; }
 
-.gl-legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-family: var(--font-main);
-  text-transform: none;
-  letter-spacing: normal;
-}
-.gl-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 9px;
-  color: var(--text-ghost);
-}
-.gl-legend-dot { width: 4px; height: 4px; border-radius: 50%; }
-.gl-legend-dot-safe { background: var(--safe); }
-.gl-legend-dot-caution { background: var(--caution); }
-.gl-legend-dot-alert { background: var(--alert); }
 
 /* ============================================================ 8. Right panel — safe overview */
 
@@ -869,30 +885,17 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--text-secondary);
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-.gl-history-count {
-  font-size: 10px;
-  color: var(--text-dim);
-  background: var(--bg-card);
-  padding: 1px 6px;
-  border-radius: 8px;
-  font-weight: 400;
+  gap: 8px;
 }
 .gl-history-counter {
-  background: var(--alert);
-  color: #fff;
-  font-size: 9px;
-  font-weight: 600;
-  padding: 1px 6px;
-  border-radius: 8px;
-  min-width: 18px;
-  text-align: center;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--alert);
 }
-.gl-history-hint {
-  font-size: 9px;
-  color: var(--text-ghost);
-  letter-spacing: 0.2px;
+.gl-history-allreviewed {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--text-dim);
 }
 
 /* ---- Alert history container ---- */
@@ -955,6 +958,22 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--border);
 }
 
+/* All-seen banner */
+.gl-history-allseen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 0;
+  font-size: 11px;
+  color: var(--safe);
+  margin-bottom: 4px;
+}
+.gl-history-allseen svg {
+  color: var(--safe);
+  flex-shrink: 0;
+}
+
 /* ============================================================ Alert cards */
 
 .gl-alert-card {
@@ -1008,17 +1027,18 @@ button { font-family: inherit; cursor: pointer; }
   min-width: 0;
 }
 .gl-alert-card-title {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: -0.2px;
 }
 .gl-alert-card-conf {
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   font-family: var(--font-mono);
-  opacity: 0.8;
+  letter-spacing: -0.5px;
 }
 .gl-alert-card-badge {
   font-size: 8px;
@@ -1045,15 +1065,39 @@ button { font-family: inherit; cursor: pointer; }
 .gl-alert-card-mid {
   grid-column: 2 / 4;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 4px;
-  margin-top: 2px;
+  margin-top: 3px;
   min-width: 0;
 }
+.gl-alert-card-plat {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gl-alert-card-plat:empty { display: none; }
+.gl-alert-card-plat img {
+  width: 10px;
+  height: 10px;
+  display: block;
+  filter: brightness(0) invert(1);
+}
+.gl-alert-card-plat[data-platform="discord"]   { background: var(--platform-discord); }
+.gl-alert-card-plat[data-platform="minecraft"] { background: var(--platform-minecraft); }
+.gl-alert-card-plat[data-platform="tiktok"]    { background: var(--platform-tiktok); }
+.gl-alert-card-plat[data-platform="instagram"] { background: var(--platform-instagram); }
+.gl-alert-card-plat[data-platform="roblox"]    { background: #e2231a; }
+.gl-alert-card-plat[data-platform="snapchat"]  { background: #fffc00; }
+.gl-alert-card-plat[data-platform="snapchat"] img { filter: brightness(0); }
+.gl-alert-card-plat[data-platform="telegram"]  { background: #26a5e4; }
 .gl-alert-card-user {
   font-size: 11px;
   font-weight: 500;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1065,10 +1109,11 @@ button { font-family: inherit; cursor: pointer; }
 .gl-alert-card-summary {
   font-size: 11px;
   color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ---- Row 3: pills + stage bar ---- */
@@ -1082,14 +1127,13 @@ button { font-family: inherit; cursor: pointer; }
   flex-wrap: wrap;
 }
 .gl-alert-card-pill {
-  font-size: 9px;
-  padding: 2px 7px;
+  font-size: 10px;
+  padding: 3px 9px;
   border-radius: 10px;
   white-space: nowrap;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: opacity 0.2s;
+  letter-spacing: 0.1px;
+  font-weight: 500;
+  line-height: 1.3;
 }
 .gl-alert-card-stage-mini {
   display: flex;
@@ -1138,29 +1182,32 @@ button { font-family: inherit; cursor: pointer; }
 /* ---- NEW state ---- */
 
 .gl-alert-card-new {
-  border-color: transparent;
-}
-.gl-alert-card-new::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: var(--radius-lg);
-  pointer-events: none;
-  transition: opacity 0.3s;
+  border-width: 1px;
 }
 .gl-alert-card-new:hover { transform: translateY(-1px); }
 
 /* ---- SEEN state ---- */
 
 .gl-alert-card-seen {
-  opacity: 0.55;
-  border-color: transparent;
+  opacity: 0.5;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
 }
 .gl-alert-card-seen:hover {
+  opacity: 0.75;
+}
+.gl-alert-card-seen .gl-alert-card-icon-wrap { opacity: 0.6; }
+.gl-alert-card-seen .gl-alert-card-pill { opacity: 0.5; }
+
+/* REVIEWED — all alerts seen, lighter dim than "seen" but still muted */
+.gl-alert-card-reviewed {
+  opacity: 0.6;
+  border-color: var(--border) !important;
+  box-shadow: none !important;
+}
+.gl-alert-card-reviewed:hover {
   opacity: 0.8;
 }
-.gl-alert-card-seen .gl-alert-card-icon-wrap { opacity: 0.7; }
-.gl-alert-card-seen .gl-alert-card-pill { opacity: 0.6; }
 
 /* ---- Threat-type color schemes ---- */
 
@@ -1171,10 +1218,13 @@ button { font-family: inherit; cursor: pointer; }
 .gl-alert-card[data-threat="grooming"] .gl-alert-card-title { color: var(--alert); }
 .gl-alert-card[data-threat="grooming"] .gl-alert-card-conf { color: var(--alert); }
 .gl-alert-card[data-threat="grooming"] .gl-alert-card-badge { background: var(--alert-bg); color: var(--alert); }
-.gl-alert-card[data-threat="grooming"] .gl-alert-card-pill { background: var(--alert-bg); color: var(--alert); }
+.gl-alert-card[data-threat="grooming"] .gl-alert-card-pill { background: rgba(226, 75, 74, 0.15); color: #f0a0a0; }
 .gl-alert-card[data-threat="grooming"] .gl-alert-card-stage-label { color: var(--alert); }
-.gl-alert-card[data-threat="grooming"].gl-alert-card-new { background: #160d12; }
-.gl-alert-card[data-threat="grooming"].gl-alert-card-new::before { box-shadow: inset 0 0 20px rgba(226, 75, 74, 0.06); }
+.gl-alert-card[data-threat="grooming"].gl-alert-card-new {
+  background: #1c1015;
+  border-color: rgba(226, 75, 74, 0.3);
+  box-shadow: 0 0 12px rgba(226, 75, 74, 0.08);
+}
 
 /* Bullying — amber */
 .gl-alert-card[data-threat="bullying"] { border-left: 3px solid var(--caution); }
@@ -1183,9 +1233,12 @@ button { font-family: inherit; cursor: pointer; }
 .gl-alert-card[data-threat="bullying"] .gl-alert-card-title { color: var(--caution); }
 .gl-alert-card[data-threat="bullying"] .gl-alert-card-conf { color: var(--caution); }
 .gl-alert-card[data-threat="bullying"] .gl-alert-card-badge { background: var(--caution-bg); color: var(--caution); }
-.gl-alert-card[data-threat="bullying"] .gl-alert-card-pill { background: var(--caution-bg); color: var(--caution); }
-.gl-alert-card[data-threat="bullying"].gl-alert-card-new { background: #14110d; }
-.gl-alert-card[data-threat="bullying"].gl-alert-card-new::before { box-shadow: inset 0 0 20px rgba(186, 117, 23, 0.06); }
+.gl-alert-card[data-threat="bullying"] .gl-alert-card-pill { background: rgba(186, 117, 23, 0.15); color: #e0c080; }
+.gl-alert-card[data-threat="bullying"].gl-alert-card-new {
+  background: #191408;
+  border-color: rgba(186, 117, 23, 0.3);
+  box-shadow: 0 0 12px rgba(186, 117, 23, 0.08);
+}
 
 /* Inappropriate content — orange */
 .gl-alert-card[data-threat="inappropriate_content"] { border-left: 3px solid var(--orange); }
@@ -1194,9 +1247,12 @@ button { font-family: inherit; cursor: pointer; }
 .gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-title { color: var(--orange); }
 .gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-conf { color: var(--orange); }
 .gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-badge { background: var(--orange-bg); color: var(--orange); }
-.gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-pill { background: var(--orange-bg); color: var(--orange); }
-.gl-alert-card[data-threat="inappropriate_content"].gl-alert-card-new { background: #16100d; }
-.gl-alert-card[data-threat="inappropriate_content"].gl-alert-card-new::before { box-shadow: inset 0 0 20px rgba(216, 90, 48, 0.06); }
+.gl-alert-card[data-threat="inappropriate_content"] .gl-alert-card-pill { background: rgba(216, 90, 48, 0.15); color: #e8b090; }
+.gl-alert-card[data-threat="inappropriate_content"].gl-alert-card-new {
+  background: #1a120c;
+  border-color: rgba(216, 90, 48, 0.3);
+  box-shadow: 0 0 12px rgba(216, 90, 48, 0.08);
+}
 
 /* Default / other */
 .gl-alert-card[data-threat="other"] { border-left: 3px solid var(--purple); }
@@ -1205,273 +1261,398 @@ button { font-family: inherit; cursor: pointer; }
 .gl-alert-card[data-threat="other"] .gl-alert-card-title { color: var(--purple); }
 .gl-alert-card[data-threat="other"] .gl-alert-card-conf { color: var(--purple); }
 .gl-alert-card[data-threat="other"] .gl-alert-card-badge { background: #1e1e32; color: var(--purple); }
-.gl-alert-card[data-threat="other"] .gl-alert-card-pill { background: #1e1e32; color: var(--purple); }
+.gl-alert-card[data-threat="other"] .gl-alert-card-pill { background: rgba(127, 119, 221, 0.15); color: #b8b0e8; }
 
 
 
-/* ============================================================ 9. Right panel — full analysis */
+/* ============================================================ 9. Detail panel */
 
-.gl-analysis-back {
-  font-size: 11px;
-  color: var(--purple);
-  cursor: pointer;
-  margin-bottom: 10px;
+.gl-detail-back {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 0;
-  background: none;
-  border: none;
-}
-.gl-analysis-back:hover { color: #AFA9EC; }
-
-.gl-analysis-live-banner {
-  display: flex;
-  align-items: center;
   gap: 6px;
-  background: rgba(226, 75, 74, 0.06);
-  border: 1px solid rgba(226, 75, 74, 0.2);
-  border-radius: var(--radius);
-  padding: 6px 10px;
-  margin-bottom: 8px;
-  font-size: 11px;
-  color: var(--alert);
+  font-size: 12px;
   font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-}
-
-/* New alert notification banner */
-.gl-new-alert-banner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(226, 75, 74, 0.06);
-  border: 1px solid rgba(226, 75, 74, 0.2);
-  border-radius: var(--radius);
-  padding: 6px 10px;
-  margin-bottom: 8px;
-  font-size: 11px;
-  color: var(--alert);
-}
-.gl-new-alert-btn {
-  margin-left: auto;
-  background: rgba(226, 75, 74, 0.12);
-  border: 1px solid rgba(226, 75, 74, 0.3);
-  border-radius: var(--radius);
-  padding: 2px 8px;
-  font-size: 10px;
-  color: var(--alert);
+  color: var(--text-muted);
   cursor: pointer;
-}
-.gl-new-alert-btn:hover { background: rgba(226, 75, 74, 0.2); }
-
-/* Analysis card */
-.gl-analysis-card {
-  background: var(--bg-card);
+  padding: 5px 12px 5px 8px;
+  margin-bottom: 10px;
   border-radius: var(--radius);
-  padding: 10px;
-  margin-bottom: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: all 0.15s;
 }
-.gl-analysis-card-header {
+.gl-detail-back:hover {
+  color: var(--text-primary);
+  background: #1a1a2e;
+  border-color: #2a2a44;
+}
+.gl-detail-back svg { flex-shrink: 0; }
+
+/* ---- Hero card (top of detail) ---- */
+
+.gl-detail-hero {
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 14px;
+  position: relative;
+  overflow: hidden;
+}
+.gl-detail-hero-top {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.gl-detail-hero-left {
+  display: flex;
   align-items: center;
-  margin-bottom: 4px;
+  gap: 12px;
+  min-width: 0;
 }
-.gl-analysis-card-titles { display: flex; flex-direction: column; gap: 2px; }
-.gl-analysis-card-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--alert);
+.gl-detail-hero-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
-.gl-analysis-card-caution .gl-analysis-card-title { color: var(--caution); }
-.gl-analysis-card-meta {
-  font-size: 10px;
-  color: #777;
+.gl-detail-hero-icon svg { width: 22px; height: 22px; }
+.gl-detail-hero-titles { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.gl-detail-hero-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
 }
-.gl-analysis-card-confidence {
+.gl-detail-hero-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.gl-detail-hero-plat {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gl-detail-hero-plat img { width: 10px; height: 10px; filter: brightness(0) invert(1); }
+.gl-detail-hero-conf {
   text-align: right;
+  flex-shrink: 0;
 }
-.gl-analysis-card-conf-value {
-  font-size: 22px;
-  font-weight: 500;
-  color: var(--alert);
+.gl-detail-hero-conf-val {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: -1.5px;
+  line-height: 1;
 }
-.gl-analysis-card-caution .gl-analysis-card-conf-value { color: var(--caution); }
-.gl-analysis-card-conf-label {
+.gl-detail-hero-conf-lbl {
   font-size: 9px;
   color: var(--text-dim);
   text-transform: uppercase;
-  font-weight: 400;
+  text-align: right;
+  margin-top: 3px;
+  letter-spacing: 0.5px;
 }
-.gl-analysis-card-pills {
+.gl-detail-hero-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin: 8px 0;
+  gap: 5px;
+  margin-bottom: 10px;
 }
-.gl-analysis-card-pill {
+.gl-detail-hero-pill {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+/* ---- Captured screen section ---- */
+
+.gl-detail-capture {
+  position: relative;
+}
+.gl-detail-capture-frame {
+  background: #0a0a14;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  height: 160px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  position: relative;
+}
+.gl-detail-capture-frame::after {
+  content: "Click to enlarge";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 0;
+  text-align: center;
   font-size: 9px;
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: var(--alert-bg);
-  color: var(--alert);
+  color: var(--text-ghost);
+  background: linear-gradient(transparent, rgba(10, 10, 20, 0.9));
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
 }
-.gl-analysis-card-caution .gl-analysis-card-pill {
-  background: var(--caution-bg);
-  color: var(--caution);
+.gl-detail-capture-frame:hover {
+  border-color: var(--text-ghost);
 }
-.gl-analysis-card-stagebar {
+.gl-detail-capture-frame:hover::after {
+  opacity: 1;
+}
+.gl-detail-capture-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center top;
+}
+
+/* Lightbox overlay */
+.gl-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
-  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  backdrop-filter: blur(4px);
+}
+.gl-lightbox.gl-lightbox-open {
+  opacity: 1;
+}
+.gl-lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+.gl-lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  font-size: 28px;
+  color: var(--text-dim);
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  transition: all 0.15s;
+}
+.gl-lightbox-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.gl-detail-hero-stagebar {
+  display: flex;
+  gap: 3px;
   margin-top: 6px;
 }
-.gl-analysis-stage-seg {
+.gl-detail-hero-stage-seg {
   flex: 1;
-  height: 3px;
-  border-radius: 1.5px;
-  background: var(--border);
+  height: 5px;
+  border-radius: 2.5px;
+  background: rgba(255,255,255,0.08);
 }
-.gl-analysis-stage-seg-active { background: var(--alert); }
-.gl-analysis-stage-seg-current { background: var(--alert); opacity: 0.35; }
+.gl-detail-hero-stage-active { background: currentColor; }
+.gl-detail-hero-stage-current { background: currentColor; opacity: 0.35; }
 
-/* Flagged messages */
-.gl-flagged-messages {
+/* Hero color themes */
+.gl-detail-hero[data-threat="grooming"] {
+  background: linear-gradient(135deg, #1c1015 0%, var(--bg-card) 100%);
+  border: 1px solid rgba(226, 75, 74, 0.2);
+}
+.gl-detail-hero[data-threat="grooming"] .gl-detail-hero-icon { background: var(--alert-bg); }
+.gl-detail-hero[data-threat="grooming"] .gl-detail-hero-icon svg { stroke: var(--alert); }
+.gl-detail-hero[data-threat="grooming"] .gl-detail-hero-title { color: var(--alert); }
+.gl-detail-hero[data-threat="grooming"] .gl-detail-hero-conf-val { color: var(--alert); }
+.gl-detail-hero[data-threat="grooming"] .gl-detail-hero-pill { background: rgba(226, 75, 74, 0.15); color: #f0a0a0; }
+.gl-detail-hero[data-threat="grooming"] .gl-detail-hero-stagebar { color: var(--alert); }
+
+.gl-detail-hero[data-threat="bullying"] {
+  background: linear-gradient(135deg, #191408 0%, var(--bg-card) 100%);
+  border: 1px solid rgba(186, 117, 23, 0.2);
+}
+.gl-detail-hero[data-threat="bullying"] .gl-detail-hero-icon { background: var(--caution-bg); }
+.gl-detail-hero[data-threat="bullying"] .gl-detail-hero-icon svg { stroke: var(--caution); }
+.gl-detail-hero[data-threat="bullying"] .gl-detail-hero-title { color: var(--caution); }
+.gl-detail-hero[data-threat="bullying"] .gl-detail-hero-conf-val { color: var(--caution); }
+.gl-detail-hero[data-threat="bullying"] .gl-detail-hero-pill { background: rgba(186, 117, 23, 0.15); color: #e0c080; }
+
+.gl-detail-hero[data-threat="inappropriate_content"] {
+  background: linear-gradient(135deg, #1a120c 0%, var(--bg-card) 100%);
+  border: 1px solid rgba(216, 90, 48, 0.2);
+}
+.gl-detail-hero[data-threat="inappropriate_content"] .gl-detail-hero-icon { background: var(--orange-bg); }
+.gl-detail-hero[data-threat="inappropriate_content"] .gl-detail-hero-icon svg { stroke: var(--orange); }
+.gl-detail-hero[data-threat="inappropriate_content"] .gl-detail-hero-title { color: var(--orange); }
+.gl-detail-hero[data-threat="inappropriate_content"] .gl-detail-hero-conf-val { color: var(--orange); }
+.gl-detail-hero[data-threat="inappropriate_content"] .gl-detail-hero-pill { background: rgba(216, 90, 48, 0.15); color: #e8b090; }
+
+.gl-detail-hero[data-threat="other"] {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+.gl-detail-hero[data-threat="other"] .gl-detail-hero-icon { background: #1e1e32; }
+.gl-detail-hero[data-threat="other"] .gl-detail-hero-icon svg { stroke: var(--purple); }
+.gl-detail-hero[data-threat="other"] .gl-detail-hero-title { color: var(--purple); }
+.gl-detail-hero[data-threat="other"] .gl-detail-hero-conf-val { color: var(--purple); }
+.gl-detail-hero[data-threat="other"] .gl-detail-hero-pill { background: rgba(127, 119, 221, 0.15); color: #b8b0e8; }
+
+/* ---- Section containers ---- */
+
+.gl-detail-section {
+  margin-bottom: 14px;
+}
+.gl-detail-section-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+.gl-detail-section-head svg {
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+/* ---- Reasoning chain ---- */
+
+.gl-detail-reasoning {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+.gl-reasoning-step-label {
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-right: 4px;
+}
+.gl-reasoning-step-text { color: var(--text-secondary); }
+.gl-reasoning-step-flag {
+  color: #f0a0a0;
+  display: block;
+  padding: 3px 0 3px 12px;
+  border-left: 2px solid rgba(226, 75, 74, 0.25);
+  margin: 3px 0;
+  font-size: 11px;
+}
+.gl-reasoning-step-verdict {
+  color: var(--alert);
+  font-weight: 700;
+  font-size: 13px;
+  display: block;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  letter-spacing: -0.2px;
+}
+
+/* ---- Why this matters ---- */
+
+.gl-detail-why {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 12px 14px;
+}
+.gl-detail-why .gl-why-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+/* ---- Flagged messages ---- */
+
+.gl-detail-flagged {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 8px;
+  gap: 6px;
 }
 .gl-flagged-msg {
   background: var(--bg-card);
-  border-radius: var(--radius);
-  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  border-left: 3px solid var(--alert);
+  padding: 10px 14px;
 }
-.gl-flagged-msg-num { display: none; }
-.gl-flagged-msg-body { display: flex; flex-direction: column; gap: 2px; }
+.gl-flagged-msg-body { display: flex; flex-direction: column; gap: 4px; }
 .gl-flagged-msg-quote {
-  font-size: 11px;
-  color: var(--alert);
+  font-size: 13px;
   font-weight: 500;
   font-style: italic;
+  line-height: 1.5;
+  word-wrap: break-word;
 }
 .gl-flagged-msg-explanation {
-  font-size: 10px;
-  color: var(--text-dim);
-  line-height: 1.4;
-}
-
-/* ============================================================ 10. Reasoning / Why / Action / Telegram */
-
-.gl-reasoning-chain {
-  background: var(--bg-card);
-  border-radius: var(--radius);
-  padding: 8px 10px;
-  font-family: monospace;
-  font-size: 10px;
-  line-height: 1.6;
-  color: var(--text-muted);
-  margin-bottom: 8px;
-}
-.gl-reasoning-step-label { color: var(--text-dim); }
-.gl-reasoning-step-text { color: var(--text-secondary); }
-.gl-reasoning-step-flag { color: var(--alert); }
-.gl-reasoning-step-verdict { color: var(--alert); font-weight: 500; }
-
-.gl-why {
-  background: var(--bg-card);
-  border-radius: var(--radius);
-  padding: 8px 10px;
-  margin-bottom: 8px;
-}
-.gl-why-text {
   font-size: 11px;
-  color: #999;
+  color: var(--text-dim);
   line-height: 1.5;
 }
-.gl-why .gl-empty {
-  font-size: 11px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-}
 
-/* Action panel — colored left border based on threat type */
-.gl-action {
+/* ---- Action steps ---- */
+
+.gl-detail-action {
   background: var(--bg-card);
-  border-left: 3px solid var(--alert);
-  border-radius: 0;
-  padding: 10px 12px;
-  margin-top: 10px;
-  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px;
 }
-.gl-action-grooming { border-left-color: var(--alert); }
-.gl-action-bullying { border-left-color: var(--caution); }
-.gl-action-inappropriate { border-left-color: var(--orange); }
-.gl-action-other { border-left-color: var(--purple); }
-
-.gl-action-label {
-  font-size: 11px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.gl-action-dismiss {
-  background: none;
-  border: none;
-  color: var(--text-faint);
-  font-size: 16px;
-  line-height: 1;
-  padding: 0 2px;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-.gl-action-dismiss:hover { color: var(--text-primary); }
-
 .gl-action-step {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 .gl-action-step:last-of-type { margin-bottom: 0; }
 .gl-action-num {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 700;
   flex-shrink: 0;
-  /* Colors set by JS based on category */
-  background: var(--alert-bg);
-  color: var(--alert);
+  margin-top: 1px;
 }
 .gl-action-text {
   font-size: 13px;
-  color: #c0c0cc;
-  line-height: 1.4;
-}
-.gl-action-privacy {
-  font-size: 9px;
-  color: var(--text-faint);
-  margin-top: 6px;
-  line-height: 1.4;
-}
-.gl-action .gl-empty {
-  font-size: 11px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
+  line-height: 1.55;
 }
 
 /* Telegram card */
@@ -1538,43 +1719,55 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 14px;
+  padding: 0 16px;
+  height: 28px;
   background: var(--bg-footer);
   border-top: 1px solid var(--border);
   font-size: 10px;
+  color: var(--text-ghost);
+}
+.gl-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.gl-footer-left span:first-child {
   color: var(--text-dim);
+  font-weight: 500;
 }
-.gl-footer strong {
-  color: var(--text-secondary);
-  font-weight: 400;
+.gl-footer-sep {
+  margin: 0 5px;
+  color: var(--border);
 }
-.gl-footer-receipt {
-  display: inline-flex;
+.gl-footer-right {
+  display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.gl-footer-lock {
+  color: var(--safe);
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+.gl-footer-zero-label {
+  color: var(--text-ghost);
 }
 .gl-footer-zero {
   color: var(--safe) !important;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 11px;
 }
 .gl-footer-check {
   color: var(--safe);
   font-weight: 700;
-  font-size: 12px;
-  vertical-align: -1px;
-  margin-left: 1px;
+  font-size: 11px;
+  margin-left: 0;
   opacity: 0;
   transition: opacity 0.5s ease;
 }
 .gl-footer-check-visible { opacity: 1; }
-.gl-footer-lock-icon {
-  display: inline-flex;
-  color: var(--safe);
-  margin-right: 2px;
-}
 
 /* ============================================================ 13. Empty / loading */
 

@@ -292,7 +292,7 @@ class AppState:
             last_alert=self.database.last_alert_summary(session_id=session_id),
         )
 
-        alert_history = build_alert_history(self.database.recent_alert_analyses(limit=10))
+        alert_history = build_alert_history(self.database.recent_alert_analyses(limit=50))
 
         return {
             "monitoring": self.worker.is_running,

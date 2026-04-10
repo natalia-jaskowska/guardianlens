@@ -15,8 +15,6 @@
     headerStatus: document.getElementById("header-status"),
     headerDuration: document.getElementById("header-duration"),
     headerModel: document.getElementById("header-model"),
-    headerStreak: document.getElementById("header-streak"),
-    headerStreakText: document.getElementById("header-streak-text"),
 
     shieldHero: document.getElementById("shield-hero"),
     shieldIcon: document.getElementById("shield-icon"),
@@ -46,13 +44,10 @@
     analysisCard: document.getElementById("analysis-card"),
     reasoningChain: document.getElementById("reasoning-chain"),
     whyThisMatters: document.getElementById("why-this-matters"),
-    flaggedLabel: document.getElementById("flagged-label"),
     flaggedMessages: document.getElementById("flagged-messages"),
     recommendedAction: document.getElementById("recommended-action"),
-    telegramBlock: document.getElementById("telegram-block"),
 
     footerModel: document.getElementById("footer-model"),
-    footerDb: document.getElementById("footer-db"),
     footerBytesCheck: document.getElementById("footer-bytes-check"),
   };
 
@@ -98,17 +93,34 @@
     return `<span class="gl-platform-badge gl-platform-badge-${k}" title="${t}"><img src="/static/icons/${k}.svg" alt=""></span>`;
   }
 
-  // Alert card SVG icons per threat type (matching mockup)
-  const CARD_ICON_GROOMING = '<svg viewBox="0 0 24 24" fill="none" stroke="#E24B4A" stroke-width="2"><path d="M12 2L1 21h22L12 2zm0 7v5m0 3v1"/></svg>';
-  const CARD_ICON_BULLYING = '<svg viewBox="0 0 24 24" fill="none" stroke="#BA7517" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 15s1.5-2 4-2 4 2 4 2M9 9h.01M15 9h.01"/></svg>';
-  const CARD_ICON_CONTENT = '<svg viewBox="0 0 24 24" fill="none" stroke="#D85A30" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4m0 4h.01"/></svg>';
-  const CARD_ICON_DEFAULT = '<svg viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>';
+  // Alert card SVG icons per threat type
+  // Grooming: warning triangle — universal danger
+  const CARD_ICON_GROOMING = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L1 21h22L12 2z"/><path d="M12 9v4"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>';
+  // Bullying: speech bubble with X — toxic communication
+  const CARD_ICON_BULLYING = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M9 8l6 6M15 8l-6 6"/></svg>';
+  // Inappropriate: eye off — shouldn't be seen
+  const CARD_ICON_CONTENT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  // Default: circle alert
+  const CARD_ICON_DEFAULT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/></svg>';
 
   // ----------------------------------------------------------------- view state machine
 
+  // Persist seen alerts in localStorage so they survive page refresh
+  const SEEN_KEY = "gl_seen_alerts";
+  function loadSeen() {
+    try { const v = localStorage.getItem(SEEN_KEY); return v ? new Set(JSON.parse(v)) : new Set(); }
+    catch(_) { return new Set(); }
+  }
+  function saveSeen(s) {
+    // Keep only the most recent 50 IDs to prevent unbounded growth
+    const arr = [...s];
+    const trimmed = arr.length > 50 ? arr.slice(arr.length - 50) : arr;
+    try { localStorage.setItem(SEEN_KEY, JSON.stringify(trimmed)); } catch(_) {}
+  }
+
   const uiState = {
     selectedAnalysis: null,
-    seenAlerts: new Set(),
+    seenAlerts: loadSeen(),
   };
 
   async function selectAlert(id) {
@@ -117,6 +129,7 @@
       if (!r.ok) return;
       const a = await r.json();
       uiState.seenAlerts.add(String(id));
+      saveSeen(uiState.seenAlerts);
       uiState.selectedAnalysis = a;
       render(window.__lastState || {});
     } catch(_) {}
@@ -131,23 +144,25 @@
 
   // ----------------------------------------------------------------- shield hero (filled SVG, matching mockup)
 
+  // Shield hero icons — clean, minimal inner symbols
   const SHIELD_SAFE =
     '<svg viewBox="0 0 80 90">' +
     '<path fill="#1D9E75" d="M40 5 L72 20 L72 50 Q72 75 40 87 Q8 75 8 50 L8 20 Z"/>' +
-    '<path fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M25 45 L35 55 L55 35"/>' +
+    '<path fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" d="M27 44 L36 53 L54 35"/>' +
     '</svg>';
 
   const SHIELD_ALERT =
     '<svg viewBox="0 0 80 90">' +
     '<path fill="#E24B4A" d="M40 5 L72 20 L72 50 Q72 75 40 87 Q8 75 8 50 L8 20 Z"/>' +
-    '<path fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" d="M40 30 L40 52 M40 60 L40 62"/>' +
+    '<path fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" d="M40 28 L40 50"/>' +
+    '<circle cx="40" cy="60" r="3" fill="#fff"/>' +
     '</svg>';
 
   const SHIELD_CAUTION =
     '<svg viewBox="0 0 80 90">' +
     '<path fill="#BA7517" d="M40 5 L72 20 L72 50 Q72 75 40 87 Q8 75 8 50 L8 20 Z"/>' +
-    '<circle cx="40" cy="42" r="8" fill="none" stroke="#fff" stroke-width="3"/>' +
-    '<circle cx="40" cy="42" r="3" fill="#fff"/>' +
+    '<path fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" d="M26 42 Q33 36 40 42 Q47 48 54 42"/>' +
+    '<circle cx="40" cy="42" r="4" fill="#fff"/>' +
     '</svg>';
 
   function renderShield(state) {
@@ -196,20 +211,18 @@
     setText(els.headerModel, state.model_name || "");
   }
 
-  function renderStreak(state) {
-    const s = state.safe_streak || 0;
-    if (s >= 3) { els.headerStreak.classList.remove("gl-streak-hidden"); setText(els.headerStreakText, `${s} safe`); }
-    else { els.headerStreak.classList.add("gl-streak-hidden"); }
-  }
-
   // ----------------------------------------------------------------- capture
 
   const CAP_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
   const CAP_WARN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L1 21h22L12 2zm0 7v5m0 3v1"/></svg>';
   const CAP_EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>';
 
+  let _lastCaptureTs = "";
+
   function renderCapture(state) {
     const a = state.latest;
+    if (a && a.timestamp === _lastCaptureTs) return;
+    _lastCaptureTs = a ? a.timestamp : "";
     if (!a) {
       els.captureCard.className = "gl-capture gl-capture-safe";
       els.captureScreen.innerHTML = '<div class="gl-capture-placeholder"><div class="gl-skeleton gl-skeleton-block" style="width:100%;height:100%;position:absolute;inset:0"></div></div>';
@@ -281,8 +294,14 @@
     els.ribbon.innerHTML = padded.map(e => `<div class="gl-ribbon-seg gl-ribbon-seg-${e.tone||"empty"}"></div>`).join("");
   }
 
+  let _lastTimelineKey = "";
+
   function renderTimeline(state) {
     const entries = state.timeline || [];
+    const tlKey = entries.map(e => e.timestamp || e.time_label).join(",");
+    if (tlKey === _lastTimelineKey) return;
+    _lastTimelineKey = tlKey;
+
     if (!entries.length) {
       els.timeline.innerHTML = '<div class="gl-empty">Waiting for the first capture...</div>';
       return;
@@ -312,10 +331,10 @@
         const idx = parseInt(row.getAttribute("data-tl-idx"), 10);
         const entry = entries[idx];
         if (!entry) return;
-        // Try to match alert history for full detail
-        const ts = entry.time_label;
+        // Match by ISO timestamp (unique per analysis) with time_label fallback
         const hist = (window.__lastState && window.__lastState.alert_history) || [];
-        const match = hist.find(a => a.time_label === ts);
+        const match = hist.find(a => a.timestamp === entry.timestamp) ||
+                      hist.find(a => a.time_label === entry.time_label);
         if (match && match.analysis_id) {
           selectAlert(match.analysis_id);
         } else {
@@ -335,33 +354,50 @@
     renderAlertHistory(state.alert_history || [], state.current_session_id);
   }
 
+  let _lastHistoryKey = "";
+
   function renderAlertHistory(history, sessionId) {
+    // Build a fingerprint to skip re-render when nothing changed
+    const ids = history.map(a => a.analysis_id).join(",");
+    const seenCount = history.filter(a => uiState.seenAlerts.has(String(a.analysis_id))).length;
+    const key = `${ids}|${seenCount}`;
+    if (key === _lastHistoryKey) return;
+    _lastHistoryKey = key;
+
     if (!history.length) {
-      els.historyLabel.innerHTML = `Alerts <span class="gl-history-count">0</span>`;
+      els.historyLabel.innerHTML = `Alerts`;
       els.alertHistory.innerHTML =
         `<div class="gl-history-empty">
           <div class="gl-history-empty-shield"><svg viewBox="0 0 80 90"><path fill="#1D9E75" d="M40 5 L72 20 L72 50 Q72 75 40 87 Q8 75 8 50 L8 20 Z"/><path fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M25 45 L35 55 L55 35"/></svg></div>
           <div class="gl-history-empty-title">All clear</div>
-          <div class="gl-history-empty-sub">No threats detected yet.\nGuardianLens is actively monitoring.</div>
+          <div class="gl-history-empty-sub">No threats detected yet.<br>GuardianLens is actively monitoring.</div>
         </div>`;
       return;
     }
     const newAlerts = history.filter(a => !uiState.seenAlerts.has(String(a.analysis_id)));
     const seenAlerts = history.filter(a => uiState.seenAlerts.has(String(a.analysis_id)));
     const newCount = newAlerts.length;
-    const counterHtml = newCount > 0 ? `<span class="gl-history-counter">${newCount}</span>` : "";
-    els.historyLabel.innerHTML = `Alerts <span class="gl-history-count">${history.length}</span>${counterHtml}`;
+    const allSeen = newCount === 0;
+    if (newCount > 0) {
+      els.historyLabel.innerHTML = `Alerts <span class="gl-history-counter">${newCount} new</span>`;
+    } else {
+      els.historyLabel.innerHTML = `Alerts <span class="gl-history-allreviewed">all reviewed</span>`;
+    }
 
     let html = "";
-    html += newAlerts.map(a => renderAlertCard(a, false)).join("");
+    html += newAlerts.map(a => renderAlertCard(a, "new")).join("");
     if (newAlerts.length > 0 && seenAlerts.length > 0) {
       html += '<div class="gl-history-divider">Reviewed</div>';
     }
-    html += seenAlerts.map(a => renderAlertCard(a, true)).join("");
+    if (allSeen) {
+      html += '<div class="gl-history-allseen"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>No new alerts</div>';
+    }
+    html += seenAlerts.map(a => renderAlertCard(a, allSeen ? "reviewed" : "seen")).join("");
     els.alertHistory.innerHTML = html;
   }
 
-  function renderAlertCard(a, seen) {
+  // state: "new" | "seen" (dimmed, mixed with new) | "reviewed" (all seen, full opacity)
+  function renderAlertCard(a, state) {
     const type = a.threat_type || "";
     const threatKey = (type === "grooming" || type === "bullying" || type === "inappropriate_content") ? type : "other";
     let icon = CARD_ICON_DEFAULT;
@@ -369,13 +405,13 @@
     else if (type === "bullying") icon = CARD_ICON_BULLYING;
     else if (type === "inappropriate_content") icon = CARD_ICON_CONTENT;
 
-    const stateClass = seen ? "gl-alert-card-seen" : "gl-alert-card-new";
+    const stateClass = state === "seen" ? "gl-alert-card-seen" : state === "new" ? "gl-alert-card-new" : state === "reviewed" ? "gl-alert-card-reviewed" : "";
 
-    const badgeHtml = seen
-      ? ""
-      : `<span class="gl-alert-card-badge">NEW</span>`;
+    const badgeHtml = state === "new"
+      ? `<span class="gl-alert-card-badge">NEW</span>`
+      : "";
 
-    const pills = (a.indicators||[]).slice(0,3).map(p =>
+    const pills = (a.indicators||[]).slice(0,4).map(p =>
       `<span class="gl-alert-card-pill">${esc(p)}</span>`
     ).join("");
 
@@ -401,6 +437,7 @@
       </div>
       <span class="gl-alert-card-time">${esc(a.time_ago)}</span>
       <div class="gl-alert-card-mid">
+        <span class="gl-alert-card-plat" data-platform="${a.platform_key||"unknown"}">${a.platform_key && a.platform_key !== "unknown" ? `<img src="/static/icons/${a.platform_key}.svg" alt="">` : ""}</span>
         <span class="gl-alert-card-user">${esc(a.user)}</span>
         <span class="gl-alert-card-sep">\u2022</span>
         <span class="gl-alert-card-summary">${esc(a.summary)}</span>
@@ -420,39 +457,65 @@
     renderWhy(a);
     renderFlagged(a);
     renderAction(a);
-    renderTelegram(a);
   }
 
   function renderAnalysisCard(a) {
     const cat = a.category || "";
-    const color = cat === "grooming" ? "#E24B4A" : cat === "bullying" ? "#BA7517" : cat === "inappropriate_content" ? "#D85A30" : "#E24B4A";
+    const threatKey = (cat === "grooming" || cat === "bullying" || cat === "inappropriate_content") ? cat : "other";
     const title = a.category_label ? `${a.category_label} detected` : "Threat detected";
     const conv = a.conversation || {};
-    const meta = `${conv.username||"\u2014"} \u203a child \u00b7 ${a.platform||"Unknown"}`;
+    const pk = conv.platform_key || a.platform_key || "unknown";
+
+    let icon = CARD_ICON_DEFAULT;
+    if (cat === "grooming") icon = CARD_ICON_GROOMING;
+    else if (cat === "bullying") icon = CARD_ICON_BULLYING;
+    else if (cat === "inappropriate_content") icon = CARD_ICON_CONTENT;
+
+    const platIcon = pk !== "unknown"
+      ? `<span class="gl-detail-hero-plat" style="background:${PLATFORM_COLORS[pk]||"#334155"}"><img src="/static/icons/${pk}.svg" alt=""></span>`
+      : "";
+    const meta = `${platIcon}${esc(conv.username||"\u2014")} \u203a child \u00b7 ${esc(a.platform||"Unknown")}`;
+
     const pills = (a.indicator_pills||a.indicators||[]).slice(0,6).map(p => {
       const l = typeof p==="string"?p:p.label;
-      return `<span class="gl-analysis-card-pill" style="background:${color}22;color:${color}">${esc(trunc(l,32))}</span>`;
+      return `<span class="gl-detail-hero-pill">${esc(l)}</span>`;
     }).join("");
+
     let stagebar = "";
-    if (a.stage_segments && Array.isArray(a.stage_segments.segments)) {
-      stagebar = `<div class="gl-analysis-card-stagebar">${a.stage_segments.segments.map(s => {
-        const c = s.state==="active"?"gl-analysis-stage-seg-active":s.state==="current"?"gl-analysis-stage-seg-current":"";
-        return `<div class="gl-analysis-stage-seg ${c}"></div>`;
+    if (cat === "grooming" && a.stage_segments && a.stage_segments.current_index >= 0 && Array.isArray(a.stage_segments.segments)) {
+      stagebar = `<div class="gl-detail-hero-stagebar">${a.stage_segments.segments.map(s => {
+        const c = s.state==="active"?"gl-detail-hero-stage-active":s.state==="current"?"gl-detail-hero-stage-current":"";
+        return `<div class="gl-detail-hero-stage-seg ${c}"></div>`;
       }).join("")}</div>`;
     }
+
+    els.analysisCard.setAttribute("data-threat", threatKey);
     els.analysisCard.innerHTML = `
-      <div class="gl-analysis-card-header">
-        <div class="gl-analysis-card-titles">
-          <div class="gl-analysis-card-title" style="color:${color}">${esc(title)}</div>
-          <div class="gl-analysis-card-meta">${esc(meta)}</div>
+      <div class="gl-detail-hero-top">
+        <div class="gl-detail-hero-left">
+          <div class="gl-detail-hero-icon">${icon}</div>
+          <div class="gl-detail-hero-titles">
+            <div class="gl-detail-hero-title">${esc(title)}</div>
+            <div class="gl-detail-hero-meta">${meta}</div>
+          </div>
         </div>
-        <div class="gl-analysis-card-confidence">
-          <div class="gl-analysis-card-conf-value" style="color:${color}">${a.confidence}%</div>
-          <div class="gl-analysis-card-conf-label">CONFIDENCE</div>
+        <div class="gl-detail-hero-conf">
+          <div class="gl-detail-hero-conf-val">${a.confidence}%</div>
+          <div class="gl-detail-hero-conf-lbl">confidence</div>
         </div>
       </div>
-      <div class="gl-analysis-card-pills">${pills}</div>
+      <div class="gl-detail-hero-pills">${pills}</div>
       ${stagebar}`;
+
+    // Render screenshot in its own section
+    const capSec = document.getElementById("capture-section");
+    const capEl = document.getElementById("detail-capture");
+    if (a.screenshot_url && capSec && capEl) {
+      capEl.innerHTML = `<div class="gl-detail-capture-frame" id="capture-frame"><img src="${a.screenshot_url}?t=${encodeURIComponent(a.timestamp||"")}" alt="Captured screenshot"></div>`;
+      capSec.style.display = "";
+    } else if (capSec) {
+      capSec.style.display = "none";
+    }
   }
 
   function renderReasoning(a) {
@@ -460,64 +523,50 @@
     if (!steps.length) { els.reasoningChain.innerHTML = '<div class="gl-empty">No reasoning.</div>'; return; }
     els.reasoningChain.innerHTML = steps.map(s => {
       if (s.type==="verdict") return `<span class="gl-reasoning-step-verdict">${esc(s.text)}</span>`;
-      if (s.type==="flag") return `<span class="gl-reasoning-step-flag">&nbsp;&nbsp;&gt; ${esc(s.text)}</span>`;
-      const lbl = s.label ? `<span class="gl-reasoning-step-label">${esc(s.label)}:</span> ` : "";
-      return `${lbl}<span class="gl-reasoning-step-text">${esc(s.text)}</span>`;
-    }).join("<br>");
+      if (s.type==="flag") return `<span class="gl-reasoning-step-flag">${esc(s.text)}</span>`;
+      const lbl = s.label ? `<span class="gl-reasoning-step-label">${esc(s.label)}</span> ` : "";
+      return `<div>${lbl}<span class="gl-reasoning-step-text">${esc(s.text)}</span></div>`;
+    }).join("");
   }
 
   function renderWhy(a) {
     const t = a&&a.why_this_matters;
-    if (!t) { els.whyThisMatters.innerHTML = '<div class="gl-empty">\u2014</div>'; return; }
+    const sec = document.getElementById("why-section");
+    if (!t) { if (sec) sec.style.display="none"; return; }
+    if (sec) sec.style.display="";
     els.whyThisMatters.innerHTML = `<div class="gl-why-text">${esc(t)}</div>`;
   }
 
   function renderFlagged(a) {
     const bd = (a&&a.threat_breakdown)||[];
     const wq = bd.filter(b=>b.quote);
-    if (!wq.length) { els.flaggedLabel.style.display="none"; els.flaggedMessages.style.display="none"; return; }
-    els.flaggedLabel.style.display=""; els.flaggedMessages.style.display="";
+    const sec = document.getElementById("flagged-section");
+    if (!wq.length) { if (sec) sec.style.display="none"; return; }
+    if (sec) sec.style.display="";
     const cat = a.category||"";
-    const color = cat==="grooming"?"#E24B4A":cat==="bullying"?"#BA7517":"#D85A30";
+    const color = cat==="grooming"?"var(--alert)":cat==="bullying"?"var(--caution)":"var(--orange)";
     els.flaggedMessages.innerHTML = wq.map(item =>
-      `<div class="gl-flagged-msg"><div class="gl-flagged-msg-body"><span class="gl-flagged-msg-quote" style="color:${color}">"${esc(trunc(item.quote,80))}"</span><span class="gl-flagged-msg-explanation">${esc(item.explanation||item.title||"")}</span></div></div>`
+      `<div class="gl-flagged-msg">
+        <div class="gl-flagged-msg-body">
+          <span class="gl-flagged-msg-quote" style="color:${color}">\u201c${esc(item.quote)}\u201d</span>
+          <span class="gl-flagged-msg-explanation">${esc(item.explanation||item.title||"")}</span>
+        </div>
+      </div>`
     ).join("");
   }
 
   function renderAction(a) {
     const action = a&&a.recommended_action;
-    if (!action) { els.recommendedAction.innerHTML='<div class="gl-empty">\u2014</div>'; els.recommendedAction.className="gl-action"; return; }
+    if (!action) { els.recommendedAction.innerHTML=''; return; }
     const cat = a.category||"";
     const color = cat==="grooming"?"#E24B4A":cat==="bullying"?"#BA7517":cat==="inappropriate_content"?"#D85A30":"#7F77DD";
     const bg = cat==="grooming"?"#2a1a1a":cat==="bullying"?"#1f1a0f":cat==="inappropriate_content"?"#2a1a0f":"#1e1e32";
-    const borderClass = cat==="grooming"?"gl-action-grooming":cat==="bullying"?"gl-action-bullying":cat==="inappropriate_content"?"gl-action-inappropriate":"gl-action-other";
-    els.recommendedAction.className = `gl-action ${borderClass}`;
-    const label = `<div class="gl-action-label" style="color:${color}">Recommended action for parent<button class="gl-action-dismiss" id="action-dismiss" type="button" title="Dismiss">\u00d7</button></div>`;
     const steps = (action.steps||[]).map((s,i) =>
       `<div class="gl-action-step"><span class="gl-action-num" style="background:${bg};color:${color}">${i+1}</span><span class="gl-action-text">${esc(s)}</span></div>`
     ).join("");
-    const priv = action.privacy_note ? `<div class="gl-action-privacy">${esc(action.privacy_note)}</div>` : "";
-    els.recommendedAction.innerHTML = label + steps + priv;
-    const dismissBtn = document.getElementById("action-dismiss");
-    if (dismissBtn) dismissBtn.addEventListener("click", (e) => { e.stopPropagation(); showOverview(); });
+    els.recommendedAction.innerHTML = steps;
   }
 
-  function renderTelegram(a) {
-    const alert = a&&a.parent_alert;
-    if (!alert) { els.telegramBlock.innerHTML=""; return; }
-    const at = alert.delivered_at ? fmtDelivered(alert.delivered_at) : fmtTime();
-    els.telegramBlock.innerHTML = `
-      <div class="gl-telegram-card">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-        <span class="gl-telegram-label">Parent alert generated \u00b7 ${esc(at)}</span>
-        <span class="gl-telegram-sent-badge">Ready</span>
-      </div>`;
-  }
-
-  function fmtDelivered(iso) {
-    if (!iso) return fmtTime();
-    try { const d = new Date(iso); return isNaN(d.getTime()) ? fmtTime() : d.toTimeString().slice(0,8); } catch(_) { return fmtTime(); }
-  }
 
   // ----------------------------------------------------------------- notifications
 
@@ -546,7 +595,6 @@
     els.shell.classList.toggle("gl-alert-active", !!isAlert);
 
     renderHeader(state);
-    renderStreak(state);
     renderShield(state);
     renderCapture(state);
     renderRibbon(state);
@@ -570,7 +618,6 @@
 
     setText(els.lastRefresh, fmtTime());
     setText(els.footerModel, state.model_name);
-    setText(els.footerDb, state.db_path);
   }
 
   // ----------------------------------------------------------------- bootstrap
@@ -598,6 +645,21 @@
     if (els.analysisBack) {
       els.analysisBack.addEventListener("click", showOverview);
     }
+    // Lightbox for captured screenshot
+    document.addEventListener("click", (e) => {
+      const frame = e.target.closest("#capture-frame");
+      if (!frame) return;
+      const img = frame.querySelector("img");
+      if (!img) return;
+      const overlay = document.createElement("div");
+      overlay.className = "gl-lightbox";
+      overlay.innerHTML = `<img src="${img.src}" alt=""><div class="gl-lightbox-close">\u00d7</div>`;
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add("gl-lightbox-open"));
+      const close = () => { overlay.classList.remove("gl-lightbox-open"); setTimeout(() => overlay.remove(), 200); };
+      overlay.addEventListener("click", close);
+      document.addEventListener("keydown", function esc(ev) { if (ev.key === "Escape") { close(); document.removeEventListener("keydown", esc); } });
+    });
     // Event delegation for alert history clicks — survives innerHTML re-renders
     if (els.alertHistory) {
       els.alertHistory.addEventListener("click", (e) => {
