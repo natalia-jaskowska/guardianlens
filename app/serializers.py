@@ -1013,8 +1013,8 @@ def generate_why_this_matters(analysis: ScreenAnalysis) -> str:
         )
 
     return (
-        f"{indicator_count} risk indicators were flagged in this conversation. "
-        f"Review the breakdown for details."
+        f"Risk indicators were flagged in this conversation."
+        f"\nReview the breakdown above for details."
     )
 
 
