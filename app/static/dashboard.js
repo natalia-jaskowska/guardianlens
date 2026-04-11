@@ -33,6 +33,17 @@
 
     overviewPanel: document.getElementById("overview-panel"),
     detailPanel: document.getElementById("detail-panel"),
+
+    // Conversation-level (session) verdict card
+    sessionVerdictCard: document.getElementById("session-verdict-card"),
+    sessionVerdictCertainty: document.getElementById("session-verdict-certainty"),
+    sessionVerdictLevel: document.getElementById("session-verdict-level"),
+    sessionVerdictConfidence: document.getElementById("session-verdict-confidence"),
+    sessionVerdictNarrative: document.getElementById("session-verdict-narrative"),
+    sessionVerdictIndicators: document.getElementById("session-verdict-indicators"),
+    sessionVerdictCount: document.getElementById("session-verdict-count"),
+    sessionVerdictCategory: document.getElementById("session-verdict-category"),
+    sessionVerdictAlertFlag: document.getElementById("session-verdict-alert-flag"),
     analysisBack: document.getElementById("analysis-back"),
     // analysisTimestampLabel removed — no longer in HTML
     analysisCard: document.getElementById("analysis-card"),
@@ -638,6 +649,89 @@
     }
   }
 
+  // ----------------------------------------------------------------- session verdict
+
+  // Render the conversation-level verdict produced by ConversationAnalyzer.
+  // The card is ALWAYS present (even when no verdict exists yet) so the
+  // layout doesn't jump when the first verdict lands. We just swap its
+  // contents + colour class based on state.session_verdict.
+  function renderSessionVerdict(state) {
+    const card = els.sessionVerdictCard;
+    if (!card) return;
+    const sv = state.session_verdict;
+    const convSize = state.conversation_size || 0;
+
+    // Reset level classes on every render (class list may have accumulated).
+    card.classList.remove(
+      "gl-session-level-safe",
+      "gl-session-level-caution",
+      "gl-session-level-warning",
+      "gl-session-level-alert",
+      "gl-session-level-critical",
+      "gl-session-verdict-empty",
+    );
+
+    if (!sv) {
+      // No verdict yet — show placeholder with current accumulation count.
+      card.classList.add("gl-session-verdict-empty");
+      setText(els.sessionVerdictLevel, convSize === 0 ? "waiting" : "accumulating");
+      setText(els.sessionVerdictCertainty, "—");
+      setText(els.sessionVerdictConfidence, "—");
+      setText(
+        els.sessionVerdictNarrative,
+        convSize < 3
+          ? `Accumulating messages (${convSize}). A verdict will appear once the conversation analyzer has enough evidence.`
+          : `Analyzing ${convSize} message${convSize===1?"":"s"}...`,
+      );
+      els.sessionVerdictIndicators.innerHTML = "";
+      setText(els.sessionVerdictCount, `${convSize} msg${convSize===1?"":"s"}`);
+      setText(els.sessionVerdictCategory, "—");
+      setText(els.sessionVerdictAlertFlag, "no action");
+      els.sessionVerdictAlertFlag.classList.remove("gl-session-alert-on");
+      els.sessionVerdictCertainty.classList.remove(
+        "gl-certainty-low", "gl-certainty-medium", "gl-certainty-high",
+      );
+      return;
+    }
+
+    // Live verdict — wire every field.
+    const level = (sv.overall_level || "safe").toLowerCase();
+    const certainty = (sv.certainty || "low").toLowerCase();
+    const category = sv.overall_category || "none";
+    const conf = Math.round(sv.confidence || 0);
+
+    card.classList.add(`gl-session-level-${level}`);
+    setText(els.sessionVerdictLevel, level);
+    setText(els.sessionVerdictConfidence, `${conf}% confidence`);
+
+    els.sessionVerdictCertainty.classList.remove(
+      "gl-certainty-low", "gl-certainty-medium", "gl-certainty-high",
+    );
+    els.sessionVerdictCertainty.classList.add(`gl-certainty-${certainty}`);
+    setText(els.sessionVerdictCertainty, `${certainty} certainty`);
+
+    setText(els.sessionVerdictNarrative, sv.narrative || "");
+
+    // Render indicator pills.
+    const inds = Array.isArray(sv.key_indicators) ? sv.key_indicators : [];
+    els.sessionVerdictIndicators.innerHTML = inds
+      .slice(0, 6)
+      .map((i) => `<span>${esc(trunc(i, 80))}</span>`)
+      .join("");
+
+    // Meta row.
+    const n = sv.messages_analyzed || 0;
+    setText(els.sessionVerdictCount, `${n} msg${n===1?"":"s"} analyzed`);
+    setText(els.sessionVerdictCategory, category);
+    if (sv.parent_alert_recommended) {
+      setText(els.sessionVerdictAlertFlag, "parent alert recommended");
+      els.sessionVerdictAlertFlag.classList.add("gl-session-alert-on");
+    } else {
+      setText(els.sessionVerdictAlertFlag, "no action");
+      els.sessionVerdictAlertFlag.classList.remove("gl-session-alert-on");
+    }
+  }
+
   function renderReasoning(a) {
     const steps = (a&&a.reasoning_chain)||[];
     if (!steps.length) { els.reasoningChain.innerHTML = '<div class="gl-empty">No reasoning.</div>'; return; }
@@ -719,6 +813,7 @@
     renderShield(state);
     renderCapture(state);
     renderTimeline(state);
+    renderSessionVerdict(state);
 
     if (els.footerBytesCheck && state.metrics && state.metrics.screenshots > 0) {
       els.footerBytesCheck.classList.add("gl-footer-check-visible");

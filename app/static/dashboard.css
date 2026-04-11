@@ -1328,6 +1328,144 @@ button { font-family: inherit; cursor: pointer; }
   margin-top: 2px;
 }
 
+/* ---- Conversation (session) verdict card ---- */
+
+.gl-session-verdict {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px 12px;
+  margin-bottom: 16px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.35s ease, background 0.35s ease;
+}
+.gl-session-verdict::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--text-ghost);
+  transition: background 0.35s ease;
+}
+.gl-session-verdict.gl-session-level-safe::before     { background: var(--safe); }
+.gl-session-verdict.gl-session-level-caution::before  { background: var(--caution); }
+.gl-session-verdict.gl-session-level-warning::before  { background: var(--orange); }
+.gl-session-verdict.gl-session-level-alert::before    { background: var(--alert); }
+.gl-session-verdict.gl-session-level-critical::before { background: var(--alert); }
+.gl-session-verdict.gl-session-level-alert,
+.gl-session-verdict.gl-session-level-critical {
+  border-color: rgba(226, 75, 74, 0.28);
+  background: linear-gradient(180deg, rgba(226, 75, 74, 0.06), var(--bg-card));
+}
+.gl-session-verdict.gl-session-verdict-empty {
+  opacity: 0.85;
+}
+.gl-session-verdict-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.gl-session-verdict-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+}
+.gl-session-verdict-certainty {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+.gl-session-verdict-certainty.gl-certainty-low {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+.gl-session-verdict-certainty.gl-certainty-medium {
+  color: var(--caution);
+  background: var(--caution-bg);
+  border-color: rgba(186, 117, 23, 0.3);
+}
+.gl-session-verdict-certainty.gl-certainty-high {
+  color: var(--alert);
+  background: var(--alert-bg);
+  border-color: rgba(226, 75, 74, 0.3);
+}
+.gl-session-verdict-level-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.gl-session-verdict-level {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+  text-transform: capitalize;
+}
+.gl-session-verdict.gl-session-level-safe    .gl-session-verdict-level { color: var(--safe); }
+.gl-session-verdict.gl-session-level-caution .gl-session-verdict-level { color: var(--caution); }
+.gl-session-verdict.gl-session-level-warning .gl-session-verdict-level { color: var(--orange); }
+.gl-session-verdict.gl-session-level-alert   .gl-session-verdict-level { color: var(--alert); }
+.gl-session-verdict.gl-session-level-critical .gl-session-verdict-level { color: var(--alert); }
+.gl-session-verdict-confidence {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.gl-session-verdict-narrative {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+}
+.gl-session-verdict-indicators {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.gl-session-verdict-indicators:empty {
+  display: none;
+}
+.gl-session-verdict-indicators span {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: 0.1px;
+}
+.gl-session-verdict-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.gl-session-verdict-dot { color: var(--text-ghost); }
+#session-verdict-alert-flag.gl-session-alert-on {
+  color: var(--alert);
+  font-weight: 600;
+}
+
 /* ---- Alert history header ---- */
 
 .gl-history-header {

@@ -168,6 +168,30 @@
         <aside class="gl-sidebar">
 
           <div id="overview-panel">
+
+            <!-- Conversation-level verdict (session analyzer) -->
+            <div class="gl-session-verdict gl-session-verdict-empty" id="session-verdict-card">
+              <div class="gl-session-verdict-head">
+                <span class="gl-session-verdict-label">Conversation verdict</span>
+                <span class="gl-session-verdict-certainty" id="session-verdict-certainty">—</span>
+              </div>
+              <div class="gl-session-verdict-level-row">
+                <span class="gl-session-verdict-level" id="session-verdict-level">waiting</span>
+                <span class="gl-session-verdict-confidence" id="session-verdict-confidence">—</span>
+              </div>
+              <div class="gl-session-verdict-narrative" id="session-verdict-narrative">
+                Accumulating messages from visible chat across frames. A session-level verdict will appear once enough messages are available.
+              </div>
+              <div class="gl-session-verdict-indicators" id="session-verdict-indicators"></div>
+              <div class="gl-session-verdict-meta">
+                <span id="session-verdict-count">0 msgs</span>
+                <span class="gl-session-verdict-dot">·</span>
+                <span id="session-verdict-category">—</span>
+                <span class="gl-session-verdict-dot">·</span>
+                <span id="session-verdict-alert-flag">no action</span>
+              </div>
+            </div>
+
             <div class="gl-history-header">
               <span class="gl-history-label" id="history-label">Alerts</span>
             </div>
