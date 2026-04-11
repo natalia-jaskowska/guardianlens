@@ -131,3 +131,82 @@ def test_state_serializer_picks_up_latest_analysis(
     assert payload["latest"]["threat_level"] == "alert"
     assert payload["is_alert"] is True
     assert payload["metrics"]["alerts"] >= 1
+
+
+def test_pause_resume_endpoints(client: TestClient) -> None:
+    """Pause and resume flip the monitoring flag and paused flag."""
+    # Initially scanning
+    assert client.get("/api/state").json()["paused"] is False
+    assert client.get("/api/state").json()["monitoring"] is True
+
+    # Pause
+    response = client.post("/api/pause")
+    assert response.status_code == 200
+    assert response.json() == {"status": "paused"}
+    state_after_pause = client.get("/api/state").json()
+    assert state_after_pause["paused"] is True
+    assert state_after_pause["monitoring"] is False
+
+    # Resume
+    response = client.post("/api/resume")
+    assert response.status_code == 200
+    assert response.json() == {"status": "running"}
+    state_after_resume = client.get("/api/state").json()
+    assert state_after_resume["paused"] is False
+    assert state_after_resume["monitoring"] is True
+
+
+def test_pause_is_idempotent(client: TestClient) -> None:
+    """Double-pause doesn't corrupt state."""
+    client.post("/api/pause")
+    client.post("/api/pause")
+    assert client.get("/api/state").json()["paused"] is True
+    # Resume once
+    client.post("/api/resume")
+    assert client.get("/api/state").json()["paused"] is False
+
+
+def test_api_analysis_not_found(client: TestClient) -> None:
+    """Missing analysis id returns 404 with error body."""
+    response = client.get("/api/analysis/999999")
+    assert response.status_code == 404
+    assert response.json() == {"error": "not found"}
+
+
+def test_api_analysis_returns_full_payload(
+    client: TestClient, config: GuardLensConfig
+) -> None:
+    """An injected analysis can be fetched by its DB id."""
+    state = client.app.state.guardlens
+    fake = ScreenAnalysis(
+        timestamp=datetime.now(),
+        screenshot_path=config.monitor.screenshots_dir / "fake.png",
+        platform="Discord",
+        classification=ThreatClassification(
+            threat_level=ThreatLevel.ALERT,
+            category=ThreatCategory.GROOMING,
+            confidence=95.0,
+            reasoning="Test alert.",
+            indicators_found=["false age", "isolation"],
+        ),
+        inference_seconds=1.2,
+    )
+    state.worker._queue.put(fake)
+    # Drain via /api/state so the row is persisted
+    client.get("/api/state")
+
+    # The injected alert should be accessible by id 1 (fresh tmp DB)
+    response = client.get("/api/analysis/1")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["threat_level"] == "alert"
+    assert payload["category"] == "grooming"
+    assert "False Age" in payload["indicators"]  # cleaned tag
+
+
+def test_state_has_alert_total_field(client: TestClient) -> None:
+    """/api/state exposes alert_total for the 'X of Y' display."""
+    response = client.get("/api/state")
+    assert response.status_code == 200
+    assert "alert_total" in response.json()
+    assert isinstance(response.json()["alert_total"], int)

@@ -7,6 +7,8 @@ from pathlib import Path
 
 from app.serializers import (
     GROOMING_STAGE_ORDER,
+    _clean_indicator,
+    _dedup_indicators,
     build_alert_history,
     empty_summary,
     format_session_duration,
@@ -179,3 +181,96 @@ def test_build_alert_history_no_grooming_stage_index() -> None:
     history = build_alert_history(rows)
     assert len(history) == 1
     assert history[0]["grooming_stage_index"] == 0
+
+
+# --- _clean_indicator ---------------------------------------------------------
+
+
+def test_clean_indicator_maps_known_keywords_to_title_case_tags() -> None:
+    # "Asking about" matches first → Personal Info
+    assert _clean_indicator("Asking about location") == "Personal Info"
+    # "age" word-boundary matches
+    assert _clean_indicator("Age confirmation") == "False Age"
+    assert _clean_indicator("Suggesting moving to Discord") == "Platform Switch"
+    assert _clean_indicator("Request for secrecy") == "Secrecy"
+    assert _clean_indicator("False age claim") == "False Age"
+    assert _clean_indicator("Excessive compliments") == "Flattery"
+    assert _clean_indicator("Offering free skins") == "Gift Offer"
+
+
+def test_clean_indicator_strips_quotes_and_parentheticals() -> None:
+    assert _clean_indicator('Name-calling ("ur so cringe")') == "Name-Calling"
+    # Keywords are checked against the whole text including parenthetical,
+    # so "isolat" in "Isolation attempt" matches before the paren is stripped
+    assert _clean_indicator("Isolation attempt") == "Isolation"
+
+
+def test_clean_indicator_word_boundary_avoids_false_matches() -> None:
+    # "age" should not match "image" or "messages"
+    assert _clean_indicator("Image request") == "Image Request"
+    assert _clean_indicator("Threatening messages") == "Threats"
+
+
+def test_clean_indicator_fallback_produces_title_case() -> None:
+    """Unknown indicators get first 3 words in Title Case, no ellipsis."""
+    result = _clean_indicator("Some completely unknown behavior pattern")
+    assert result == "Some Completely Unknown"
+    assert "…" not in result
+    assert "..." not in result
+
+
+def test_clean_indicator_empty_returns_none() -> None:
+    assert _clean_indicator("") is None
+    assert _clean_indicator("   ") is None
+
+
+# --- _dedup_indicators --------------------------------------------------------
+
+
+def test_dedup_indicators_removes_duplicate_tags() -> None:
+    """Multiple raw indicators that map to the same tag only appear once."""
+    raw = [
+        "Excessive compliments",
+        "Excessive flattery",
+        "Compliments used to build rapport",
+    ]
+    result = _dedup_indicators(raw)
+    # Flattery appears exactly once even though three raw strings map to it
+    assert result.count("Flattery") == 1
+    assert len(result) == 1
+
+
+def test_dedup_indicators_preserves_order() -> None:
+    """Tags appear in the order their first raw indicator appears."""
+    raw = ["Flattery compliments", "Isolation to Discord", "Secrecy request"]
+    result = _dedup_indicators(raw)
+    assert result == ["Flattery", "Platform Switch", "Secrecy"]
+
+
+def test_dedup_indicators_filters_empty() -> None:
+    """Empty or unmappable-to-nothing indicators get dropped."""
+    raw = ["", "Flattery", "   ", "Isolation"]
+    result = _dedup_indicators(raw)
+    assert result == ["Flattery", "Isolation"]
+
+
+# --- Timeline payload contract (for JS escalation detection) ------------------
+
+
+def test_serialize_timeline_entries_have_fields_for_escalation_detection() -> None:
+    """Timeline entries must include threat_level and timestamp so the
+    front-end can compute escalation runs."""
+    entries = [
+        _analysis(ThreatLevel.SAFE),
+        _analysis(ThreatLevel.CAUTION),
+        _analysis(ThreatLevel.ALERT),
+    ]
+    timeline = serialize_timeline(entries)
+    for row in timeline:
+        assert "threat_level" in row
+        assert "timestamp" in row
+        assert "time_label" in row
+        assert "platform" in row
+    # Order is newest-first
+    assert timeline[0]["threat_level"] == "alert"
+    assert timeline[-1]["threat_level"] == "safe"

@@ -90,20 +90,23 @@ class MonitorWorker:
         logger.info("Monitor thread stop requested.")
 
     def pause(self) -> None:
-        if self._pause_event.is_set():
-            return
-        self._pause_event.set()
-        self._paused_at = time.monotonic()
-        logger.info("Monitor paused.")
+        with self._lock:
+            if self._pause_event.is_set():
+                return
+            self._pause_event.set()
+            self._paused_at = time.monotonic()
+        logger.info("Monitor paused at %.1fs session time.", self.session_seconds)
 
     def resume(self) -> None:
-        if not self._pause_event.is_set():
-            return
-        if self._paused_at is not None:
-            self._paused_total += time.monotonic() - self._paused_at
-            self._paused_at = None
-        self._pause_event.clear()
-        logger.info("Monitor resumed.")
+        with self._lock:
+            if not self._pause_event.is_set():
+                return
+            if self._paused_at is not None:
+                paused_duration = time.monotonic() - self._paused_at
+                self._paused_total += paused_duration
+                self._paused_at = None
+            self._pause_event.clear()
+        logger.info("Monitor resumed (was paused for %.1fs total).", self._paused_total)
 
     @property
     def is_paused(self) -> bool:
@@ -120,7 +123,13 @@ class MonitorWorker:
 
     @property
     def is_running(self) -> bool:
-        return self._thread is not None and not self._stop_event.is_set() and not self._pause_event.is_set()
+        """True when the session is active (running or paused). Used for data queries."""
+        return self._thread is not None and not self._stop_event.is_set()
+
+    @property
+    def is_scanning(self) -> bool:
+        """True when actively capturing and analyzing. False when paused."""
+        return self.is_running and not self._pause_event.is_set()
 
     # ------------------------------------------------------------------ drain
 
@@ -147,6 +156,12 @@ class MonitorWorker:
             delivered = self._alerts.maybe_send(analysis)
             if analysis.parent_alert is not None:
                 self._database.record_alert(analysis_id, analysis, delivered=delivered)
+                logger.info(
+                    "Parent alert recorded (id=%d, urgency=%s, delivered=%s)",
+                    analysis_id,
+                    analysis.parent_alert.urgency.value,
+                    delivered,
+                )
             latest = analysis
             if analysis.classification.threat_level.value in {"alert", "critical"}:
                 with self._lock:
@@ -190,11 +205,22 @@ class MonitorWorker:
                 time.sleep(1)
             if self._stop_event.is_set():
                 break
+            logger.info("Analyzing screenshot: %s", screenshot_path.name)
             try:
                 analysis = self._analyzer.analyze(screenshot_path)
             except Exception:  # noqa: BLE001 - never crash the loop
                 logger.exception("Analyzer failed for %s", screenshot_path)
                 continue
+            level = analysis.classification.threat_level.value
+            category = analysis.classification.category.value
+            confidence = round(analysis.classification.confidence)
+            logger.info(
+                "Scan result: %s · %s · %d%% · %.2fs",
+                level.upper(),
+                category,
+                confidence,
+                analysis.inference_seconds,
+            )
             # In demo mode the screenshot filename encodes the platform
             # and scenario (e.g. "demo_instagram_grooming_<ts>.png").
             # Use that to (1) override the platform with a section label
@@ -326,7 +352,7 @@ class AppState:
         alert_history = build_alert_history(self.database.recent_alert_analyses(limit=30))
 
         return {
-            "monitoring": self.worker.is_running,
+            "monitoring": self.worker.is_scanning,
             "paused": self.worker.is_paused,
             "session_duration": format_session_duration(self.worker.session_seconds),
             "model_name": self.config.ollama.inference_model,

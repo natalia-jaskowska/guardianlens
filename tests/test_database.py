@@ -73,3 +73,36 @@ def test_analysis_round_trip(tmp_path: Path) -> None:
 
     db.end_session()
     db.close()
+
+
+def test_total_alert_count(tmp_path: Path) -> None:
+    """total_alert_count counts non-safe analyses with a real category."""
+    db = GuardLensDatabase(tmp_path / "test.db")
+    db.start_session(notes="unit test")
+    # 2 safe, 3 alerts — only 3 should count
+    db.record_analysis(_analysis(ThreatLevel.SAFE))
+    db.record_analysis(_analysis(ThreatLevel.SAFE))
+    db.record_analysis(_analysis(ThreatLevel.ALERT))
+    db.record_analysis(_analysis(ThreatLevel.ALERT))
+    db.record_analysis(_analysis(ThreatLevel.CAUTION))
+    assert db.total_alert_count() == 3
+    db.close()
+
+
+def test_analysis_by_id_returns_none_for_missing(tmp_path: Path) -> None:
+    db = GuardLensDatabase(tmp_path / "test.db")
+    db.start_session()
+    assert db.analysis_by_id(999) is None
+    db.close()
+
+
+def test_analysis_by_id_returns_reconstructed(tmp_path: Path) -> None:
+    db = GuardLensDatabase(tmp_path / "test.db")
+    db.start_session()
+    alert = _analysis(ThreatLevel.ALERT)
+    row_id = db.record_analysis(alert)
+    restored = db.analysis_by_id(row_id)
+    assert restored is not None
+    assert restored.classification.threat_level == ThreatLevel.ALERT
+    assert restored.classification.category == ThreatCategory.GROOMING
+    db.close()
