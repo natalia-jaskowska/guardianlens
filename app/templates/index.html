@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/dashboard.css?v=32" />
+    <link rel="stylesheet" href="/static/dashboard.css?v=33" />
   </head>
   <body>
     <div id="shell" class="gl-shell">
@@ -60,7 +60,7 @@
                 <option>Loading...</option>
               </select>
             </div>
-            <div class="gl-drawer-hint">Switch between base and fine-tuned Gemma 4 variants. The next scan uses the new model.</div>
+            <div class="gl-drawer-hint">Smaller models scan faster. Larger models catch more subtle threats. The next scan uses the new model.</div>
           </div>
           <div class="gl-drawer-section">
             <div class="gl-drawer-section-label">
@@ -73,7 +73,7 @@
               <button class="gl-drawer-pill" data-seconds="180">3m</button>
               <button class="gl-drawer-pill" data-seconds="300">5m</button>
             </div>
-            <div class="gl-drawer-hint">How often GuardianLens captures a new screenshot.</div>
+            <div class="gl-drawer-hint">Shorter intervals catch threats faster but use more CPU. Changes apply to the next scan.</div>
           </div>
         </div>
         <div class="gl-drawer-footer">
@@ -240,6 +240,6 @@
     </div>
 
     <script id="initial-state" type="application/json">{{ initial_state | tojson }}</script>
-    <script src="/static/dashboard.js?v=32" defer></script>
+    <script src="/static/dashboard.js?v=33" defer></script>
   </body>
 </html>
