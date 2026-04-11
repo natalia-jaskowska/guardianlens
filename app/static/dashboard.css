@@ -112,7 +112,7 @@ button { font-family: inherit; cursor: pointer; }
   gap: 14px;
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 /* RIGHT — alerts panel */
