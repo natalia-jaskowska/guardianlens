@@ -678,21 +678,42 @@ button { font-family: inherit; cursor: pointer; }
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
   transition: border-color 0.4s ease, box-shadow 0.4s ease;
 }
+/* Paused overlay — modern glassmorphism card centered over capture */
 .gl-capture-paused .gl-capture-screen::before {
-  content: "PAUSED";
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 6, 12, 0.55);
+  backdrop-filter: blur(10px) saturate(1.1);
+  -webkit-backdrop-filter: blur(10px) saturate(1.1);
+  z-index: 2;
+  border-radius: 8px;
+  animation: gl-pause-fade 0.3s ease-out;
+}
+.gl-capture-paused .gl-capture-screen::after {
+  content: "";
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(11, 11, 20, 0.7);
-  backdrop-filter: blur(4px);
-  color: var(--text-muted);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 3px;
-  z-index: 2;
+  z-index: 3;
   border-radius: 8px;
+  pointer-events: none;
+  /* SVG-based pause card: rounded glass panel + pause icon + text */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='100' viewBox='0 0 220 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop offset='0' stop-color='%23ffffff' stop-opacity='0.08'/%3E%3Cstop offset='1' stop-color='%23ffffff' stop-opacity='0.02'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='1' y='1' width='218' height='98' rx='16' fill='url(%23g)' stroke='rgba(255,255,255,0.12)' stroke-width='1'/%3E%3Ccircle cx='50' cy='50' r='22' fill='rgba(255,255,255,0.06)' stroke='rgba(255,255,255,0.15)' stroke-width='1.5'/%3E%3Crect x='43' y='40' width='4' height='20' rx='1' fill='%23e0e0e8'/%3E%3Crect x='53' y='40' width='4' height='20' rx='1' fill='%23e0e0e8'/%3E%3Ctext x='85' y='45' font-family='Inter, system-ui, sans-serif' font-size='15' font-weight='700' fill='%23e0e0e8' letter-spacing='0.5'%3EMonitoring paused%3C/text%3E%3Ctext x='85' y='64' font-family='Inter, system-ui, sans-serif' font-size='11' font-weight='400' fill='%23888'%3EClick Resume in the header%3C/text%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 240px 110px;
+  animation: gl-pause-card 0.35s cubic-bezier(0.2, 0, 0, 1);
+}
+@keyframes gl-pause-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes gl-pause-card {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 .gl-capture-paused { border-color: var(--border) !important; }
 
