@@ -270,7 +270,8 @@
     if (a && a.timestamp === _lastCaptureTs) return;
     _lastCaptureTs = a ? a.timestamp : "";
     if (!a) {
-      els.captureCard.className = "gl-capture gl-capture-safe";
+      els.captureCard.classList.remove("gl-capture-caution", "gl-capture-alert");
+      els.captureCard.classList.add("gl-capture", "gl-capture-safe");
       els.captureScreen.innerHTML = '<div class="gl-capture-placeholder"><div class="gl-skeleton gl-skeleton-block" style="width:100%;height:100%;position:absolute;inset:0"></div></div>';
       els.captureBarIcon.innerHTML = CAP_CHECK;
       setText(els.captureBarTitle, "Initializing");
@@ -282,7 +283,9 @@
     const isAlert = level === "alert" || level === "critical";
     const isCaution = level === "caution" || level === "warning";
     const mode = isAlert ? "alert" : isCaution ? "caution" : "safe";
-    els.captureCard.className = `gl-capture gl-capture-${mode}`;
+    // Use classList to preserve gl-capture-paused set by renderHeader
+    els.captureCard.classList.remove("gl-capture-safe", "gl-capture-caution", "gl-capture-alert");
+    els.captureCard.classList.add("gl-capture", `gl-capture-${mode}`);
 
     // Always store the screenshot URL for the lightbox
     const screenshotSrc = a.screenshot_url ? `${a.screenshot_url}?t=${encodeURIComponent(a.timestamp||Date.now())}` : "";
