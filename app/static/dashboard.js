@@ -830,17 +830,41 @@
     async function openDrawer() {
       drawer.classList.add("gl-drawer-open");
       drawerBackdrop.classList.add("gl-drawer-open");
+      // Update current interval pills + active state from last state
+      const currentInterval = (window.__lastState && window.__lastState.capture_interval_seconds) || 30;
+      if (intervalPills) {
+        intervalPills.querySelectorAll(".gl-drawer-pill").forEach(b => {
+          const s = parseFloat(b.getAttribute("data-seconds"));
+          b.classList.toggle("gl-drawer-pill-active", Math.abs(s - currentInterval) < 1);
+        });
+      }
       // Fetch available models
+      modelPicker.innerHTML = '<option>Loading models...</option>';
       try {
         const r = await fetch("/api/models");
         if (r.ok) {
           const data = await r.json();
           const current = data.current || "";
-          modelPicker.innerHTML = (data.models || []).map(m =>
-            `<option value="${m}"${m === current ? " selected" : ""}>${m}</option>`
-          ).join("");
+          const models = data.models || [];
+          if (models.length === 0) {
+            modelPicker.innerHTML = '<option>No models found</option>';
+          } else {
+            modelPicker.innerHTML = models.map(m =>
+              `<option value="${m}"${m === current ? " selected" : ""}>${m}</option>`
+            ).join("");
+          }
+          updateDrawerFooter(current);
         }
-      } catch(_) {}
+      } catch(err) {
+        modelPicker.innerHTML = '<option>Failed to load models</option>';
+        console.error("Failed to fetch models:", err);
+      }
+    }
+    function updateDrawerFooter(modelName) {
+      const footer = document.querySelector(".gl-drawer-footer");
+      if (footer && modelName) {
+        footer.innerHTML = `Active model: <strong style="color:var(--purple);font-family:var(--font-mono)">${modelName}</strong> \u00b7 On-device`;
+      }
     }
     function closeDrawer() {
       drawer.classList.remove("gl-drawer-open");
@@ -856,12 +880,19 @@
       modelPicker.addEventListener("change", async () => {
         const model = modelPicker.value;
         try {
-          await fetch("/api/config/model", {
+          const r = await fetch("/api/config/model", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({model}),
           });
-        } catch(_) {}
+          if (r.ok) {
+            // Update header chip and drawer footer immediately
+            setText(els.headerModel, model);
+            updateDrawerFooter(model);
+          }
+        } catch(err) {
+          console.error("Failed to switch model:", err);
+        }
       });
     }
     if (intervalPills) {

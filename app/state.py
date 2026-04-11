@@ -354,6 +354,7 @@ class AppState:
         return {
             "monitoring": self.worker.is_scanning,
             "paused": self.worker.is_paused,
+            "capture_interval_seconds": self.config.monitor.capture_interval_seconds,
             "session_duration": format_session_duration(self.worker.session_seconds),
             "model_name": self.config.ollama.inference_model,
             "db_path": str(self.config.database.path),

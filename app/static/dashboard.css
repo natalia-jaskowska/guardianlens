@@ -481,6 +481,18 @@ button { font-family: inherit; cursor: pointer; }
   border-color: var(--purple);
   box-shadow: 0 0 0 3px rgba(127, 119, 221, 0.15);
 }
+/* Style the native option list — works in Chrome, Firefox, Edge */
+.gl-drawer-select option {
+  background: #14142a;
+  color: var(--text-primary);
+  padding: 8px;
+  font-family: var(--font-mono);
+}
+.gl-drawer-select option:checked,
+.gl-drawer-select option:hover {
+  background: rgba(127, 119, 221, 0.2);
+  color: var(--purple);
+}
 .gl-drawer-select-wrap::after {
   content: "";
   position: absolute;
