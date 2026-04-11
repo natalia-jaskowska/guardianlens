@@ -725,6 +725,35 @@ button { font-family: inherit; cursor: pointer; }
 .gl-timeline-entry-alert  { border-left: 3px solid var(--alert); }
 .gl-timeline-entry-caution { border-left: 3px solid var(--caution); }
 
+/* Collapsed safe-group row — compact "N safe scans (14:30 – 14:45)" */
+.gl-timeline-group {
+  padding: 6px 10px;
+  border-left: 3px solid rgba(29, 158, 117, 0.35);
+  cursor: default;
+  opacity: 0.75;
+}
+.gl-timeline-group:hover {
+  background: transparent;
+  border-color: rgba(29, 158, 117, 0.35);
+  transform: none;
+}
+.gl-timeline-group-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--safe-bg);
+  color: var(--safe);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.gl-timeline-group-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--safe);
+}
+
 /* Escalation connector — red gradient bar connecting consecutive worsening entries */
 .gl-timeline-esc-bar {
   display: none;

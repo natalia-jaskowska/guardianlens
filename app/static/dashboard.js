@@ -346,21 +346,52 @@
   let _lastTimelineKey = "";
 
   function renderTimeline(state) {
-    const entries = state.timeline || [];
-    const tlKey = entries.map(e => e.timestamp || e.time_label).join(",");
+    const rawEntries = state.timeline || [];
+    const tlKey = rawEntries.map(e => e.timestamp || e.time_label).join(",");
     if (tlKey === _lastTimelineKey) return;
     _lastTimelineKey = tlKey;
 
-    if (!entries.length) {
+    if (!rawEntries.length) {
       els.timeline.innerHTML = '<div class="gl-empty">Waiting for the first capture...</div>';
       return;
     }
+
+    // Collapse consecutive safe entries into a single group row.
+    // Runs of 2+ safe scans become one "N safe scans (14:30 – 14:45)" entry.
+    // Single safe scans render normally so the UI isn't too aggressive.
+    const entries = [];
+    let i = 0;
+    while (i < rawEntries.length) {
+      const curr = rawEntries[i];
+      if (curr.threat_level === "safe") {
+        let j = i;
+        while (j < rawEntries.length && rawEntries[j].threat_level === "safe") j++;
+        const runLen = j - i;
+        if (runLen >= 2) {
+          // entries are newest-first, so newest of the run is at i, oldest at j-1
+          entries.push({
+            is_group: true,
+            count: runLen,
+            time_start: rawEntries[j - 1].time_label,
+            time_end: rawEntries[i].time_label,
+            platform: rawEntries[i].platform,
+            platform_key: rawEntries[i].platform_key,
+          });
+          i = j;
+          continue;
+        }
+      }
+      entries.push(curr);
+      i++;
+    }
+
     // Compute escalation runs — mark entries that are part of a worsening sequence
     // Entries are newest-first, so we scan bottom-up (oldest to newest) to find progression
     const levelNum = (l) => l === "safe" ? 0 : (l === "caution" || l === "warning") ? 1 : 2;
     const escalation = new Array(entries.length).fill(false);
     // Walk oldest→newest (end→start of array)
     for (let i = entries.length - 2; i >= 0; i--) {
+      if (entries[i].is_group || entries[i + 1].is_group) continue;
       const curr = levelNum(entries[i].threat_level);
       const prev = levelNum(entries[i + 1].threat_level);
       if (curr > 0 && prev > 0 && curr >= prev) {
@@ -370,6 +401,21 @@
     }
 
     els.timeline.innerHTML = entries.map((e, i) => {
+      // Collapsed group row — consecutive safe scans
+      if (e.is_group) {
+        const range = e.time_start === e.time_end ? e.time_end : `${e.time_start} – ${e.time_end}`;
+        return `<div class="gl-timeline-entry gl-timeline-group" data-tl-idx="${i}">
+          <span class="gl-timeline-group-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </span>
+          <div class="gl-timeline-body">
+            <div class="gl-timeline-row1">
+              <span class="gl-timeline-group-text">${e.count} safe scans</span>
+              <span class="gl-timeline-time">${esc(range)}</span>
+            </div>
+          </div>
+        </div>`;
+      }
       const level = e.threat_level;
       const k = e.platform_key || pKey(e.platform);
       const levelCls = level === "alert" || level === "critical" ? "alert" :
@@ -380,7 +426,6 @@
         : `<span class="gl-timeline-icon-letter">${(e.platform||"?").charAt(0).toUpperCase()}</span>`;
       const isClickable = levelCls !== "safe";
       const escCls = escalation[i] ? " gl-timeline-escalation" : "";
-      // Is this the first entry in an escalation run? (entry above is not escalating)
       const escStart = escalation[i] && (i === 0 || !escalation[i - 1]);
       const escStartCls = escStart ? " gl-timeline-esc-start" : "";
       return `<div class="gl-timeline-entry gl-timeline-entry-${levelCls}${isClickable?" gl-timeline-clickable":""}${escCls}${escStartCls}" data-tl-idx="${i}">
@@ -405,7 +450,7 @@
       row.addEventListener("click", () => {
         const idx = parseInt(row.getAttribute("data-tl-idx"), 10);
         const entry = entries[idx];
-        if (!entry) return;
+        if (!entry || entry.is_group) return;
         // Match by ISO timestamp (unique per analysis) with time_label fallback
         const hist = (window.__lastState && window.__lastState.alert_history) || [];
         const match = hist.find(a => a.timestamp === entry.timestamp) ||
@@ -413,7 +458,6 @@
         if (match && match.analysis_id) {
           selectAlert(match.analysis_id);
         }
-        // Safe entries — no detail to show, ignore click
       });
     });
   }

@@ -374,7 +374,7 @@ class AppState:
             # then reversed because serialize_timeline expects
             # oldest-first input.
             "timeline": serialize_timeline(
-                list(reversed(self.database.recent_analyses_models(limit=15)))
+                list(reversed(self.database.recent_analyses_models(limit=25)))
             ),
             "latest": latest_payload,
             "latest_alert": latest_alert_payload,
