@@ -713,6 +713,7 @@
     const latest = state.latest;
     const isAlert = latest && (latest.threat_level==="alert"||latest.threat_level==="critical");
     els.shell.classList.toggle("gl-alert-active", !!isAlert);
+    els.shell.classList.toggle("gl-shell-paused", !!state.paused);
 
     renderHeader(state);
     renderShield(state);

@@ -88,6 +88,13 @@ button { font-family: inherit; cursor: pointer; }
 .gl-shell.gl-alert-active {
   background-image: radial-gradient(ellipse at 50% 0%, rgba(226, 75, 74, 0.06) 0%, transparent 60%);
 }
+/* Paused state — dim the timeline wrap and stats row */
+.gl-shell.gl-shell-paused .gl-timeline-wrap,
+.gl-shell.gl-shell-paused .gl-stats-row {
+  opacity: 0.55;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
 
 .gl-main {
   display: grid;
