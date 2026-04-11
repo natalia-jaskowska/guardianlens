@@ -311,6 +311,168 @@ button { font-family: inherit; cursor: pointer; }
   animation: pulse-dot 1.5s ease-in-out infinite;
 }
 
+/* Settings gear button */
+.gl-header-gear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.gl-header-gear:hover {
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+/* Settings drawer */
+.gl-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.gl-drawer-backdrop.gl-drawer-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.gl-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 100vw;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
+  z-index: 91;
+  display: flex;
+  flex-direction: column;
+  transform: translate3d(100%, 0, 0);
+  transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+.gl-drawer.gl-drawer-open {
+  transform: translate3d(0, 0, 0);
+}
+.gl-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.gl-drawer-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+.gl-drawer-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.gl-drawer-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+.gl-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.gl-drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gl-drawer-section-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.gl-drawer-hint {
+  font-size: 11px;
+  color: var(--text-ghost);
+  line-height: 1.5;
+  margin-top: 2px;
+}
+.gl-drawer-select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: var(--font-main);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.gl-drawer-select:hover, .gl-drawer-select:focus {
+  border-color: rgba(255, 255, 255, 0.12);
+  outline: none;
+}
+.gl-drawer-pills {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.gl-drawer-pill {
+  padding: 10px 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-main);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.gl-drawer-pill:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.gl-drawer-pill.gl-drawer-pill-active {
+  color: var(--safe);
+  border-color: rgba(29, 158, 117, 0.35);
+  background: var(--safe-bg);
+}
+.gl-drawer-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+  color: var(--text-ghost);
+  text-align: center;
+}
+
 /* Pause/Resume button */
 .gl-header-pause {
   display: inline-flex;

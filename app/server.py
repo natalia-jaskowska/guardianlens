@@ -160,6 +160,49 @@ def create_app(config: GuardLensConfig) -> FastAPI:
         state.worker.resume()
         return JSONResponse({"status": "running"})
 
+    @app.get("/api/models")
+    async def api_models() -> JSONResponse:
+        """List Ollama models available on the local server."""
+        try:
+            import httpx
+            r = httpx.get(f"{config.ollama.host}/api/tags", timeout=2.0)
+            r.raise_for_status()
+            data = r.json()
+            names = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+            return JSONResponse({
+                "models": sorted(names),
+                "current": config.ollama.inference_model,
+            })
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Failed to list Ollama models: %s", exc)
+            return JSONResponse({"models": [config.ollama.inference_model], "current": config.ollama.inference_model})
+
+    @app.post("/api/config/model")
+    async def api_set_model(request: Request) -> JSONResponse:
+        """Switch the analyzer to a different Ollama model at runtime."""
+        body = await request.json()
+        new_model = (body or {}).get("model", "").strip()
+        if not new_model:
+            return JSONResponse({"error": "model required"}, status_code=400)
+        config.ollama.inference_model = new_model
+        state.analyzer.config.inference_model = new_model
+        logger.info("Model switched to %s", new_model)
+        return JSONResponse({"status": "ok", "model": new_model})
+
+    @app.post("/api/config/interval")
+    async def api_set_interval(request: Request) -> JSONResponse:
+        """Change the capture interval at runtime."""
+        body = await request.json()
+        try:
+            seconds = float((body or {}).get("seconds", 0))
+        except (TypeError, ValueError):
+            return JSONResponse({"error": "invalid seconds"}, status_code=400)
+        if seconds < 5 or seconds > 3600:
+            return JSONResponse({"error": "seconds must be between 5 and 3600"}, status_code=400)
+        config.monitor.capture_interval_seconds = seconds
+        logger.info("Capture interval changed to %.0fs", seconds)
+        return JSONResponse({"status": "ok", "seconds": seconds})
+
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}

@@ -819,6 +819,69 @@
         render(window.__lastState || {});
       }
     });
+    // ---------------- Settings drawer ----------------
+    const gearBtn = document.getElementById("header-gear");
+    const drawer = document.getElementById("settings-drawer");
+    const drawerBackdrop = document.getElementById("drawer-backdrop");
+    const drawerClose = document.getElementById("drawer-close");
+    const modelPicker = document.getElementById("model-picker");
+    const intervalPills = document.getElementById("interval-pills");
+
+    async function openDrawer() {
+      drawer.classList.add("gl-drawer-open");
+      drawerBackdrop.classList.add("gl-drawer-open");
+      // Fetch available models
+      try {
+        const r = await fetch("/api/models");
+        if (r.ok) {
+          const data = await r.json();
+          const current = data.current || "";
+          modelPicker.innerHTML = (data.models || []).map(m =>
+            `<option value="${m}"${m === current ? " selected" : ""}>${m}</option>`
+          ).join("");
+        }
+      } catch(_) {}
+    }
+    function closeDrawer() {
+      drawer.classList.remove("gl-drawer-open");
+      drawerBackdrop.classList.remove("gl-drawer-open");
+    }
+    if (gearBtn) gearBtn.addEventListener("click", openDrawer);
+    if (drawerClose) drawerClose.addEventListener("click", closeDrawer);
+    if (drawerBackdrop) drawerBackdrop.addEventListener("click", closeDrawer);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && drawer && drawer.classList.contains("gl-drawer-open")) closeDrawer();
+    });
+    if (modelPicker) {
+      modelPicker.addEventListener("change", async () => {
+        const model = modelPicker.value;
+        try {
+          await fetch("/api/config/model", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({model}),
+          });
+        } catch(_) {}
+      });
+    }
+    if (intervalPills) {
+      intervalPills.addEventListener("click", async (e) => {
+        const btn = e.target.closest(".gl-drawer-pill");
+        if (!btn) return;
+        const seconds = parseFloat(btn.getAttribute("data-seconds"));
+        if (!seconds) return;
+        intervalPills.querySelectorAll(".gl-drawer-pill").forEach(b => b.classList.remove("gl-drawer-pill-active"));
+        btn.classList.add("gl-drawer-pill-active");
+        try {
+          await fetch("/api/config/interval", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({seconds}),
+          });
+        } catch(_) {}
+      });
+    }
+
     const node = document.getElementById("initial-state");
     if (node) try { render(JSON.parse(node.textContent)); } catch(_) {}
     connectStream();
