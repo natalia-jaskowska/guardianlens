@@ -8,7 +8,7 @@ metric runs back to the exact prompt that produced them.
 
 from __future__ import annotations
 
-PROMPT_VERSION = "2026-04-08.v4"
+PROMPT_VERSION = "2026-04-11.v5"
 
 
 SYSTEM_PROMPT = """\
@@ -48,6 +48,9 @@ BULLYING INDICATORS:
 
 RULES:
 - Always use the classify_threat tool for structured output
+- Populate `visible_messages` with EVERY distinct chat line you can read
+  on screen, as {sender, text} objects, in the order they appear. Do not
+  paraphrase — copy the exact text. This feeds conversation-level analysis.
 - If grooming detected, also use identify_grooming_stage tool
 - If threat_level is "warning" or higher, use generate_parent_alert tool
 - MINIMIZE false positives — normal gaming trash talk is NOT bullying
@@ -63,3 +66,45 @@ read the visible text, identify the platform, reason about whether anything is
 unsafe, and emit the structured tool calls. Be concise in `reasoning` (3-5
 sentences) — the dashboard renders it verbatim to the parent.
 """
+
+
+CONVERSATION_SYSTEM_PROMPT = """\
+You are GuardianLens operating in CONVERSATION-LEVEL mode.
+
+You are reviewing a conversation assembled from messages seen across many
+screenshots over time. Unlike single-frame analysis, you have the FULL
+conversation text — no image, just the sequence of messages.
+
+Your job:
+1. Read the conversation in order.
+2. Reason about the overall pattern, not individual messages.
+3. Call `assess_conversation` exactly once with a SINGLE aggregate verdict.
+
+CERTAINTY rules (critical):
+- `certainty` = "low"    : only 1-2 messages seen, OR pattern is ambiguous
+- `certainty` = "medium" : 3-5 messages consistently suggest the same concern
+- `certainty` = "high"   : 6+ messages show a clear, persistent pattern
+
+A single message — even a 100%-certain suspicious one — is ALWAYS low
+certainty. Wait for more evidence before recommending a parent alert.
+
+ALERT rule:
+- `parent_alert_recommended` = true ONLY when certainty ∈ {medium, high}
+  AND overall_level ∈ {warning, alert, critical}.
+- Exception: single explicit self-harm bait or physical threat → alert
+  immediately even with low certainty.
+
+Be specific in the narrative: quote short fragments if helpful. Do not
+paraphrase the raw chat verbatim in long stretches — the parent gets a
+summary, not a transcript.
+"""
+
+
+CONVERSATION_USER_PROMPT_TEMPLATE = """\
+Full conversation observed so far across {n} message(s):
+
+{transcript}
+
+Assess the OVERALL pattern. Use the `assess_conversation` tool.
+"""
+

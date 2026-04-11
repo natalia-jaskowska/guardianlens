@@ -55,6 +55,26 @@ class AlertUrgency(str, Enum):
     IMMEDIATE = "immediate"
 
 
+class ChatMessage(BaseModel):
+    """One message inside the captured conversation.
+
+    Used by:
+
+    - The dashboard's "fake browser" capture view, which renders the
+      conversation as platform-styled chat bubbles. Each message can be
+      tagged with a ``flag`` (e.g. "age inquiry", "isolation") so the
+      front-end can outline it in red and show the indicator label.
+    - The conversation-level analyzer, which accumulates messages across
+      frames (via :class:`guardlens.conversation_store.ConversationStore`)
+      and re-analyzes the full chat log to catch patterns that any single
+      frame misses.
+    """
+
+    sender: str
+    text: str
+    flag: str | None = None
+
+
 class ThreatClassification(BaseModel):
     """Output of the ``classify_threat`` tool call."""
 
@@ -66,6 +86,13 @@ class ThreatClassification(BaseModel):
     platform_detected: str | None = Field(
         None,
         description="The app/platform visible on screen, as identified by the model.",
+    )
+    visible_messages: list[ChatMessage] = Field(
+        default_factory=list,
+        description=(
+            "Every distinct chat message visible on screen, extracted by the "
+            "vision model. Feeds the conversation-level analyzer."
+        ),
     )
 
 
@@ -90,18 +117,38 @@ class ParentAlert(BaseModel):
     urgency: AlertUrgency
 
 
-class ChatMessage(BaseModel):
-    """One message inside the captured conversation.
+class SessionCertainty(str, Enum):
+    """How much evidence the conversation-level verdict is based on.
 
-    Used by the dashboard's "fake browser" capture view, which renders
-    the conversation as platform-styled chat bubbles. Each message can
-    be tagged with a ``flag`` (e.g. "age inquiry", "isolation") so the
-    front-end can outline it in red and show the indicator label.
+    Distinct from per-verdict ``confidence``: a single frame can be 100%
+    confidently classified but still have LOW session certainty because
+    one frame is not enough evidence for a conversation-level decision.
     """
 
-    sender: str
-    text: str
-    flag: str | None = None
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+
+
+class SessionVerdict(BaseModel):
+    """Output of a conversation-level safety analysis.
+
+    Produced by :class:`guardlens.conversation_analyzer.ConversationAnalyzer`
+    from the accumulated set of visible chat messages across frames.
+    """
+
+    overall_level: ThreatLevel
+    overall_category: ThreatCategory
+    confidence: float = Field(..., ge=0.0, le=100.0)
+    certainty: SessionCertainty
+    narrative: str = Field(
+        ...,
+        description="Short plain-English summary of the pattern observed across messages.",
+    )
+    key_indicators: list[str] = Field(default_factory=list)
+    messages_analyzed: int = 0
+    parent_alert_recommended: bool = False
+    timestamp: datetime = Field(default_factory=datetime.now)
 
 
 class ScreenAnalysis(BaseModel):

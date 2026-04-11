@@ -33,13 +33,21 @@ from app.serializers import (
 from guardlens.alerts import AlertSender
 from guardlens.analyzer import GuardLensAnalyzer
 from guardlens.config import GuardLensConfig
+from guardlens.conversation_analyzer import ConversationAnalyzer
+from guardlens.conversation_store import ConversationStore
 from guardlens.database import GuardLensDatabase
 from guardlens.demo import build_chat_messages
 from guardlens.monitor import capture_loop
-from guardlens.schema import ChatMessage, ScreenAnalysis
+from guardlens.schema import ChatMessage, ScreenAnalysis, SessionVerdict
 from guardlens.session_tracker import SessionTracker
 
 logger = logging.getLogger(__name__)
+
+
+# MVP threshold: re-run the conversation analyzer every N new unique
+# messages accumulated in the store. Low = responsive but noisy; high =
+# rare but stable. 3 is a reasonable starting point for demo pacing.
+CONVERSATION_ANALYSIS_EVERY_N_NEW_MESSAGES = 3
 
 
 class MonitorWorker:
@@ -56,12 +64,16 @@ class MonitorWorker:
         session: SessionTracker,
         alerts: AlertSender,
         database: GuardLensDatabase,
+        conversation_store: ConversationStore,
+        conversation_analyzer: ConversationAnalyzer,
     ) -> None:
         self._config = config
         self._analyzer = analyzer
         self._session = session
         self._alerts = alerts
         self._database = database
+        self._conversation_store = conversation_store
+        self._conversation_analyzer = conversation_analyzer
         self._queue: queue.Queue[ScreenAnalysis] = queue.Queue()
         self._stop_event = threading.Event()
         self._pause_event = threading.Event()
@@ -71,6 +83,7 @@ class MonitorWorker:
         self._paused_total: float = 0.0
         self._latest: ScreenAnalysis | None = None
         self._latest_alert: ScreenAnalysis | None = None
+        self._latest_session_verdict: SessionVerdict | None = None
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ lifecycle
@@ -142,6 +155,9 @@ class MonitorWorker:
         3. Dispatch an alert if it meets the urgency threshold; record the
            outcome in the alerts table.
         4. Cache the most recent for the SSE stream.
+        5. Feed visible_messages into the ConversationStore and,
+           if enough new messages have accumulated, trigger a text-only
+           conversation-level re-analysis.
         """
         drained: list[ScreenAnalysis] = []
         while True:
@@ -166,10 +182,54 @@ class MonitorWorker:
             if analysis.classification.threat_level.value in {"alert", "critical"}:
                 with self._lock:
                     self._latest_alert = analysis
+
+            # Feed the conversation store from whichever source has messages.
+            # Demo mode (synthetic scenarios) pre-populates
+            # ``analysis.chat_messages`` from the known scenario script.
+            # Real vision mode fills ``classification.visible_messages`` via
+            # the model's OCR. Prefer classification.visible_messages because
+            # that's what the real pipeline will produce; fall back to
+            # chat_messages so demo mode keeps working.
+            extracted = (
+                analysis.classification.visible_messages
+                or analysis.chat_messages
+                or []
+            )
+            logger.info(
+                "Frame messages: %d extracted (source=%s, frame=%s)",
+                len(extracted),
+                "visible_messages" if analysis.classification.visible_messages else (
+                    "chat_messages" if analysis.chat_messages else "none"
+                ),
+                analysis.screenshot_path.name,
+            )
+            if extracted:
+                new = self._conversation_store.add(extracted)
+                # Trigger conversation-level analysis when enough has changed.
+                threshold = CONVERSATION_ANALYSIS_EVERY_N_NEW_MESSAGES
+                if self._conversation_store.unacknowledged_new >= threshold:
+                    self._run_conversation_analysis()
+
         if latest is not None:
             with self._lock:
                 self._latest = latest
         return latest
+
+    def _run_conversation_analysis(self) -> None:
+        """Call the text-only analyzer and cache the resulting verdict."""
+        conversation = self._conversation_store.all_messages
+        logger.info(
+            "Triggering conversation analyzer over %d messages "
+            "(threshold=%d, unacknowledged=%d)",
+            len(conversation),
+            CONVERSATION_ANALYSIS_EVERY_N_NEW_MESSAGES,
+            self._conversation_store.unacknowledged_new,
+        )
+        verdict = self._conversation_analyzer.analyze(conversation)
+        if verdict is not None:
+            with self._lock:
+                self._latest_session_verdict = verdict
+        self._conversation_store.acknowledge()
 
     @property
     def latest(self) -> ScreenAnalysis | None:
@@ -180,6 +240,11 @@ class MonitorWorker:
     def latest_alert(self) -> ScreenAnalysis | None:
         with self._lock:
             return self._latest_alert
+
+    @property
+    def latest_session_verdict(self) -> SessionVerdict | None:
+        with self._lock:
+            return self._latest_session_verdict
 
     def bootstrap_latest_alert(self, analysis: ScreenAnalysis | None) -> None:
         """Pre-populate ``_latest_alert`` from a previous DB session.
@@ -251,6 +316,23 @@ _DEMO_SECTION_LABELS: dict[str, str] = {
 }
 
 
+def _serialize_session_verdict(verdict: SessionVerdict | None) -> dict[str, Any] | None:
+    """JSON-friendly dump of a :class:`SessionVerdict` for the API."""
+    if verdict is None:
+        return None
+    return {
+        "overall_level": verdict.overall_level.value,
+        "overall_category": verdict.overall_category.value,
+        "confidence": verdict.confidence,
+        "certainty": verdict.certainty.value,
+        "narrative": verdict.narrative,
+        "key_indicators": list(verdict.key_indicators),
+        "messages_analyzed": verdict.messages_analyzed,
+        "parent_alert_recommended": verdict.parent_alert_recommended,
+        "timestamp": verdict.timestamp.isoformat(timespec="seconds"),
+    }
+
+
 def _parse_demo_filename(filename: str) -> tuple[str, str] | None:
     """Parse ``demo_<platform>_<scenario>_<timestamp>.png`` into (platform, scenario).
 
@@ -280,12 +362,16 @@ class AppState:
         self.session = SessionTracker(config.session)
         self.alerts = AlertSender(config.alerts)
         self.database = GuardLensDatabase(config.database.path)
+        self.conversation_store = ConversationStore()
+        self.conversation_analyzer = ConversationAnalyzer(config.ollama)
         self.worker = MonitorWorker(
             config=config,
             analyzer=self.analyzer,
             session=self.session,
             alerts=self.alerts,
             database=self.database,
+            conversation_store=self.conversation_store,
+            conversation_analyzer=self.conversation_analyzer,
         )
 
     # ------------------------------------------------------------------ lifecycle helpers
@@ -381,4 +467,8 @@ class AppState:
             "latest_alert": latest_alert_payload,
             "is_alert": latest is not None and latest.classification.threat_level.value
             in {"alert", "critical"},
+            "session_verdict": _serialize_session_verdict(
+                self.worker.latest_session_verdict
+            ),
+            "conversation_size": self.conversation_store.size,
         }
