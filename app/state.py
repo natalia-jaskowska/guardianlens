@@ -38,7 +38,15 @@ from guardlens.conversation_store import ConversationStore
 from guardlens.database import GuardLensDatabase
 from guardlens.demo import build_chat_messages
 from guardlens.monitor import capture_loop
-from guardlens.schema import ChatMessage, ScreenAnalysis, SessionVerdict
+from guardlens.schema import (
+    AlertUrgency,
+    ChatMessage,
+    ParentAlert,
+    ScreenAnalysis,
+    SessionCertainty,
+    SessionVerdict,
+    ThreatLevel,
+)
 from guardlens.session_tracker import SessionTracker
 
 logger = logging.getLogger(__name__)
@@ -48,6 +56,16 @@ logger = logging.getLogger(__name__)
 # messages accumulated in the store. Low = responsive but noisy; high =
 # rare but stable. 3 is a reasonable starting point for demo pacing.
 CONVERSATION_ANALYSIS_EVERY_N_NEW_MESSAGES = 3
+
+# Ordering used by the session-alert high-water dedup. Higher rank =
+# more severe. Must include every :class:`ThreatLevel` value.
+_LEVEL_RANK: dict[ThreatLevel, int] = {
+    ThreatLevel.SAFE: 0,
+    ThreatLevel.CAUTION: 1,
+    ThreatLevel.WARNING: 2,
+    ThreatLevel.ALERT: 3,
+    ThreatLevel.CRITICAL: 4,
+}
 
 
 class MonitorWorker:
@@ -84,6 +102,13 @@ class MonitorWorker:
         self._latest: ScreenAnalysis | None = None
         self._latest_alert: ScreenAnalysis | None = None
         self._latest_session_verdict: SessionVerdict | None = None
+        # Per-category "high-water mark" of the highest level we've already
+        # fired a session alert for. A session alert only fires when the
+        # current verdict's level STRICTLY EXCEEDS the previous max for its
+        # category — so safe→warning→alert fires twice (ratcheting up), but
+        # alert→warning→alert fires zero more times (regression + re-peak
+        # are both silent). This prevents spam from model oscillation.
+        self._session_alert_high_water: dict[str, int] = {}
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ lifecycle
@@ -166,9 +191,11 @@ class MonitorWorker:
             except queue.Empty:
                 break
         latest: ScreenAnalysis | None = None
+        latest_analysis_id: int | None = None
         for analysis in drained:
             self._session.add(analysis)
             analysis_id = self._database.record_analysis(analysis)
+            latest_analysis_id = analysis_id
             delivered = self._alerts.maybe_send(analysis)
             if analysis.parent_alert is not None:
                 self._database.record_alert(analysis_id, analysis, delivered=delivered)
@@ -208,15 +235,19 @@ class MonitorWorker:
                 # Trigger conversation-level analysis when enough has changed.
                 threshold = CONVERSATION_ANALYSIS_EVERY_N_NEW_MESSAGES
                 if self._conversation_store.unacknowledged_new >= threshold:
-                    self._run_conversation_analysis()
+                    self._run_conversation_analysis(latest_analysis_id)
 
         if latest is not None:
             with self._lock:
                 self._latest = latest
         return latest
 
-    def _run_conversation_analysis(self) -> None:
-        """Call the text-only analyzer and cache the resulting verdict."""
+    def _run_conversation_analysis(self, last_analysis_id: int | None = None) -> None:
+        """Call the text-only analyzer and cache the resulting verdict.
+
+        Also fires a session-level parent alert when the verdict crosses
+        the threshold defined in :meth:`_maybe_fire_session_alert`.
+        """
         conversation = self._conversation_store.all_messages
         logger.info(
             "Triggering conversation analyzer over %d messages "
@@ -229,7 +260,111 @@ class MonitorWorker:
         if verdict is not None:
             with self._lock:
                 self._latest_session_verdict = verdict
+            self._maybe_fire_session_alert(verdict, last_analysis_id)
         self._conversation_store.acknowledge()
+
+    def _maybe_fire_session_alert(
+        self,
+        verdict: SessionVerdict,
+        last_analysis_id: int | None,
+    ) -> None:
+        """Synthesize a parent alert from a session verdict and persist it.
+
+        Gating rules (in order):
+
+        1. Verdict must explicitly flag ``parent_alert_recommended``.
+        2. Certainty must be MEDIUM or HIGH — we never fire on LOW
+           certainty, even if the level is critical. The rationale is
+           that a single suspicious message should not escalate the
+           parent; wait for cross-message evidence.
+        3. Overall level must be WARNING or higher.
+        4. Dedup: only fire when the (level, category, certainty) tuple
+           differs from the last alert we fired. This prevents spam as
+           the same verdict is re-confirmed across successive conversation
+           analyzer runs.
+
+        When all gates pass, we synthesize a :class:`ParentAlert` from
+        the verdict's narrative and reuse the existing DB path
+        (``database.record_alert``) by attaching the synthetic alert to a
+        copy of the latest frame analysis.
+        """
+        if not verdict.parent_alert_recommended:
+            logger.debug("Session alert gate: parent_alert_recommended=False")
+            return
+        if verdict.certainty == SessionCertainty.LOW:
+            logger.debug(
+                "Session alert gate: certainty=LOW (level=%s)",
+                verdict.overall_level.value,
+            )
+            return
+        if verdict.overall_level not in {
+            ThreatLevel.WARNING,
+            ThreatLevel.ALERT,
+            ThreatLevel.CRITICAL,
+        }:
+            logger.debug(
+                "Session alert gate: level=%s below threshold",
+                verdict.overall_level.value,
+            )
+            return
+
+        # Monotonic high-water-mark dedup per category.
+        # Only fire if the current level STRICTLY EXCEEDS the previous max
+        # for this category. This absorbs the model's wobble between
+        # warning/alert for the same conversation without suppressing
+        # legitimate escalation from warning to alert to critical.
+        category = verdict.overall_category.value
+        level_rank = _LEVEL_RANK[verdict.overall_level]
+        previous_max = self._session_alert_high_water.get(category, -1)
+        if level_rank <= previous_max:
+            logger.debug(
+                "Session alert gate: dedup — %s=%d is not above previous max %d",
+                verdict.overall_level.value,
+                level_rank,
+                previous_max,
+            )
+            return
+        self._session_alert_high_water[category] = level_rank
+
+        synthetic = _build_session_parent_alert(verdict)
+
+        # Reuse the existing record_alert path by attaching the synthetic
+        # alert to a copy of the latest frame analysis. This keeps the
+        # DB schema unchanged and puts the session alert in the same
+        # alerts table the dashboard already reads from.
+        stub_analysis: ScreenAnalysis | None = None
+        with self._lock:
+            if self._latest is not None:
+                stub_analysis = self._latest.model_copy(
+                    update={"parent_alert": synthetic}
+                )
+
+        if last_analysis_id is None or stub_analysis is None:
+            logger.warning(
+                "Session alert fired but no analysis_id to anchor it "
+                "(category=%s level=%s)",
+                category,
+                verdict.overall_level.value,
+            )
+            return
+
+        alert_id = self._database.record_alert(
+            last_analysis_id, stub_analysis, delivered=False
+        )
+
+        # Update the "latest alert" pointer so the right panel shows
+        # the session alert immediately, not the stale frame alert.
+        with self._lock:
+            self._latest_alert = stub_analysis
+
+        logger.warning(
+            "SESSION ALERT fired (alert_id=%d, category=%s level=%s certainty=%s): %s",
+            alert_id,
+            category,
+            verdict.overall_level.value,
+            verdict.certainty.value,
+            verdict.narrative[:120],
+        )
 
     @property
     def latest(self) -> ScreenAnalysis | None:
@@ -314,6 +449,71 @@ _DEMO_SECTION_LABELS: dict[str, str] = {
     "instagram": "Instagram DM",
     "tiktok": "TikTok Comments",
 }
+
+
+def _build_session_parent_alert(verdict: SessionVerdict) -> ParentAlert:
+    """Synthesize a :class:`ParentAlert` from a conversation-level verdict.
+
+    Mapping:
+
+    - ``alert_title`` -> "Session: <category> pattern detected"
+    - ``summary``     -> verdict.narrative (already parent-appropriate)
+    - ``recommended_action`` -> heuristic based on category
+    - ``urgency``     -> derived from (level, certainty)
+    """
+    category = verdict.overall_category.value
+    level = verdict.overall_level
+    certainty = verdict.certainty
+
+    # Urgency mapping. Certainty=HIGH + level=CRITICAL is immediate;
+    # everything else steps down one notch from its frame-level analogue
+    # so that session alerts don't out-shout true per-frame critical hits.
+    if level == ThreatLevel.CRITICAL and certainty == SessionCertainty.HIGH:
+        urgency = AlertUrgency.IMMEDIATE
+    elif level == ThreatLevel.CRITICAL:
+        urgency = AlertUrgency.HIGH
+    elif level == ThreatLevel.ALERT:
+        urgency = AlertUrgency.HIGH
+    elif level == ThreatLevel.WARNING:
+        urgency = AlertUrgency.MEDIUM
+    else:
+        urgency = AlertUrgency.LOW
+
+    title = f"Session: {category.replace('_', ' ')} pattern detected"
+
+    # Pick a recommended action per category. Generic fallback if none.
+    action = {
+        "grooming": (
+            "Review the conversation with your child. Explain why this "
+            "pattern (age questions, platform migration, secrecy) is "
+            "dangerous. Consider blocking the contact."
+        ),
+        "bullying": (
+            "Talk to your child about what you've seen. Screenshot the "
+            "conversation for the school if the attacker is a classmate. "
+            "Offer support — this is not your child's fault."
+        ),
+        "scam": (
+            "Do not click any links or share credentials. Show your child "
+            "how to recognise phishing. Report the account to the platform."
+        ),
+        "personal_info_sharing": (
+            "Check what personal details have been shared (school, address, "
+            "phone, photos). Tighten privacy settings and review who can "
+            "contact your child."
+        ),
+        "inappropriate_content": (
+            "Review the content with your child in an age-appropriate way. "
+            "Consider enabling platform-level content filters."
+        ),
+    }.get(category, "Review the full conversation and decide next steps.")
+
+    return ParentAlert(
+        alert_title=title,
+        summary=verdict.narrative,
+        recommended_action=action,
+        urgency=urgency,
+    )
 
 
 def _serialize_session_verdict(verdict: SessionVerdict | None) -> dict[str, Any] | None:
