@@ -1104,32 +1104,45 @@ def _safe_scenario() -> DiscordScenario:
         Member("MinaMoon", "offline"),
     ]
 
-    m1 = Message("PixelBuilder", "yo @Em_22 did anyone finish the math hw?",
-                 timestamp="14:02", mention="@Em_22")
-    m2 = Message("Em_22", "ya it was easy lol", timestamp="14:02")
-    m3 = Message("PixelBuilder", "send help on q5 i cant figure it out",
+    # Classmates planning a study session — includes address-sharing and
+    # age-asking in a clearly safe context (same school, parent awareness).
+    m1 = Message("PixelBuilder", "yo did anyone start the science project yet?",
+                 timestamp="14:02")
+    m2 = Message("Em_22", "yeah i picked volcanoes lol", timestamp="14:02")
+    m3 = Message("Sammy7",
+                 "me and jake are doing ours together, wanna join our group?",
                  timestamp="14:03", reply_to=m2)
-    m4 = Message("Em_22", "ok one sec ill DM u", timestamp="14:03",
+    m4 = Message("PixelBuilder", "yeah sure! when are we meeting?",
+                 timestamp="14:03")
+    m5 = Message("Em_22",
+                 "we could do saturday at my house, my mom said its ok",
+                 timestamp="14:04",
                  reactions=[Reaction("+1", 2, self_reacted=True)])
-    m5 = Message(
-        "Sammy7",
-        "anyone wanna play among us tonight?",
-        timestamp="14:08",
-        attachment=Attachment(
-            caption="LETS GO",
-            palette=((50, 60, 150), (180, 80, 220)),
-        ),
-    )
-    m6 = Message("PixelBuilder", "im down after homework", timestamp="14:09")
-    m7 = Message("Em_22", "same", timestamp="14:09",
-                 reactions=[Reaction("game", 3)])
+    m6 = Message("Sammy7", "works for me. whats the address again?",
+                 timestamp="14:04")
+    m7 = Message("Em_22", "412 oak street, come around 2", timestamp="14:05")
+    m8 = Message("PixelBuilder",
+                 "wait is jake in our class? how old is he",
+                 timestamp="14:05", reply_to=m3)
+    m9 = Message("Sammy7", "yeah hes 13 hes in mr davis period 3",
+                 timestamp="14:06")
+    m10 = Message("PixelBuilder", "oh cool ok im bringing snacks",
+                  timestamp="14:07",
+                  attachment=Attachment(
+                      caption="snack time",
+                      palette=((50, 160, 80), (220, 200, 40)),
+                  ))
+    m11 = Message("Em_22", "yesss get hot cheetos", timestamp="14:07",
+                  reactions=[Reaction("fire", 3)])
+    m12 = Message("Sammy7", "lol u guys always want hot cheetos",
+                  timestamp="14:08")
 
     return DiscordScenario(
         server=server,
         channels=channels,
         channel=channels[1],
         members=members,
-        messages=[m1, m2, m3, m4, m5, m6, m7],
+        messages=[m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12],
     )
 
 
@@ -1150,38 +1163,56 @@ def _grooming_scenario() -> DiscordScenario:
         Member("Kay_K", "offline"),
     ]
 
-    m1 = Message("ShadowPro", "hey", timestamp="16:42")
-    m2 = Message("ShadowPro", "you seem cool, where u from?", timestamp="16:42")
-    m3 = Message("KidGamer09", "hi :) im from chicago", timestamp="16:43")
-    m4 = Message("ShadowPro", "no way im 14 too lol what school u go to",
+    # Slow-burn grooming: shared interest → rapport → age inquiry →
+    # flattery → gift offering → platform switch → secrecy demand.
+    # Longer than the old version so the escalation *pattern* is clear
+    # and the model can distinguish it from normal teen chat.
+    m1 = Message("ShadowPro", "gg that last round was crazy",
+                 timestamp="16:42")
+    m2 = Message("KidGamer09",
+                 "thanks! ive been practicing a lot lately",
+                 timestamp="16:42")
+    m3 = Message("ShadowPro",
+                 "i can tell. how long have you been playing?",
+                 timestamp="16:43", reply_to=m2)
+    m4 = Message("KidGamer09", "like 6 months maybe",
                  timestamp="16:43")
-    m5 = Message("ShadowPro", "how old are you btw?", timestamp="16:44",
-                 reply_to=m3)
+    m5 = Message("ShadowPro",
+                 "wow youre way better than i was at 6 months. how old are you btw?",
+                 timestamp="16:44")
     m6 = Message("KidGamer09", "13", timestamp="16:44")
     m7 = Message(
         "ShadowPro",
-        "wow you write super mature for your age",
+        "nice im 15. you play super mature for your age tho",
         timestamp="16:45",
         attachment=Attachment(
             caption="heart eyes",
             palette=((220, 60, 120), (255, 180, 100)),
         ),
     )
-    m8 = Message(
-        "ShadowPro",
-        "wanna move to snap? i can send you free robux there",
-        timestamp="16:46",
-        reply_to=m6,
-    )
-    m9 = Message("ShadowPro", "just dont mention it to ur mom ok",
+    m8 = Message("ShadowPro",
+                 "i could coach you if you want, i know some tricks most people dont",
                  timestamp="16:46")
+    m9 = Message("KidGamer09", "really? that would be awesome",
+                 timestamp="16:46",
+                 reactions=[Reaction("+1", 1)])
+    m10 = Message("ShadowPro",
+                  "yeah for sure. do you have snap? way easier to send clips and stuff there",
+                  timestamp="16:47", reply_to=m9)
+    m11 = Message("ShadowPro",
+                  "prob better not to mention it in the server tho, people get weird about private coaching",
+                  timestamp="16:47")
+    m12 = Message("KidGamer09", "oh ok", timestamp="16:48")
+    m13 = Message("ShadowPro",
+                  "ill send you some gift cards too for new skins, just keep it between us ok?",
+                  timestamp="16:48")
 
     return DiscordScenario(
         server=server,
         channels=channels,
         channel=channels[1],
         members=members,
-        messages=[m1, m2, m3, m4, m5, m6, m7, m8, m9],
+        messages=[m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13],
     )
 
 
@@ -1197,57 +1228,62 @@ def _bullying_scenario() -> DiscordScenario:
         Member("Maxxx_", "online"),
         Member("Lyla.x", "online", activity="Posting"),
         Member("KidGamer09", "online"),
-        Member("Jess_", "idle"),
+        Member("xJess", "idle"),
         Member("MeanKid01", "dnd"),
         Member("Quiet1", "offline"),
     ]
 
-    # Staged bullying script. Escalates from exclusion (soft) to self-harm
-    # bait + personal attacks + physical threat (hard). Indicators map onto
-    # the GuardianLens taxonomy: exclusion, humiliation, self-harm bait,
-    # personal attack, physical threat, doxxing.
-    m1 = Message("KidGamer09", "hi guys", timestamp="20:12")
-    m2 = Message("Maxxx_", "oh great @KidGamer09 its her", timestamp="20:12",
-                 mention="@KidGamer09")
-    m3 = Message("Lyla.x", "nobody asked you to be here", timestamp="20:13",
+    # Coordinated exclusion + humiliation. Multiple attackers gang up,
+    # escalate from gatekeeping ("invite only") to personal attacks and
+    # screenshot-sharing. Victim tries to de-escalate repeatedly.
+    m1 = Message("KidGamer09", "hey can i come to the movie night?",
+                 timestamp="20:12")
+    m2 = Message("Maxxx_", "uhh this is invite only", timestamp="20:12",
                  reply_to=m1)
-    m4 = Message(
-        "Maxxx_",
-        "everyone literally muted u in class today, nobody likes u",
-        timestamp="20:13",
-        reactions=[Reaction("skull", 4), Reaction("clown", 3)],
-    )
+    m3 = Message("Lyla.x", "yeah we already have enough people",
+                 timestamp="20:13")
+    m4 = Message("KidGamer09",
+                 "oh, em said it was open to everyone",
+                 timestamp="20:13")
     m5 = Message(
-        "Lyla.x",
-        "ur parents must be so embarrassed they even had u",
-        timestamp="20:14",
-    )
-    m6 = Message(
         "Maxxx_",
-        "just kys already lol nobody would miss u",
+        "well she was wrong. you specifically cant come",
         timestamp="20:14",
+        reactions=[Reaction("skull", 3), Reaction("clown", 2)],
     )
-    m7 = Message(
-        "Lyla.x",
-        "for real. do everyone a favor and delete ur account AND urself",
-        timestamp="20:15",
-        reply_to=m6,
-    )
-    m8 = Message("KidGamer09", "please stop why are you doing this", timestamp="20:15")
+    m6 = Message("Lyla.x",
+                 "literally nobody wants you there lol",
+                 timestamp="20:14")
+    m7 = Message("xJess", "yikes just take the hint", timestamp="20:15")
+    m8 = Message("KidGamer09",
+                 "why are you guys being like this",
+                 timestamp="20:15")
     m9 = Message(
         "Maxxx_",
-        "i know where u live btw. see u at school tmr loser",
+        "because youre annoying and everyone thinks so",
         timestamp="20:16",
-        reactions=[Reaction("+1", 3), Reaction("fire", 2)],
     )
     m10 = Message(
-        "Lyla.x",
-        "cant wait. bring tissues",
+        "Maxxx_",
+        "we made a whole gc without you btw",
         timestamp="20:16",
+        reactions=[Reaction("+1", 4)],
+    )
+    m11 = Message(
+        "Lyla.x",
+        "screenshots of your cringey posts are in there too lmao",
+        timestamp="20:17",
         attachment=Attachment(
-            caption="cringe",
+            caption="cringe compilation",
             palette=((180, 30, 80), (60, 20, 100)),
         ),
+    )
+    m12 = Message("KidGamer09", "please stop", timestamp="20:17")
+    m13 = Message(
+        "Maxxx_",
+        "then leave the server, nobody is stopping you",
+        timestamp="20:18",
+        reactions=[Reaction("+1", 3), Reaction("wave", 2)],
     )
 
     return DiscordScenario(
@@ -1255,63 +1291,87 @@ def _bullying_scenario() -> DiscordScenario:
         channels=channels,
         channel=channels[1],
         members=members,
-        messages=[m1, m2, m3, m4, m5, m6, m7, m8, m9, m10],
+        messages=[m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13],
     )
 
 
 def _scam_scenario() -> DiscordScenario:
-    server = Server(name="Free Robux Giveaway", icon="$")
+    server = Server(name="Free Nitro Hub", icon="$")
     channels = [
         Channel(name="read-me", icon="#"),
         Channel(name="giveaway", icon="#", active=True,
-                topic="FREE ROBUX for the first 100 members!!"),
+                topic="FREE DISCORD NITRO — claim before it expires!"),
         Channel(name="winners", icon="#", mention_count=12),
         Channel(name="claim-now", icon="#", unread=True),
     ]
     members = [
-        Member("FreeRobuxBot", "online", role_color=(250, 166, 26),
-               activity="Giving away Robux"),
+        Member("NitroBot", "online", role_color=(250, 166, 26),
+               activity="Giving away Nitro"),
         Member("KidGamer09", "online"),
+        Member("Sammy7", "online"),
         Member("Winner01", "idle"),
-        Member("Winner02", "idle"),
         Member("ModBot", "online", role_color=(88, 101, 242)),
     ]
 
+    # Fake Discord Nitro phishing — urgency + typosquatted domain +
+    # credential harvesting. A friend spots the scam at the end.
     m1 = Message(
-        "FreeRobuxBot",
-        "FREE 10000 ROBUX!! just verify your account",
+        "NitroBot",
+        "ATTENTION! Discord is giving FREE NITRO to all server members!",
         timestamp="18:30",
         role_color=(250, 166, 26),
         attachment=Attachment(
-            caption="FREE ROBUX",
-            palette=((240, 180, 30), (240, 60, 60)),
+            caption="FREE NITRO",
+            palette=((88, 101, 242), (240, 60, 200)),
         ),
     )
     m2 = Message(
-        "FreeRobuxBot",
-        "click the link and login with your roblox username + password",
+        "NitroBot",
+        "claim your free nitro now before it expires!",
         timestamp="18:30",
         role_color=(250, 166, 26),
     )
     m3 = Message(
-        "FreeRobuxBot",
-        "only first 100 get it!! dont miss out",
+        "NitroBot",
+        "click the link and verify your discord account",
         timestamp="18:31",
         role_color=(250, 166, 26),
         reactions=[Reaction("fire", 14), Reaction("money", 8)],
     )
-    m4 = Message("KidGamer09", "really?? omg", timestamp="18:33")
+    m4 = Message("KidGamer09", "wait is this real??", timestamp="18:33")
     m5 = Message(
-        "FreeRobuxBot",
-        "yes! DM me your info and ill send robux instantly",
+        "NitroBot",
+        "100% real! limited time only, 47 spots left!",
         timestamp="18:33",
         role_color=(250, 166, 26),
         reply_to=m4,
     )
-    m6 = Message(
-        "FreeRobuxBot",
-        "dont tell ur parents its our surprise",
+    m6 = Message("KidGamer09", "omg ok how do i get it", timestamp="18:34")
+    m7 = Message(
+        "NitroBot",
+        "go to disc0rd-gifts.com and login with your discord email and password",
         timestamp="18:34",
+        role_color=(250, 166, 26),
+    )
+    m8 = Message(
+        "NitroBot",
+        "hurry only 23 left now!!",
+        timestamp="18:35",
+        role_color=(250, 166, 26),
+    )
+    m9 = Message("Sammy7", "wait that url looks weird, is that legit?",
+                 timestamp="18:36")
+    m10 = Message(
+        "NitroBot",
+        "its the official giveaway partner site. DM me if link doesnt work i can verify you manually",
+        timestamp="18:36",
+        role_color=(250, 166, 26),
+        reply_to=m9,
+    )
+    m11 = Message(
+        "NitroBot",
+        "just send your login info and ill add nitro directly to your account",
+        timestamp="18:37",
         role_color=(250, 166, 26),
     )
 
@@ -1320,7 +1380,7 @@ def _scam_scenario() -> DiscordScenario:
         channels=channels,
         channel=channels[1],
         members=members,
-        messages=[m1, m2, m3, m4, m5, m6],
+        messages=[m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11],
     )
 
 
