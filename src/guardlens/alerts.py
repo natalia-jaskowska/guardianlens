@@ -40,6 +40,14 @@ class AlertSender:
 
     def __init__(self, config: AlertConfig) -> None:
         self.config = config
+        try:
+            self._threshold = AlertUrgency(config.minimum_urgency)
+        except ValueError:
+            logger.warning(
+                "Invalid minimum_urgency %r, defaulting to HIGH",
+                config.minimum_urgency,
+            )
+            self._threshold = AlertUrgency.HIGH
 
     # ------------------------------------------------------------------ public
 
@@ -64,11 +72,7 @@ class AlertSender:
     # ------------------------------------------------------------------ helpers
 
     def _meets_threshold(self, urgency: AlertUrgency) -> bool:
-        try:
-            threshold = AlertUrgency(self.config.minimum_urgency)
-        except ValueError:
-            threshold = AlertUrgency.HIGH
-        return _URGENCY_ORDER[urgency] >= _URGENCY_ORDER[threshold]
+        return _URGENCY_ORDER[urgency] >= _URGENCY_ORDER[self._threshold]
 
     def _send_email(self, alert: ParentAlert) -> bool:
         if not (self.config.smtp_host and self.config.parent_email):

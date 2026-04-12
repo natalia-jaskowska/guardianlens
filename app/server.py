@@ -163,8 +163,8 @@ def create_app(config: GuardLensConfig) -> FastAPI:
     @app.get("/api/models")
     async def api_models() -> JSONResponse:
         """List Ollama models available on the local server."""
+        import httpx
         try:
-            import httpx
             r = httpx.get(f"{config.ollama.host}/api/tags", timeout=2.0)
             r.raise_for_status()
             data = r.json()
@@ -173,7 +173,7 @@ def create_app(config: GuardLensConfig) -> FastAPI:
                 "models": sorted(names),
                 "current": config.ollama.inference_model,
             })
-        except Exception as exc:  # noqa: BLE001
+        except (httpx.HTTPError, ValueError, KeyError) as exc:
             logger.warning("Failed to list Ollama models: %s", exc)
             return JSONResponse({"models": [config.ollama.inference_model], "current": config.ollama.inference_model})
 

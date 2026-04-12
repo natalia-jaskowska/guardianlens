@@ -7,7 +7,7 @@ seed: 42
 
 ollama:
   host: http://localhost:11434
-  inference_model: gemma4:26b
+  inference_model: gemma4:latest
   finetuned_model: guardlens
   timeout_seconds: 120
   temperature: 0.2

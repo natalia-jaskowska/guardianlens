@@ -744,8 +744,8 @@
     const category = sv.overall_category || "none";
     const conf = Math.round(sv.confidence || 0);
 
-    card.classList.add(`gl-session-level-${level}`);
-    setText(els.sessionVerdictLevel, level);
+    card.classList.add(`gl-session-level-${svLevel}`);
+    setText(els.sessionVerdictLevel, svLevel);
     setText(els.sessionVerdictConfidence, `${conf}% confidence`);
 
     els.sessionVerdictCertainty.classList.remove(

@@ -26,6 +26,7 @@ from app.serializers import (
     metric_sublabels,
     serialize_analysis,
     serialize_scan_history,
+    serialize_session_verdict,
     serialize_timeline,
     session_totals,
     stat_boxes,
@@ -75,8 +76,8 @@ _LEVEL_RANK: dict[ThreatLevel, int] = {
 class MonitorWorker:
     """Background thread that drives the capture/analyze/persist loop.
 
-    Identical responsibilities to the previous Gradio worker — only the
-    consumer changed (FastAPI SSE generator instead of Gradio Timer).
+    The FastAPI SSE generator (``/api/stream``) polls the worker's queue
+    to push fresh state snapshots to the browser.
     """
 
     def __init__(
@@ -235,7 +236,7 @@ class MonitorWorker:
                 analysis.screenshot_path.name,
             )
             if extracted:
-                new = self._conversation_store.add(extracted)
+                self._conversation_store.add(extracted)
 
             # Decide whether to trigger conversation-level re-analysis.
             # Two triggers:
@@ -449,7 +450,7 @@ class MonitorWorker:
             logger.info("Analyzing screenshot: %s", screenshot_path.name)
             try:
                 analysis = self._analyzer.analyze(screenshot_path)
-            except Exception:  # noqa: BLE001 - never crash the loop
+            except Exception:  # noqa: BLE001 — broad by design: daemon thread must not crash
                 logger.exception("Analyzer failed for %s", screenshot_path)
                 continue
             level = analysis.classification.threat_level.value
@@ -511,9 +512,7 @@ def _build_session_parent_alert(verdict: SessionVerdict) -> ParentAlert:
     # so that session alerts don't out-shout true per-frame critical hits.
     if level == ThreatLevel.CRITICAL and certainty == SessionCertainty.HIGH:
         urgency = AlertUrgency.IMMEDIATE
-    elif level == ThreatLevel.CRITICAL:
-        urgency = AlertUrgency.HIGH
-    elif level == ThreatLevel.ALERT:
+    elif level in {ThreatLevel.CRITICAL, ThreatLevel.ALERT}:
         urgency = AlertUrgency.HIGH
     elif level == ThreatLevel.WARNING:
         urgency = AlertUrgency.MEDIUM
@@ -555,23 +554,6 @@ def _build_session_parent_alert(verdict: SessionVerdict) -> ParentAlert:
         recommended_action=action,
         urgency=urgency,
     )
-
-
-def _serialize_session_verdict(verdict: SessionVerdict | None) -> dict[str, Any] | None:
-    """JSON-friendly dump of a :class:`SessionVerdict` for the API."""
-    if verdict is None:
-        return None
-    return {
-        "overall_level": verdict.overall_level.value,
-        "overall_category": verdict.overall_category.value,
-        "confidence": verdict.confidence,
-        "certainty": verdict.certainty.value,
-        "narrative": verdict.narrative,
-        "key_indicators": list(verdict.key_indicators),
-        "messages_analyzed": verdict.messages_analyzed,
-        "parent_alert_recommended": verdict.parent_alert_recommended,
-        "timestamp": verdict.timestamp.isoformat(timespec="seconds"),
-    }
 
 
 def _parse_demo_filename(filename: str) -> tuple[str, str] | None:
@@ -654,12 +636,13 @@ class AppState:
         )
 
         # Telegram-style delivered timestamp for the parent alert preview.
+        # Query once, reuse for both payloads.
+        _alert_rows: list | None = None
         for payload in (latest_payload, latest_alert_payload):
             if payload is not None and payload.get("parent_alert"):
-                recent_alert_rows = self.database.recent_alerts(limit=1)
-                delivered_at: str | None = None
-                if recent_alert_rows:
-                    delivered_at = recent_alert_rows[0]["sent_at"]
+                if _alert_rows is None:
+                    _alert_rows = self.database.recent_alerts(limit=1)
+                delivered_at = _alert_rows[0]["sent_at"] if _alert_rows else None
                 payload["parent_alert"]["delivered_at"] = delivered_at
                 payload["parent_alert"]["channel"] = "Telegram"
 
@@ -698,17 +681,16 @@ class AppState:
             # Timeline display is decoupled from SessionTracker's
             # in-memory window — that one is sized for the AI's
             # cross-reference logic, this one is a UX surface and
-            # benefits from more rows. Pulled straight from the DB,
-            # then reversed because serialize_timeline expects
-            # oldest-first input.
+            # benefits from more rows. recent_analyses_models returns
+            # newest-first; serialize_timeline expects oldest-first.
             "timeline": serialize_timeline(
-                list(reversed(self.database.recent_analyses_models(limit=25)))
+                reversed(self.database.recent_analyses_models(limit=25))
             ),
             "latest": latest_payload,
             "latest_alert": latest_alert_payload,
             "is_alert": latest is not None and latest.classification.threat_level.value
             in {"alert", "critical"},
-            "session_verdict": _serialize_session_verdict(
+            "session_verdict": serialize_session_verdict(
                 self.worker.latest_session_verdict
             ),
             "conversation_size": self.conversation_store.size,

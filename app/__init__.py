@@ -1,1 +1,1 @@
-"""Gradio dashboard entry point for GuardianLens."""
+"""FastAPI dashboard package for GuardianLens."""

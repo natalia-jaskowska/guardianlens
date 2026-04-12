@@ -1,9 +1,8 @@
 """Screen capture loop for GuardianLens.
 
-We use ``mss`` because it is lightweight, cross-platform, and (unlike
-``pyautogui``) does not require a display server on Linux when running over
-SSH with X forwarding. The capture loop is implemented as a generator so the
-dashboard can drive it from its own event loop without spawning threads.
+We use ``mss`` for real screen capture because it is lightweight and
+cross-platform. The capture loop is implemented as a generator so the
+worker thread can drive it without additional concurrency.
 
 When ``MonitorConfig.demo_mode`` is True the loop swaps in synthetic Pillow
 screenshots from :mod:`guardlens.demo` instead of calling ``mss``. This
@@ -147,13 +146,16 @@ def _link_into_screenshots_dir(source: Path, screenshots_dir: Path) -> Path:
 
 
 def _prune_old_screenshots(screenshots_dir: Path, keep_last_n: int) -> None:
-    """Delete all but the most recent ``keep_last_n`` PNGs in the directory."""
+    """Delete all but the most recent ``keep_last_n`` PNGs in the directory.
+
+    Covers both real captures (``capture_*.png``) and demo-mode images
+    (``demo_*.png``).
+    """
     if keep_last_n <= 0:
         return
-    pngs = sorted(screenshots_dir.glob("capture_*.png"), key=lambda p: p.stat().st_mtime)
+    pngs = sorted(screenshots_dir.glob("*.png"), key=lambda p: p.stat().st_mtime)
     for stale in pngs[:-keep_last_n]:
         try:
             stale.unlink()
         except OSError:
-            # Best-effort cleanup; never crash the monitor loop.
             pass

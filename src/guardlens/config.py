@@ -30,7 +30,7 @@ class OllamaConfig(BaseModel):
     """Settings for the local Ollama server."""
 
     host: str = "http://localhost:11434"
-    inference_model: str = "gemma4:26b"
+    inference_model: str = "gemma4:latest"
     finetuned_model: str = "guardlens"
     timeout_seconds: float = 120.0
     temperature: float = 0.2
@@ -40,7 +40,7 @@ class OllamaConfig(BaseModel):
 class MonitorConfig(BaseModel):
     """Settings for the screen capture loop."""
 
-    capture_interval_seconds: float = Field(15.0, gt=0)
+    capture_interval_seconds: float = Field(15.0, ge=5, le=3600)
     monitor_index: int = 1
     screenshots_dir: Path = PROJECT_ROOT / "outputs" / "screenshots"
     keep_last_n: int = 200
@@ -93,7 +93,7 @@ class AlertConfig(BaseModel):
 
 
 class DashboardConfig(BaseModel):
-    """Settings for the Gradio dashboard."""
+    """Settings for the FastAPI dashboard."""
 
     server_name: str = "0.0.0.0"
     server_port: int = 7860

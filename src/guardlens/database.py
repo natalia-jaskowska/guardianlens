@@ -2,7 +2,7 @@
 
 Why SQLite and not just an in-memory list:
 
-- The dashboard worker thread writes; the Gradio UI thread reads. SQLite
+- The dashboard worker thread writes; the FastAPI UI thread reads. SQLite
   gives us safe concurrent access with zero extra dependencies.
 - Judges reading the code can see that ``classify_threat`` and
   ``generate_parent_alert`` actually persist their output — this is the
@@ -27,15 +27,18 @@ Schema (kept deliberately small):
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 import threading
 from datetime import datetime
 from pathlib import Path
-
-import json as _json
 from typing import Any
 
+from pydantic import ValidationError
+
 from guardlens.schema import ScreenAnalysis, ThreatLevel
+
+logger = logging.getLogger(__name__)
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -87,7 +90,7 @@ class GuardLensDatabase:
         self._db_path = db_path
         self._lock = threading.Lock()
         # ``check_same_thread=False`` is safe because every write goes through
-        # ``_lock``. The Gradio UI thread reads via short-lived connections.
+        # ``_lock``. The FastAPI handler thread reads under the same lock.
         self._conn = sqlite3.connect(
             str(db_path),
             check_same_thread=False,
@@ -121,7 +124,11 @@ class GuardLensDatabase:
 
     @property
     def session_id(self) -> int:
-        """Return the active session ID, opening a session if needed."""
+        """Return the active session ID, opening a session if needed.
+
+        Must NOT be called while ``self._lock`` is held — ``start_session``
+        acquires the same (non-reentrant) lock.
+        """
         if self._session_id is None:
             return self.start_session()
         return self._session_id
@@ -134,6 +141,10 @@ class GuardLensDatabase:
         grooming_stage_value = (
             analysis.grooming_stage.stage.value if analysis.grooming_stage else None
         )
+        # Resolve session_id BEFORE acquiring the lock.  The property may
+        # call start_session() which also acquires self._lock — calling it
+        # inside the ``with self._lock`` block would deadlock.
+        sid = self.session_id
         with self._lock:
             cursor = self._conn.execute(
                 """
@@ -144,7 +155,7 @@ class GuardLensDatabase:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    self.session_id,
+                    sid,
                     analysis.timestamp.isoformat(),
                     str(analysis.screenshot_path),
                     analysis.platform,
@@ -224,9 +235,10 @@ class GuardLensDatabase:
         if row is None:
             return None
         try:
-            payload = _json.loads(row["raw_json"])
+            payload = json.loads(row["raw_json"])
             return ScreenAnalysis.model_validate(payload)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, ValidationError) as exc:
+            logger.warning("Failed to deserialize analysis from DB: %s", exc)
             return None
 
     def recent_alert_analyses(
@@ -259,7 +271,7 @@ class GuardLensDatabase:
         out: list[tuple[int, int, ScreenAnalysis]] = []
         for row in rows:
             try:
-                payload = _json.loads(row["raw_json"])
+                payload = json.loads(row["raw_json"])
                 # Overlay alert metadata so the dashboard renders the
                 # session-level narrative, not the per-frame indicators.
                 payload["parent_alert"] = {
@@ -275,7 +287,8 @@ class GuardLensDatabase:
                         ScreenAnalysis.model_validate(payload),
                     )
                 )
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, ValidationError) as exc:
+                logger.warning("Skipping corrupt alert row: %s", exc)
                 continue
         return out
 
@@ -296,9 +309,10 @@ class GuardLensDatabase:
         out: list[ScreenAnalysis] = []
         for row in rows:
             try:
-                payload = _json.loads(row["raw_json"])
+                payload = json.loads(row["raw_json"])
                 out.append(ScreenAnalysis.model_validate(payload))
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, ValidationError) as exc:
+                logger.warning("Skipping corrupt analysis row: %s", exc)
                 continue
         return out
 
@@ -317,9 +331,10 @@ class GuardLensDatabase:
         if row is None:
             return None
         try:
-            payload = _json.loads(row["raw_json"])
+            payload = json.loads(row["raw_json"])
             return ScreenAnalysis.model_validate(payload)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, ValidationError) as exc:
+            logger.warning("Failed to deserialize analysis from DB: %s", exc)
             return None
 
     def recent_threat_levels(self, limit: int = 20) -> list[str]:
@@ -377,36 +392,26 @@ class GuardLensDatabase:
         When ``session_id`` is given, the search is scoped to that
         session only — so a fresh dashboard restart doesn't surface a
         stale alert from yesterday's session. When omitted, the search
-        spans all history (the previous behavior, kept for callers that
-        explicitly want cross-session bootstrapping).
+        spans all history.
 
-        Also requires ``category != 'none'`` so we don't surface
+        Requires ``category != 'none'`` so we don't surface
         uninformative model-misclassification rows.
+        """
+        base = """
+            SELECT platform, category, timestamp
+            FROM analyses
+            WHERE threat_level IN ('alert', 'critical')
+              AND category != 'none'
         """
         with self._lock:
             if session_id is not None:
                 row = self._conn.execute(
-                    """
-                    SELECT platform, category, timestamp
-                    FROM analyses
-                    WHERE threat_level IN ('alert', 'critical')
-                      AND category != 'none'
-                      AND session_id = ?
-                    ORDER BY id DESC
-                    LIMIT 1
-                    """,
+                    base + "AND session_id = ? ORDER BY id DESC LIMIT 1",
                     (session_id,),
                 ).fetchone()
             else:
                 row = self._conn.execute(
-                    """
-                    SELECT platform, category, timestamp
-                    FROM analyses
-                    WHERE threat_level IN ('alert', 'critical')
-                      AND category != 'none'
-                    ORDER BY id DESC
-                    LIMIT 1
-                    """,
+                    base + "ORDER BY id DESC LIMIT 1",
                 ).fetchone()
         if row is None:
             return None

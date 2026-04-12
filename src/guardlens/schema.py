@@ -171,8 +171,8 @@ class ScreenAnalysis(BaseModel):
         None,
         description=(
             "Reconstructed conversation as structured messages. Populated "
-            "in demo mode where the chat lines are known ahead of time; "
-            "may be None in real-screenshot mode."
+            "by the worker from demo scenario scripts or watch-folder "
+            "metadata; may be None in real-screenshot mode."
         ),
     )
 

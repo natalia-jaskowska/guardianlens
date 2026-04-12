@@ -2,8 +2,7 @@
 
 The FastAPI server returns these dicts to the browser. The browser-side
 JavaScript renders the DOM from the dict — no HTML rendering happens on
-the server side any more (we used to render HTML strings in
-``app.components`` for the Gradio version).
+the server side.
 
 Keeping the serialization logic in its own module means:
 
@@ -15,6 +14,7 @@ Keeping the serialization logic in its own module means:
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
@@ -22,6 +22,7 @@ from typing import Any
 from guardlens.schema import (
     GroomingStage,
     ScreenAnalysis,
+    SessionVerdict,
     ThreatCategory,
     ThreatLevel,
 )
@@ -192,7 +193,7 @@ def metric_sublabels(totals: dict[str, int]) -> dict[str, str]:
     caution_pct = round(100 * totals["caution"] / screenshots)
     alerts = totals["alerts"]
     return {
-        "screenshots": "live · 8s interval",
+        "screenshots": "live",
         "safe": f"{safe_pct}% of scans",
         "caution": f"{caution_pct}% of scans",
         "alerts": "no active threats" if alerts == 0 else (
@@ -378,9 +379,14 @@ def build_alert_history(
         # detected") and derive severity from the urgency field.
         if alert is not None:
             # Parse category from title: "Session: <cat> pattern detected"
+            # Fall back to classification category when the title doesn't
+            # match the session alert pattern.
             title = alert.alert_title or ""
-            cat_part = title.removeprefix("Session: ").removesuffix(" pattern detected").strip()
-            category = cat_part.replace(" ", "_") if cat_part else cls.category.value
+            if title.startswith("Session: ") and title.endswith(" pattern detected"):
+                cat_part = title.removeprefix("Session: ").removesuffix(" pattern detected").strip()
+                category = cat_part.replace(" ", "_") if cat_part else cls.category.value
+            else:
+                category = cls.category.value
             urgency = alert.urgency.value if alert.urgency else "medium"
             if urgency in ("immediate", "high"):
                 severity = "alert"
@@ -412,9 +418,17 @@ def build_alert_history(
             key = _platform_key(analysis.platform)
             user = _DEFAULT_USERNAMES.get(key) or "—"
 
+        # Grooming stage index — always computed from the analysis,
+        # independent of which summary path we take.
+        stage_idx = 0
+        if analysis.grooming_stage and analysis.grooming_stage.stage != GroomingStage.NONE:
+            try:
+                stage_idx = GROOMING_STAGE_ORDER.index(analysis.grooming_stage.stage) + 1
+            except ValueError:
+                pass
+
         # Session-level alerts carry a parent_alert with a narrative-based
         # summary. Prefer that over the per-frame indicator list.
-        stage_idx = 0
         if analysis.parent_alert is not None and analysis.parent_alert.summary:
             summary = analysis.parent_alert.summary[:96]
         else:
@@ -423,12 +437,8 @@ def build_alert_history(
             summary_bits: list[str] = []
             if indicator_words:
                 summary_bits.append(", ".join(indicator_words[:2]))
-            if analysis.grooming_stage and analysis.grooming_stage.stage != GroomingStage.NONE:
-                try:
-                    stage_idx = GROOMING_STAGE_ORDER.index(analysis.grooming_stage.stage) + 1
-                    summary_bits.append(f"Stage {stage_idx}/5")
-                except ValueError:
-                    pass
+            if stage_idx > 0:
+                summary_bits.append(f"Stage {stage_idx}/5")
             if not summary_bits:
                 summary_bits.append(cls.category.value.replace("_", " "))
             summary = " · ".join(summary_bits)[:96]
@@ -497,16 +507,12 @@ def format_session_duration(seconds: float) -> str:
     return f"{minutes}m {secs:02d}s"
 
 
-def _screenshot_url(analysis: ScreenAnalysis) -> str | None:
+def _screenshot_url(analysis: ScreenAnalysis) -> str:
     """Translate a local file path into a URL the browser can fetch.
 
     The FastAPI server mounts ``outputs/screenshots`` at ``/screenshots/``.
-    We pass the bare filename so the front-end can build the full URL.
     """
-    path = analysis.screenshot_path
-    if path is None:
-        return None
-    return f"/screenshots/{path.name}"
+    return f"/screenshots/{analysis.screenshot_path.name}"
 
 
 def _platform_key(platform: str | None) -> str:
@@ -737,15 +743,15 @@ _INDICATOR_TAGS: list[tuple[str, str]] = [
 ]
 
 
-def _clean_indicator(raw: str) -> str:
+def _clean_indicator(raw: str) -> str | None:
     """Map a verbose model indicator to a short tag for pill display.
+
+    Returns ``None`` for empty/whitespace-only input.
 
     'Asking about age and school' → 'Age inquiry'
     'Suggesting moving to a private, unmonitored platform' → 'Isolation'
     'Name-calling/Insults ("ur so ugly")' → 'Name-calling'
     """
-    import re
-
     norm = raw.lower()
     for keyword, tag in _INDICATOR_TAGS:
         # Use word-start boundary for short keywords to avoid false matches
@@ -857,32 +863,22 @@ def _indicator_pills(analysis: ScreenAnalysis) -> list[dict[str, str]]:
 
 
 def _stage_segments(analysis: ScreenAnalysis) -> dict[str, Any]:
-    """Five-segment stage bar payload for the threat breakdown card."""
-    if analysis.grooming_stage is None or analysis.grooming_stage.stage == GroomingStage.NONE:
-        current_idx = -1
-    else:
-        try:
-            current_idx = GROOMING_STAGE_ORDER.index(analysis.grooming_stage.stage)
-        except ValueError:
-            current_idx = -1
+    """Five-segment stage bar payload for the threat breakdown card.
 
-    segments = []
-    for idx, stage in enumerate(GROOMING_STAGE_ORDER):
-        if idx < current_idx:
-            state = "active"
-        elif idx == current_idx:
-            state = "current"
-        else:
-            state = "inactive"
-        segments.append(
-            {
-                "state": state,
-                "label": GROOMING_STAGE_LABELS[stage.value],
-            }
-        )
+    Delegates to :func:`serialize_stage` for the actual segment logic.
+    """
+    stage = (
+        analysis.grooming_stage.stage
+        if analysis.grooming_stage is not None
+        else GroomingStage.NONE
+    )
+    data = serialize_stage(stage)
     return {
-        "segments": segments,
-        "current_index": current_idx,
+        "segments": [
+            {"state": s["state"], "label": s["label"]}
+            for s in data["segments"]
+        ],
+        "current_index": data["current_index"],
     }
 
 
@@ -1092,3 +1088,20 @@ def generate_recommended_action(
         ]
 
     return {"steps": steps, "privacy_note": privacy_note}
+
+
+def serialize_session_verdict(verdict: SessionVerdict | None) -> dict[str, Any] | None:
+    """JSON-friendly dump of a :class:`SessionVerdict` for the API."""
+    if verdict is None:
+        return None
+    return {
+        "overall_level": verdict.overall_level.value,
+        "overall_category": verdict.overall_category.value,
+        "confidence": verdict.confidence,
+        "certainty": verdict.certainty.value,
+        "narrative": verdict.narrative,
+        "key_indicators": list(verdict.key_indicators),
+        "messages_analyzed": verdict.messages_analyzed,
+        "parent_alert_recommended": verdict.parent_alert_recommended,
+        "timestamp": verdict.timestamp.isoformat(timespec="seconds"),
+    }
