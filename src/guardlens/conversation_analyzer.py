@@ -37,6 +37,7 @@ from guardlens.config import OllamaConfig
 from guardlens.prompts import (
     CONVERSATION_SYSTEM_PROMPT,
     CONVERSATION_USER_PROMPT_TEMPLATE,
+    CONVERSATION_USER_PROMPT_WITH_FRAME_HINT,
     PROMPT_VERSION,
 )
 from guardlens.schema import (
@@ -63,23 +64,42 @@ class ConversationAnalyzer:
     def analyze(
         self,
         messages: Sequence[ChatMessage],
+        frame_hint: dict[str, str] | None = None,
     ) -> SessionVerdict | None:
         """Run a session-level analysis.
 
-        Returns ``None`` if the conversation is empty (nothing to assess)
-        or if the model fails to emit the ``assess_conversation`` tool
-        call. The caller's :class:`guardlens.schema.SessionVerdict`
-        consumer should treat ``None`` as "no session verdict yet — keep
-        using per-frame signals".
+        Parameters
+        ----------
+        messages:
+            The conversation window to analyze.
+        frame_hint:
+            Optional dict with keys ``level``, ``category``,
+            ``confidence``, ``reasoning`` from the latest per-frame
+            scan. When provided, the prompt tells the model what the
+            real-time scanner flagged so it can specifically address
+            whether that concern is justified in context.
+
+        Returns ``None`` if the conversation is empty or the model fails
+        to emit the ``assess_conversation`` tool call.
         """
         if not messages:
             logger.info("ConversationAnalyzer: skip (empty conversation)")
             return None
 
         transcript = _format_transcript(messages)
-        user_prompt = CONVERSATION_USER_PROMPT_TEMPLATE.format(
-            n=len(messages), transcript=transcript
-        )
+        if frame_hint:
+            user_prompt = CONVERSATION_USER_PROMPT_WITH_FRAME_HINT.format(
+                n=len(messages),
+                transcript=transcript,
+                frame_level=frame_hint.get("level", "unknown"),
+                frame_category=frame_hint.get("category", "unknown"),
+                frame_confidence=frame_hint.get("confidence", "?"),
+                frame_reasoning=frame_hint.get("reasoning", ""),
+            )
+        else:
+            user_prompt = CONVERSATION_USER_PROMPT_TEMPLATE.format(
+                n=len(messages), transcript=transcript
+            )
 
         logger.info(
             "ConversationAnalyzer: analyzing %d messages (prompt_version=%s)",

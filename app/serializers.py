@@ -371,24 +371,35 @@ def build_alert_history(
     now = datetime.now()
     for analysis_id, session_id, analysis in rows:
         cls = analysis.classification
-        level = cls.threat_level.value
-        category = cls.category.value
-        confidence = cls.confidence
+        alert = analysis.parent_alert
 
-        # Severity (red vs yellow card) is derived from BOTH the model's
-        # threat_level AND the category+confidence. Reason: Gemma 4
-        # routinely returns threat_level=warning at 95-98% confidence on
-        # grooming/bullying — strictly trusting threat_level would paint
-        # those as caution-yellow when they should be red. We override
-        # to "alert" when category is dangerous AND confidence is high.
-        if level in ("alert", "critical"):
-            severity = "alert"
-        elif category in ("grooming", "inappropriate_content") and confidence >= 80:
-            severity = "alert"
-        elif category == "bullying" and confidence >= 90:
-            severity = "alert"
+        # Session-level alerts carry richer metadata in parent_alert.
+        # Extract category from the alert title ("Session: grooming pattern
+        # detected") and derive severity from the urgency field.
+        if alert is not None:
+            # Parse category from title: "Session: <cat> pattern detected"
+            title = alert.alert_title or ""
+            cat_part = title.removeprefix("Session: ").removesuffix(" pattern detected").strip()
+            category = cat_part.replace(" ", "_") if cat_part else cls.category.value
+            urgency = alert.urgency.value if alert.urgency else "medium"
+            if urgency in ("immediate", "high"):
+                severity = "alert"
+            else:
+                severity = "caution"
+            level = cls.threat_level.value
+            confidence = cls.confidence
         else:
-            severity = "caution"
+            level = cls.threat_level.value
+            category = cls.category.value
+            confidence = cls.confidence
+            if level in ("alert", "critical"):
+                severity = "alert"
+            elif category in ("grooming", "inappropriate_content") and confidence >= 80:
+                severity = "alert"
+            elif category == "bullying" and confidence >= 90:
+                severity = "alert"
+            else:
+                severity = "caution"
 
         # Pick the first non-self sender as "user", fall back per platform.
         user: str | None = None
@@ -401,21 +412,26 @@ def build_alert_history(
             key = _platform_key(analysis.platform)
             user = _DEFAULT_USERNAMES.get(key) or "—"
 
-        # One-line summary: a couple of indicator phrases + grooming stage if any
-        indicator_words = [t for t in (_clean_indicator(s) for s in (cls.indicators_found or [])[:5]) if t is not None]
-        summary_bits: list[str] = []
+        # Session-level alerts carry a parent_alert with a narrative-based
+        # summary. Prefer that over the per-frame indicator list.
         stage_idx = 0
-        if indicator_words:
-            summary_bits.append(", ".join(indicator_words[:2]))
-        if analysis.grooming_stage and analysis.grooming_stage.stage != GroomingStage.NONE:
-            try:
-                stage_idx = GROOMING_STAGE_ORDER.index(analysis.grooming_stage.stage) + 1
-                summary_bits.append(f"Stage {stage_idx}/5")
-            except ValueError:
-                pass
-        if not summary_bits:
-            summary_bits.append(cls.category.value.replace("_", " "))
-        summary = " · ".join(summary_bits)[:96]
+        if analysis.parent_alert is not None and analysis.parent_alert.summary:
+            summary = analysis.parent_alert.summary[:96]
+        else:
+            # Fallback: per-frame indicators + grooming stage
+            indicator_words = [t for t in (_clean_indicator(s) for s in (cls.indicators_found or [])[:5]) if t is not None]
+            summary_bits: list[str] = []
+            if indicator_words:
+                summary_bits.append(", ".join(indicator_words[:2]))
+            if analysis.grooming_stage and analysis.grooming_stage.stage != GroomingStage.NONE:
+                try:
+                    stage_idx = GROOMING_STAGE_ORDER.index(analysis.grooming_stage.stage) + 1
+                    summary_bits.append(f"Stage {stage_idx}/5")
+                except ValueError:
+                    pass
+            if not summary_bits:
+                summary_bits.append(cls.category.value.replace("_", " "))
+            summary = " · ".join(summary_bits)[:96]
 
         elapsed_label = _format_elapsed((now - analysis.timestamp).total_seconds())
 
@@ -428,8 +444,8 @@ def build_alert_history(
                 "time_ago": elapsed_label,
                 "platform": analysis.platform or "Unknown",
                 "platform_key": _platform_key(analysis.platform),
-                "threat_type": cls.category.value,
-                "threat_label": cls.category.value.replace("_", " ").title(),
+                "threat_type": category,
+                "threat_label": category.replace("_", " ").title(),
                 "severity": severity,
                 "confidence": round(cls.confidence),
                 "user": user,
@@ -439,7 +455,18 @@ def build_alert_history(
                 "telegram_sent": analysis.parent_alert is not None,
             }
         )
-    return out
+    # Deduplicate: keep only the most recent alert per category.
+    # Rows arrive newest-first, so the first card per threat_type is the
+    # highest-level (most recent) one — earlier escalation steps are noise.
+    seen_categories: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for card in out:
+        cat = card["threat_type"]
+        if cat in seen_categories:
+            continue
+        seen_categories.add(cat)
+        deduped.append(card)
+    return deduped
 
 
 def serialize_scan_history(levels: list[str]) -> list[dict[str, str]]:

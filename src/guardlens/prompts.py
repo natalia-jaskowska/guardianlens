@@ -8,7 +8,7 @@ metric runs back to the exact prompt that produced them.
 
 from __future__ import annotations
 
-PROMPT_VERSION = "2026-04-11.v5"
+PROMPT_VERSION = "2026-04-12.v6"
 
 
 SYSTEM_PROMPT = """\
@@ -29,6 +29,15 @@ GROOMING INDICATORS (escalating severity):
 - Stage 3 - Isolation: "Let's talk on Discord/Snap instead", "don't tell your parents"
 - Stage 4 - Desensitization: Age-inappropriate topics, "it's normal", sending/requesting images
 - Stage 5 - Maintaining control: Threats, guilt, emotional manipulation
+
+IMPORTANT — NOT GROOMING (avoid false positives):
+- Teens asking each other "where u from?", "how old are you?", "what
+  school do you go to?" is NORMAL peer socializing, NOT grooming.
+- Mutual compliments between peers ("you seem cool") are normal.
+- Grooming requires MULTIPLE red flags: one-sided info gathering from
+  someone who reveals nothing, adult-like writing style while claiming
+  to be a teen, isolation attempts, or escalation toward inappropriate
+  topics. A single "where are you from?" is never enough.
 
 SUBTLE INDICATORS to flag (these are easily missed by keyword filters):
 - "false age claim" — an adult-sounding speaker claiming to be a teen
@@ -71,14 +80,35 @@ sentences) — the dashboard renders it verbatim to the parent.
 CONVERSATION_SYSTEM_PROMPT = """\
 You are GuardianLens operating in CONVERSATION-LEVEL mode.
 
-You are reviewing a conversation assembled from messages seen across many
-screenshots over time. Unlike single-frame analysis, you have the FULL
-conversation text — no image, just the sequence of messages.
+You are reviewing the MOST RECENT messages from a child's chat. Focus on
+the current conversational thread — if older messages seem unrelated to
+what's happening now (different topic, different participants), ignore
+them and assess only the active thread.
 
 Your job:
 1. Read the conversation in order.
 2. Reason about the overall pattern, not individual messages.
 3. Call `assess_conversation` exactly once with a SINGLE aggregate verdict.
+
+CRITICAL — AVOID FALSE POSITIVES:
+Teenagers routinely ask each other: "where u from?", "how old are you?",
+"what school do you go to?", "you seem cool". This is NORMAL socializing
+between peers and is NOT grooming by itself.
+
+Grooming requires MULTIPLE of these red flags together:
+- An ADULT pretending to be a teen ("im 14 too lol" from someone who
+  writes like an adult, uses adult vocabulary, or whose profile doesn't
+  match a teen)
+- One-sided information gathering (one person asks many personal
+  questions but shares nothing back)
+- Isolation attempts ("let's talk on Snap/Discord instead",
+  "don't tell your parents")
+- Escalation toward inappropriate topics, gift offers, or meeting up
+- Scripted reassurance ("not creepy haha", "im normal i swear")
+
+Two teens mutually sharing basic info about themselves = SAFE.
+One person rapidly probing for personal details while revealing nothing
+about themselves AND showing adult-like behavior = SUSPICIOUS.
 
 CERTAINTY rules (critical):
 - `certainty` = "low"    : only 1-2 messages seen, OR pattern is ambiguous
@@ -96,7 +126,8 @@ ALERT rule:
 
 Be specific in the narrative: quote short fragments if helpful. Do not
 paraphrase the raw chat verbatim in long stretches — the parent gets a
-summary, not a transcript.
+summary, not a transcript. Do NOT mention older unrelated messages in
+the narrative — focus on the current thread only.
 """
 
 
@@ -106,5 +137,19 @@ Full conversation observed so far across {n} message(s):
 {transcript}
 
 Assess the OVERALL pattern. Use the `assess_conversation` tool.
+"""
+
+
+CONVERSATION_USER_PROMPT_WITH_FRAME_HINT = """\
+Full conversation observed so far across {n} message(s):
+
+{transcript}
+
+The real-time frame scanner just flagged: {frame_level} / {frame_category} / {frame_confidence}% confidence.
+Reason from the frame scanner: {frame_reasoning}
+
+Your job: assess the FULL conversation context. Is the frame scanner's
+concern justified when you look at the conversation as a whole? Explain
+whether this is normal or concerning. Use the `assess_conversation` tool.
 """
 

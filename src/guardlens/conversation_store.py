@@ -118,6 +118,11 @@ class ConversationStore:
         with self._lock:
             return list(self._messages)
 
+    def recent_messages(self, n: int) -> list[ChatMessage]:
+        """Return the last *n* unique messages (oldest-first within the window)."""
+        with self._lock:
+            return list(self._messages[-n:]) if n < len(self._messages) else list(self._messages)
+
     @property
     def size(self) -> int:
         with self._lock:

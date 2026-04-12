@@ -232,24 +232,26 @@ class GuardLensDatabase:
     def recent_alert_analyses(
         self, limit: int = 10
     ) -> list[tuple[int, int, ScreenAnalysis]]:
-        """Reconstruct the N most recent alert/caution :class:`ScreenAnalysis` rows.
+        """Reconstruct the N most recent *alerted* :class:`ScreenAnalysis` rows.
 
-        Used by the dashboard's "Alert history" list in the safe-state
-        right panel. Returns ``(analysis_id, session_id, ScreenAnalysis)``
-        tuples ordered newest first. The session_id lets the front-end
-        group cards into "from this session" vs "earlier" buckets.
+        Only returns analyses that have a matching row in the ``alerts``
+        table — i.e. actual alerts that were synthesized by the session-level
+        conversation analyzer. Plain per-frame classifications (even non-safe
+        ones) are excluded.
 
-        Filters out rows where the model returned a non-safe
-        ``threat_level`` but ``category=none`` — those are uninformative
-        in a history list and the card has nothing meaningful to show.
+        Returns ``(analysis_id, session_id, ScreenAnalysis)`` tuples ordered
+        newest first. The alert metadata (title, summary, action, urgency)
+        is overlaid onto the ScreenAnalysis's ``parent_alert`` field so the
+        dashboard can render session-level info.
         """
         with self._lock:
             rows = self._conn.execute(
                 """
-                SELECT id, session_id, raw_json FROM analyses
-                WHERE threat_level IN ('alert', 'critical', 'warning', 'caution')
-                  AND category != 'none'
-                ORDER BY id DESC
+                SELECT a.id, a.session_id, a.raw_json,
+                       al.title, al.summary, al.recommended_action, al.urgency
+                FROM alerts al
+                JOIN analyses a ON a.id = al.analysis_id
+                ORDER BY al.id DESC
                 LIMIT ?
                 """,
                 (limit,),
@@ -258,6 +260,14 @@ class GuardLensDatabase:
         for row in rows:
             try:
                 payload = _json.loads(row["raw_json"])
+                # Overlay alert metadata so the dashboard renders the
+                # session-level narrative, not the per-frame indicators.
+                payload["parent_alert"] = {
+                    "alert_title": row["title"],
+                    "summary": row["summary"],
+                    "recommended_action": row["recommended_action"],
+                    "urgency": row["urgency"],
+                }
                 out.append(
                     (
                         int(row["id"]),
@@ -426,14 +436,10 @@ class GuardLensDatabase:
         return summary
 
     def total_alert_count(self) -> int:
-        """Total non-safe, non-none-category analyses across all sessions."""
+        """Total session-level alerts (from the ``alerts`` table)."""
         with self._lock:
             row = self._conn.execute(
-                """
-                SELECT COUNT(*) FROM analyses
-                WHERE threat_level IN ('alert', 'critical', 'warning', 'caution')
-                  AND category != 'none'
-                """,
+                "SELECT COUNT(*) FROM alerts",
             ).fetchone()
         return int(row[0]) if row else 0
 

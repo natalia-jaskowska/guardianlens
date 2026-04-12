@@ -414,6 +414,12 @@
       }
     }
 
+    // Build a set of timestamps where session alerts were fired, so we
+    // can overlay a marker on the corresponding timeline entry.
+    const alertTsSet = new Set(
+      (state.alert_timestamps || []).map(ts => (ts || "").slice(0, 19))
+    );
+
     els.timeline.innerHTML = entries.map((e, i) => {
       // Collapsed group row — consecutive safe scans
       if (e.is_group) {
@@ -442,12 +448,17 @@
       const escCls = escalation[i] ? " gl-timeline-escalation" : "";
       const escStart = escalation[i] && (i === 0 || !escalation[i - 1]);
       const escStartCls = escStart ? " gl-timeline-esc-start" : "";
-      return `<div class="gl-timeline-entry gl-timeline-entry-${levelCls}${isClickable?" gl-timeline-clickable":""}${escCls}${escStartCls}" data-tl-idx="${i}">
+      const hasSessionAlert = alertTsSet.has((e.timestamp || "").slice(0, 19));
+      const alertMarker = hasSessionAlert
+        ? `<span class="gl-timeline-alert-marker" title="Session alert fired">\u26a0</span>`
+        : "";
+      return `<div class="gl-timeline-entry gl-timeline-entry-${levelCls}${isClickable?" gl-timeline-clickable":""}${escCls}${escStartCls}${hasSessionAlert?" gl-timeline-has-alert":""}" data-tl-idx="${i}">
         <div class="gl-timeline-esc-bar"></div>
         <span class="gl-timeline-icon" data-platform="${k}">${iconInner}</span>
         <div class="gl-timeline-body">
           <div class="gl-timeline-row1">
             <span class="gl-timeline-platform">${esc(e.platform||"Unknown")}</span>
+            ${alertMarker}
             <span class="gl-timeline-time">${esc(time)}</span>
             <span class="gl-timeline-badge gl-timeline-badge-${levelCls}">${esc(level)}</span>
           </div>
@@ -672,30 +683,63 @@
     );
 
     if (!sv) {
-      // No verdict yet — show placeholder with current accumulation count.
+      // No verdict yet �� show placeholder.
+      card.style.display = "";
       card.classList.add("gl-session-verdict-empty");
-      setText(els.sessionVerdictLevel, convSize === 0 ? "waiting" : "accumulating");
-      setText(els.sessionVerdictCertainty, "—");
-      setText(els.sessionVerdictConfidence, "—");
-      setText(
-        els.sessionVerdictNarrative,
+      setText(els.sessionVerdictLevel, convSize === 0 ? "waiting" : "analyzing\u2026");
+      setText(els.sessionVerdictCertainty, "");
+      setText(els.sessionVerdictConfidence, "");
+      setText(els.sessionVerdictNarrative,
         convSize < 3
-          ? `Accumulating messages (${convSize}). A verdict will appear once the conversation analyzer has enough evidence.`
-          : `Analyzing ${convSize} message${convSize===1?"":"s"}...`,
+          ? `Accumulating messages (${convSize}). Verdict appears after enough context.`
+          : `Analyzing ${convSize} messages\u2026`
       );
       els.sessionVerdictIndicators.innerHTML = "";
       setText(els.sessionVerdictCount, `${convSize} msg${convSize===1?"":"s"}`);
-      setText(els.sessionVerdictCategory, "—");
-      setText(els.sessionVerdictAlertFlag, "no action");
-      els.sessionVerdictAlertFlag.classList.remove("gl-session-alert-on");
+      setText(els.sessionVerdictCategory, "");
+      setText(els.sessionVerdictAlertFlag, "");
       els.sessionVerdictCertainty.classList.remove(
         "gl-certainty-low", "gl-certainty-medium", "gl-certainty-high",
       );
       return;
     }
 
-    // Live verdict — wire every field.
-    const level = (sv.overall_level || "safe").toLowerCase();
+    // Always show the session verdict — safe or not.
+    card.style.display = "";
+
+    // If the per-frame analysis sees something non-safe but the session
+    // verdict hasn't caught up yet, show the frame signal as a preview.
+    const frameLevel = state.latest && state.latest.threat_level
+      ? state.latest.threat_level.toLowerCase() : "safe";
+    const svLevel = (sv.overall_level || "safe").toLowerCase();
+
+    if (svLevel === "safe" && frameLevel !== "safe") {
+      const frameCategory = (state.latest && state.latest.category) || "none";
+      const frameConf = state.latest && state.latest.confidence != null
+        ? Math.round(state.latest.confidence) : 0;
+      const frameReasoning = (state.latest && state.latest.reasoning) || "";
+      card.classList.add(`gl-session-level-${frameLevel}`);
+      setText(els.sessionVerdictLevel, frameLevel);
+      setText(els.sessionVerdictConfidence, `${frameConf}%`);
+      els.sessionVerdictCertainty.classList.remove(
+        "gl-certainty-low", "gl-certainty-medium", "gl-certainty-high",
+      );
+      els.sessionVerdictCertainty.classList.add("gl-certainty-low");
+      setText(els.sessionVerdictCertainty, "preliminary");
+      setText(els.sessionVerdictNarrative,
+        frameReasoning
+          ? frameReasoning.slice(0, 200)
+          : "Analyzing full conversation context\u2026"
+      );
+      els.sessionVerdictIndicators.innerHTML = "";
+      setText(els.sessionVerdictCount, `${convSize} msg${convSize===1?"":"s"}`);
+      setText(els.sessionVerdictCategory, frameCategory.replace(/_/g, " "));
+      setText(els.sessionVerdictAlertFlag, "analyzing context\u2026");
+      els.sessionVerdictAlertFlag.classList.remove("gl-session-alert-on");
+      return;
+    }
+
+    // Full session verdict — always shown (safe, caution, or threat).
     const certainty = (sv.certainty || "low").toLowerCase();
     const category = sv.overall_category || "none";
     const conf = Math.round(sv.confidence || 0);

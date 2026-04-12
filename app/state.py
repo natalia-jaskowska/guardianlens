@@ -57,6 +57,10 @@ logger = logging.getLogger(__name__)
 # rare but stable. 3 is a reasonable starting point for demo pacing.
 CONVERSATION_ANALYSIS_EVERY_N_NEW_MESSAGES = 3
 
+# Sliding window: only feed the last N messages to the conversation
+# analyzer. Old messages from earlier, unrelated conversations age out.
+CONVERSATION_WINDOW_SIZE = 25
+
 # Ordering used by the session-alert high-water dedup. Higher rank =
 # more severe. Must include every :class:`ThreatLevel` value.
 _LEVEL_RANK: dict[ThreatLevel, int] = {
@@ -196,19 +200,19 @@ class MonitorWorker:
             self._session.add(analysis)
             analysis_id = self._database.record_analysis(analysis)
             latest_analysis_id = analysis_id
-            delivered = self._alerts.maybe_send(analysis)
+            # Per-frame alerts are DISABLED — we only fire session-level
+            # alerts from _maybe_fire_session_alert() after the
+            # ConversationAnalyzer has accumulated enough cross-message
+            # context.  Per-frame parent_alert (if any) is still logged
+            # but NOT persisted or delivered.
             if analysis.parent_alert is not None:
-                self._database.record_alert(analysis_id, analysis, delivered=delivered)
-                logger.info(
-                    "Parent alert recorded (id=%d, urgency=%s, delivered=%s)",
-                    analysis_id,
+                logger.debug(
+                    "Per-frame alert SKIPPED (frame=%s, urgency=%s) — "
+                    "waiting for session-level context",
+                    analysis.screenshot_path.name,
                     analysis.parent_alert.urgency.value,
-                    delivered,
                 )
             latest = analysis
-            if analysis.classification.threat_level.value in {"alert", "critical"}:
-                with self._lock:
-                    self._latest_alert = analysis
 
             # Feed the conversation store from whichever source has messages.
             # Demo mode (synthetic scenarios) pre-populates
@@ -232,31 +236,68 @@ class MonitorWorker:
             )
             if extracted:
                 new = self._conversation_store.add(extracted)
-                # Trigger conversation-level analysis when enough has changed.
-                threshold = CONVERSATION_ANALYSIS_EVERY_N_NEW_MESSAGES
-                if self._conversation_store.unacknowledged_new >= threshold:
-                    self._run_conversation_analysis(latest_analysis_id)
+
+            # Decide whether to trigger conversation-level re-analysis.
+            # Two triggers:
+            #  A) Enough new messages accumulated (steady-state).
+            #  B) Per-frame escalation: the frame scanner flagged something
+            #     non-safe but the session verdict is still safe — run the
+            #     analyzer NOW so it can contextualize what the frame saw.
+            threshold = CONVERSATION_ANALYSIS_EVERY_N_NEW_MESSAGES
+            frame_level = analysis.classification.threat_level
+            frame_hint: dict[str, str] | None = None
+
+            should_run = False
+            if self._conversation_store.unacknowledged_new >= threshold:
+                should_run = True
+            if frame_level != ThreatLevel.SAFE:
+                with self._lock:
+                    sv = self._latest_session_verdict
+                sv_safe = sv is None or sv.overall_level == ThreatLevel.SAFE
+                if sv_safe:
+                    should_run = True
+                    frame_hint = {
+                        "level": frame_level.value,
+                        "category": analysis.classification.category.value,
+                        "confidence": str(round(analysis.classification.confidence)),
+                        "reasoning": analysis.classification.reasoning or "",
+                    }
+                    logger.info(
+                        "Frame escalation trigger: %s/%s — forcing conversation re-analysis",
+                        frame_level.value,
+                        analysis.classification.category.value,
+                    )
+
+            if should_run and self._conversation_store.size > 0:
+                self._run_conversation_analysis(latest_analysis_id, frame_hint=frame_hint)
 
         if latest is not None:
             with self._lock:
                 self._latest = latest
         return latest
 
-    def _run_conversation_analysis(self, last_analysis_id: int | None = None) -> None:
+    def _run_conversation_analysis(
+        self,
+        last_analysis_id: int | None = None,
+        frame_hint: dict[str, str] | None = None,
+    ) -> None:
         """Call the text-only analyzer and cache the resulting verdict.
 
-        Also fires a session-level parent alert when the verdict crosses
-        the threshold defined in :meth:`_maybe_fire_session_alert`.
+        When *frame_hint* is provided (from a per-frame escalation trigger),
+        it is forwarded to the analyzer so the model can specifically address
+        what the real-time scanner flagged.
         """
-        conversation = self._conversation_store.all_messages
+        conversation = self._conversation_store.recent_messages(CONVERSATION_WINDOW_SIZE)
         logger.info(
             "Triggering conversation analyzer over %d messages "
-            "(threshold=%d, unacknowledged=%d)",
+            "(window=%d, total=%d, unacknowledged=%d, frame_hint=%s)",
             len(conversation),
-            CONVERSATION_ANALYSIS_EVERY_N_NEW_MESSAGES,
+            CONVERSATION_WINDOW_SIZE,
+            self._conversation_store.size,
             self._conversation_store.unacknowledged_new,
+            bool(frame_hint),
         )
-        verdict = self._conversation_analyzer.analyze(conversation)
+        verdict = self._conversation_analyzer.analyze(conversation, frame_hint=frame_hint)
         if verdict is not None:
             with self._lock:
                 self._latest_session_verdict = verdict
@@ -671,4 +712,6 @@ class AppState:
                 self.worker.latest_session_verdict
             ),
             "conversation_size": self.conversation_store.size,
+            "conversation_pending": self.conversation_store.unacknowledged_new > 0,
+            "alert_timestamps": [card["timestamp"] for card in alert_history],
         }
