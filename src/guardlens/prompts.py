@@ -1,9 +1,10 @@
-"""Prompt templates for the Gemma 4 safety analyzer.
+"""Prompt templates for GuardianLens LLM calls.
 
-Kept in their own module so that prompt iteration during demo prep does not
-require touching the analyzer logic. Both the system prompt and the per-turn
-analysis prompt are versioned via :data:`PROMPT_VERSION` so we can correlate
-metric runs back to the exact prompt that produced them.
+Production pipeline prompts (used by :mod:`guardlens.pipeline`):
+  FRAME_EXTRACT_*, MATCH_CONVERSATION_*, MERGE_MESSAGES_*, STATUS_UPDATE_*
+
+Legacy per-frame prompts (used by :mod:`guardlens.analyzer` for eval scripts):
+  SYSTEM_PROMPT, ANALYSIS_PROMPT
 """
 
 from __future__ import annotations
@@ -76,84 +77,6 @@ unsafe, and emit the structured tool calls. Be concise in `reasoning` (3-5
 sentences) — the dashboard renders it verbatim to the parent.
 """
 
-
-CONVERSATION_SYSTEM_PROMPT = """\
-You are GuardianLens operating in CONVERSATION-LEVEL mode.
-
-You are reviewing the MOST RECENT messages from a child's chat. Focus on
-the current conversational thread — if older messages seem unrelated to
-what's happening now (different topic, different participants), ignore
-them and assess only the active thread.
-
-Your job:
-1. Read the conversation in order.
-2. Reason about the overall pattern, not individual messages.
-3. Call `assess_conversation` exactly once with a SINGLE aggregate verdict.
-
-CRITICAL — AVOID FALSE POSITIVES:
-Teenagers routinely ask each other: "where u from?", "how old are you?",
-"what school do you go to?", "you seem cool". This is NORMAL socializing
-between peers and is NOT grooming by itself.
-
-Grooming requires MULTIPLE of these red flags together:
-- An ADULT pretending to be a teen ("im 14 too lol" from someone who
-  writes like an adult, uses adult vocabulary, or whose profile doesn't
-  match a teen)
-- One-sided information gathering (one person asks many personal
-  questions but shares nothing back)
-- Isolation attempts ("let's talk on Snap/Discord instead",
-  "don't tell your parents")
-- Escalation toward inappropriate topics, gift offers, or meeting up
-- Scripted reassurance ("not creepy haha", "im normal i swear")
-
-Two teens mutually sharing basic info about themselves = SAFE.
-One person rapidly probing for personal details while revealing nothing
-about themselves AND showing adult-like behavior = SUSPICIOUS.
-
-CERTAINTY rules (critical):
-- `certainty` = "low"    : only 1-2 messages seen, OR pattern is ambiguous
-- `certainty` = "medium" : 3-5 messages consistently suggest the same concern
-- `certainty` = "high"   : 6+ messages show a clear, persistent pattern
-
-A single message — even a 100%-certain suspicious one — is ALWAYS low
-certainty. Wait for more evidence before recommending a parent alert.
-
-ALERT rule:
-- `parent_alert_recommended` = true ONLY when certainty ∈ {medium, high}
-  AND overall_level ∈ {warning, alert, critical}.
-- Exception: single explicit self-harm bait or physical threat → alert
-  immediately even with low certainty.
-
-Be specific in the narrative: quote short fragments if helpful. Do not
-paraphrase the raw chat verbatim in long stretches — the parent gets a
-summary, not a transcript. Do NOT mention older unrelated messages in
-the narrative — focus on the current thread only.
-"""
-
-
-CONVERSATION_USER_PROMPT_TEMPLATE = """\
-Full conversation observed so far across {n} message(s):
-
-{transcript}
-
-Assess the OVERALL pattern. Use the `assess_conversation` tool.
-"""
-
-
-CONVERSATION_USER_PROMPT_WITH_FRAME_HINT = """\
-Full conversation observed so far across {n} message(s):
-
-{transcript}
-
-The real-time frame scanner's CURRENT assessment: {frame_level} / {frame_category} / {frame_confidence}% confidence.
-Frame scanner reasoning: {frame_reasoning}
-
-Your job: produce a verdict aligned with the CURRENT state of the
-conversation. If the frame scanner sees safe content, the conversation
-has likely moved on — reflect that. If it sees a threat, evaluate
-whether the full context supports or contradicts it.
-Use the `assess_conversation` tool.
-"""
 
 
 # ====================== New conversation-first pipeline prompts ======================

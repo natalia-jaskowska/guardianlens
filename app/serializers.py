@@ -15,14 +15,12 @@ Keeping the serialization logic in its own module means:
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
 from datetime import datetime
 from typing import Any
 
 from guardlens.schema import (
     GroomingStage,
     ScreenAnalysis,
-    SessionVerdict,
     ThreatCategory,
     ThreatLevel,
 )
@@ -151,11 +149,6 @@ def serialize_stage(stage: GroomingStage) -> dict[str, Any]:
     }
 
 
-def serialize_timeline(analyses: Iterable[ScreenAnalysis]) -> list[dict[str, Any]]:
-    """Serialize a list of analyses, newest first."""
-    return [serialize_analysis(a) for a in reversed(list(analyses))]
-
-
 # ----------------------------------------------------------------------- helpers
 
 
@@ -251,22 +244,6 @@ def stat_boxes(
         {"label": "Escalation", "value": escalation_label},
         {"label": "Stage", "value": f"{stage_idx}/5"},
     ]
-
-
-def compute_safe_streak(history: list[ScreenAnalysis]) -> int:
-    """How many consecutive safe analyses from the latest backwards.
-
-    Used by the header streak badge. Walks the session window from
-    newest to oldest, counting safe scans until it hits a non-safe one
-    or runs out of history.
-    """
-    count = 0
-    for analysis in reversed(history):
-        if analysis.classification.threat_level == ThreatLevel.SAFE:
-            count += 1
-        else:
-            break
-    return count
 
 
 def build_session_health(
@@ -1090,18 +1067,3 @@ def generate_recommended_action(
     return {"steps": steps, "privacy_note": privacy_note}
 
 
-def serialize_session_verdict(verdict: SessionVerdict | None) -> dict[str, Any] | None:
-    """JSON-friendly dump of a :class:`SessionVerdict` for the API."""
-    if verdict is None:
-        return None
-    return {
-        "overall_level": verdict.overall_level.value,
-        "overall_category": verdict.overall_category.value,
-        "confidence": verdict.confidence,
-        "certainty": verdict.certainty.value,
-        "narrative": verdict.narrative,
-        "key_indicators": list(verdict.key_indicators),
-        "messages_analyzed": verdict.messages_analyzed,
-        "parent_alert_recommended": verdict.parent_alert_recommended,
-        "timestamp": verdict.timestamp.isoformat(timespec="seconds"),
-    }

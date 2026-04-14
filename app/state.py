@@ -10,7 +10,6 @@ import json
 import logging
 import threading
 import time
-from pathlib import Path
 from typing import Any
 
 from app.serializers import (
@@ -28,7 +27,6 @@ from guardlens.database import GuardLensDatabase
 from guardlens.monitor import capture_loop
 from guardlens.pipeline import ConversationPipeline
 from guardlens.privacy import NetworkGuard, PrivacyGuard
-from guardlens.schema import ThreatLevel
 
 logger = logging.getLogger(__name__)
 

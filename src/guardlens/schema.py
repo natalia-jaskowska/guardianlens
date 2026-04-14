@@ -55,24 +55,6 @@ class AlertUrgency(str, Enum):
     IMMEDIATE = "immediate"
 
 
-class ContentType(str, Enum):
-    """How a frame should be routed after per-frame analysis.
-
-    CONVERSATION — a 1-to-1 or small-group direct message chat (Instagram DM,
-    Discord DM, WhatsApp). Tracked per-participant: the store accumulates
-    messages attributed to each username, so the conversation-level analyzer
-    can reason about one specific interlocutor across minutes of chat.
-
-    ENVIRONMENT — a public space the child is visiting (Minecraft server,
-    TikTok feed, YouTube, Discord public channel). No single interlocutor,
-    so we track the *space* instead of a person. If someone in the space
-    specifically targets the child (asks age, offers to move private),
-    they get promoted to a tracked conversation.
-    """
-
-    CONVERSATION = "conversation"
-    ENVIRONMENT = "environment"
-
 
 class ChatMessage(BaseModel):
     """One message inside the captured conversation.
@@ -169,33 +151,13 @@ class SessionCertainty(str, Enum):
     HIGH = "high"
 
 
-class SessionVerdict(BaseModel):
-    """Output of a conversation-level safety analysis.
-
-    Produced by :class:`guardlens.conversation_analyzer.ConversationAnalyzer`
-    from the accumulated set of visible chat messages across frames.
-    """
-
-    overall_level: ThreatLevel
-    overall_category: ThreatCategory
-    confidence: float = Field(..., ge=0.0, le=100.0)
-    certainty: SessionCertainty
-    narrative: str = Field(
-        ...,
-        description="Short plain-English summary of the pattern observed across messages.",
-    )
-    key_indicators: list[str] = Field(default_factory=list)
-    messages_analyzed: int = 0
-    parent_alert_recommended: bool = False
-    timestamp: datetime = Field(default_factory=datetime.now)
-
-
 class ScreenAnalysis(BaseModel):
     """Full analysis result for one screenshot.
 
-    This is what flows through the rest of the pipeline (session tracker,
-    alerts, dashboard). Anything the parent or judge sees is rendered from
-    a :class:`ScreenAnalysis`.
+    Used by the alert system and serializers. The pipeline's per-frame
+    analysis produces :class:`FrameAnalysis` (conversation-centric);
+    ScreenAnalysis is retained for alert persistence and the legacy
+    ``/api/analysis/{id}`` endpoint.
     """
 
     timestamp: datetime
@@ -206,22 +168,7 @@ class ScreenAnalysis(BaseModel):
     grooming_stage: GroomingStageResult | None = None
     parent_alert: ParentAlert | None = None
     inference_seconds: float = Field(..., ge=0.0)
-    chat_messages: list[ChatMessage] | None = Field(
-        None,
-        description=(
-            "Reconstructed conversation as structured messages. Populated "
-            "by the worker from demo scenario scripts or watch-folder "
-            "metadata; may be None in real-screenshot mode."
-        ),
-    )
-    content_type: ContentType | None = Field(
-        None,
-        description=(
-            "Routing hint set by ContentClassifier: CONVERSATION (per-participant "
-            "tracking) or ENVIRONMENT (per-space tracking). Filled in after "
-            "per-frame analysis, before store update."
-        ),
-    )
+    chat_messages: list[ChatMessage] | None = None
 
     @property
     def is_safe(self) -> bool:
@@ -270,69 +217,3 @@ class FrameAnalysis(BaseModel):
     inference_seconds: float = 0.0
 
 
-class ConversationContext(BaseModel):
-    """A tracked 1-to-1 (or small-group) conversation with one participant.
-
-    The dashboard renders one circle-avatar card per ConversationContext.
-    Grows across frames as the same participant sends more messages.
-    """
-
-    participant: str
-    platform: str
-    source: str = Field(
-        "direct",
-        description=(
-            "How this conversation entered tracking. 'direct' when the child "
-            "opened a DM; 'promoted_from_<platform>' when the environment "
-            "monitor promoted a targeting user to a tracked conversation."
-        ),
-    )
-    first_seen: datetime = Field(default_factory=datetime.now)
-    last_seen: datetime = Field(default_factory=datetime.now)
-    message_count: int = 0
-    threat_level: ThreatLevel = ThreatLevel.SAFE
-    category: ThreatCategory = ThreatCategory.NONE
-    grooming_stage: GroomingStage = GroomingStage.NONE
-    indicators: list[str] = Field(default_factory=list)
-    confidence: float = Field(0.0, ge=0.0, le=100.0)
-    narrative: str = ""
-    alert_sent: bool = False
-    telegram_delivered: bool = False
-
-    @property
-    def key(self) -> tuple[str, str]:
-        """Store key: (platform, participant). Used for per-participant dedup."""
-        return (self.platform, self.participant)
-
-
-class EnvironmentContext(BaseModel):
-    """A public space the child is visiting (not a 1-to-1 conversation).
-
-    The dashboard renders one square-icon card per EnvironmentContext.
-    Updated each frame while the child is in that space.
-    """
-
-    platform: str
-    context: str = Field(
-        "",
-        description="Sub-identifier for the space, e.g. 'survival_server' or 'tiktok_feed'.",
-    )
-    content_type_label: str = Field(
-        "",
-        description="Human label: 'in_game_chat' | 'video_feed' | 'social_feed' | 'website'.",
-    )
-    first_seen: datetime = Field(default_factory=datetime.now)
-    last_seen: datetime = Field(default_factory=datetime.now)
-    user_count: int = 0
-    overall_safety: ThreatLevel = ThreatLevel.SAFE
-    content_summary: str = ""
-    promoted_users: list[str] = Field(
-        default_factory=list,
-        description="Usernames promoted to conversation tracking from this environment.",
-    )
-    indicators: list[str] = Field(default_factory=list)
-
-    @property
-    def key(self) -> tuple[str, str]:
-        """Store key: (platform, context)."""
-        return (self.platform, self.context)

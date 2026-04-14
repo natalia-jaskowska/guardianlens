@@ -121,25 +121,6 @@ DEMO_FLAGS: dict[tuple[str, str], dict[int, str]] = {
 }
 
 
-def build_chat_messages(platform: str, scenario: str) -> list[dict[str, str | None]]:
-    """Build the structured chat messages payload for a demo scenario.
-
-    Returns a list of ``{sender, text, flag}`` dicts ready to be passed
-    to :class:`guardlens.schema.ChatMessage`. Each line carries its
-    pre-computed flag from :data:`DEMO_FLAGS` (or ``None`` if safe).
-    """
-    platform_lines = _SCENARIO_LINES.get(platform)
-    if platform_lines is None:
-        return []
-    lines = platform_lines.get(scenario)
-    if lines is None:
-        return []
-    flags = DEMO_FLAGS.get((platform, scenario), {})
-    out: list[dict[str, str | None]] = []
-    for idx, (sender, text) in enumerate(lines):
-        out.append({"sender": sender, "text": text, "flag": flags.get(idx)})
-    return out
-
 
 # ----------------------------------------------------------------------- chat lines
 

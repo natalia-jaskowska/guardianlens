@@ -14,7 +14,6 @@ from app.serializers import (
     format_session_duration,
     serialize_analysis,
     serialize_stage,
-    serialize_timeline,
     session_totals,
 )
 
@@ -116,15 +115,6 @@ def test_serialize_stage_first_and_last() -> None:
     assert all(seg["state"] == "active" for seg in last["segments"][:-1])
     assert last["segments"][-1]["state"] == "current"
 
-
-def test_serialize_timeline_orders_newest_first() -> None:
-    a = _analysis(ThreatLevel.SAFE)
-    b = _analysis(ThreatLevel.ALERT)
-    payload = serialize_timeline([a, b])
-    assert len(payload) == 2
-    # b was added second, so it should appear first after reversal.
-    assert payload[0]["threat_level"] == "alert"
-    assert payload[1]["threat_level"] == "safe"
 
 
 def test_session_totals_aggregates_caution_and_alert() -> None:
@@ -254,23 +244,3 @@ def test_dedup_indicators_filters_empty() -> None:
     assert result == ["Flattery", "Isolation"]
 
 
-# --- Timeline payload contract (for JS escalation detection) ------------------
-
-
-def test_serialize_timeline_entries_have_fields_for_escalation_detection() -> None:
-    """Timeline entries must include threat_level and timestamp so the
-    front-end can compute escalation runs."""
-    entries = [
-        _analysis(ThreatLevel.SAFE),
-        _analysis(ThreatLevel.CAUTION),
-        _analysis(ThreatLevel.ALERT),
-    ]
-    timeline = serialize_timeline(entries)
-    for row in timeline:
-        assert "threat_level" in row
-        assert "timestamp" in row
-        assert "time_label" in row
-        assert "platform" in row
-    # Order is newest-first
-    assert timeline[0]["threat_level"] == "alert"
-    assert timeline[-1]["threat_level"] == "safe"

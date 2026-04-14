@@ -9,22 +9,17 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from guardlens.analyzer import GuardLensAnalyzer
-from guardlens.config import GuardLensConfig, OllamaConfig, SessionConfig
+from guardlens.config import GuardLensConfig, OllamaConfig
 from guardlens.database import GuardLensDatabase
 from guardlens.pipeline import ConversationPipeline, _naive_merge
 from guardlens.schema import (
-    ChatMessage,
-    ConversationFragment,
-    ConversationStatus,
     FrameAnalysis,
     ScreenAnalysis,
-    ThreatCategory,
     ThreatLevel,
 )
-from guardlens.session_tracker import SessionTracker
 
 
 _FAKE_OLLAMA_RESPONSE: dict[str, Any] = {
@@ -94,41 +89,6 @@ def test_analyzer_parses_full_tool_chain(tmp_path: Path) -> None:
     assert result.parent_alert is not None
     assert result.needs_parent_attention is True
 
-
-def _fake_analysis(level: ThreatLevel) -> ScreenAnalysis:
-    return ScreenAnalysis.model_validate(
-        {
-            "timestamp": datetime.now(),
-            "screenshot_path": "/tmp/fake.png",
-            "classification": {
-                "threat_level": level.value,
-                "category": "grooming" if level != ThreatLevel.SAFE else "none",
-                "confidence": 90.0,
-                "reasoning": "synthetic",
-                "indicators_found": [],
-            },
-            "inference_seconds": 0.1,
-        }
-    )
-
-
-def test_session_tracker_detects_escalation() -> None:
-    """Two consecutive non-safe analyses should trip the escalation flag."""
-    session = SessionTracker(SessionConfig(window_size=5, escalation_threshold=2))
-    session.add(_fake_analysis(ThreatLevel.ALERT))
-    assert session.has_escalating_pattern() is False
-    session.add(_fake_analysis(ThreatLevel.ALERT))
-    assert session.has_escalating_pattern() is True
-
-
-def test_session_tracker_resets_on_safe() -> None:
-    """A SAFE verdict in between two ALERTs should reset the streak."""
-    session = SessionTracker(SessionConfig(window_size=5, escalation_threshold=2))
-    session.add(_fake_analysis(ThreatLevel.ALERT))
-    session.add(_fake_analysis(ThreatLevel.SAFE))
-    session.add(_fake_analysis(ThreatLevel.ALERT))
-    assert session.consecutive_unsafe() == 1
-    assert session.has_escalating_pattern() is False
 
 
 # ---------------------------------------------------------------------------

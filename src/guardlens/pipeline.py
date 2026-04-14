@@ -42,7 +42,6 @@ from guardlens.schema import (
     ConversationFragment,
     ConversationStatus,
     FrameAnalysis,
-    ThreatCategory,
     ThreatLevel,
 )
 from guardlens.tools import (
