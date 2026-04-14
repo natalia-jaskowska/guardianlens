@@ -33,15 +33,20 @@ from app.serializers import (
 )
 from guardlens.alerts import AlertSender
 from guardlens.analyzer import GuardLensAnalyzer
+from guardlens.classifier import ContentClassifier
 from guardlens.config import GuardLensConfig
 from guardlens.conversation_analyzer import ConversationAnalyzer
-from guardlens.conversation_store import ConversationStore
+from guardlens.conversation_store import ConversationStore, ParticipantTracker
 from guardlens.database import GuardLensDatabase
 from guardlens.demo import build_chat_messages
+from guardlens.environment import EnvironmentMonitor
+from guardlens.escalation import EscalationTracker
 from guardlens.monitor import capture_loop
+from guardlens.privacy import NetworkGuard, PrivacyGuard
 from guardlens.schema import (
     AlertUrgency,
     ChatMessage,
+    ContentType,
     ParentAlert,
     ScreenAnalysis,
     SessionCertainty,
@@ -89,6 +94,11 @@ class MonitorWorker:
         database: GuardLensDatabase,
         conversation_store: ConversationStore,
         conversation_analyzer: ConversationAnalyzer,
+        classifier: ContentClassifier | None = None,
+        participant_tracker: ParticipantTracker | None = None,
+        environment_monitor: EnvironmentMonitor | None = None,
+        escalation_tracker: EscalationTracker | None = None,
+        privacy_guard: PrivacyGuard | None = None,
     ) -> None:
         self._config = config
         self._analyzer = analyzer
@@ -97,6 +107,17 @@ class MonitorWorker:
         self._database = database
         self._conversation_store = conversation_store
         self._conversation_analyzer = conversation_analyzer
+        # New conversation-centric helpers. Kept optional so the
+        # existing pipeline tests that predate them don't need to
+        # know they exist — but in the real AppState wiring they are
+        # always supplied.
+        self._classifier = classifier or ContentClassifier()
+        self._participants = participant_tracker or ParticipantTracker()
+        self._environments = environment_monitor or EnvironmentMonitor(
+            tracker=self._participants
+        )
+        self._escalation = escalation_tracker or EscalationTracker()
+        self._privacy = privacy_guard or PrivacyGuard(config.privacy)
         self._queue: queue.Queue[ScreenAnalysis] = queue.Queue()
         self._stop_event = threading.Event()
         self._pause_event = threading.Event()
@@ -198,6 +219,21 @@ class MonitorWorker:
         latest: ScreenAnalysis | None = None
         latest_analysis_id: int | None = None
         for analysis in drained:
+            # Canonicalize the platform string up front so DB rows, the
+            # capture status bar (reads self._latest), and the
+            # conversation/environment cards all render the same name.
+            # Without this, a verbose model output like
+            # "chat/messaging platform (likely discord)" lands raw in
+            # the DB and the status bar while the cards show "discord".
+            raw_platform = (
+                analysis.platform
+                or analysis.classification.platform_detected
+                or "unknown"
+            )
+            canonical = _canonical_platform(raw_platform)
+            if canonical and canonical != raw_platform:
+                analysis = analysis.model_copy(update={"platform": canonical})
+
             self._session.add(analysis)
             analysis_id = self._database.record_analysis(analysis)
             latest_analysis_id = analysis_id
@@ -214,6 +250,13 @@ class MonitorWorker:
                     analysis.parent_alert.urgency.value,
                 )
             latest = analysis
+            # Publish the current frame as _latest BEFORE the conversation
+            # analyzer runs. _maybe_fire_session_alert reads self._latest
+            # to build the session-alert stub; if _latest is stale (or
+            # None on the first frame) the stub is missing and the alert
+            # is silently dropped.
+            with self._lock:
+                self._latest = analysis
 
             # Feed the conversation store from whichever source has messages.
             # Demo mode (synthetic scenarios) pre-populates
@@ -238,44 +281,166 @@ class MonitorWorker:
             if extracted:
                 self._conversation_store.add(extracted)
 
+            # --- Conversation-centric routing --------------------------------
+            # Stamp content_type on the analysis, then route the frame.
+            # CONVERSATION  → accumulate under a per-participant store and
+            #                 update the per-participant ConversationContext.
+            # ENVIRONMENT   → observe the space and let the monitor decide
+            #                 whether any user should be promoted to a
+            #                 tracked conversation (targeting detection).
+            # Escalation is tracked per-participant on the CONVERSATION
+            # path and per-environment on the ENVIRONMENT path.
+            self._route_frame(analysis, extracted)
+
+            # Privacy: delete the screenshot once analysis is done, if the
+            # config flag is set. The watch-folder mode runs against
+            # real sample images we want to keep, so the flag stays off
+            # by default — turn it on for live capture / privacy-strict
+            # demos.
+            self._privacy.delete_screenshot(analysis.screenshot_path)
+
             # Decide whether to trigger conversation-level re-analysis.
-            # Two triggers:
-            #  A) Enough new messages accumulated (steady-state).
-            #  B) Per-frame escalation: the frame scanner flagged something
-            #     non-safe but the session verdict is still safe — run the
-            #     analyzer NOW so it can contextualize what the frame saw.
+            # The conversation analyzer should stay aligned with the
+            # current frame. We always pass the frame's classification
+            # as context so the model knows what's on screen NOW.
+            #
+            # Triggers:
+            #  A) Enough new unique messages accumulated (steady-state).
+            #  B) Non-safe frame — always re-run.
+            #  C) Safe frame but stale non-safe verdict — re-run so the
+            #     verdict can downgrade.
             threshold = CONVERSATION_ANALYSIS_EVERY_N_NEW_MESSAGES
             frame_level = analysis.classification.threat_level
-            frame_hint: dict[str, str] | None = None
+
+            # Always build frame context so the conversation analyzer
+            # knows what's currently on screen.
+            frame_hint: dict[str, str] = {
+                "level": frame_level.value,
+                "category": analysis.classification.category.value,
+                "confidence": str(round(analysis.classification.confidence)),
+                "reasoning": analysis.classification.reasoning or "",
+            }
 
             should_run = False
             if self._conversation_store.unacknowledged_new >= threshold:
                 should_run = True
+
+            with self._lock:
+                sv = self._latest_session_verdict
+
             if frame_level != ThreatLevel.SAFE:
-                with self._lock:
-                    sv = self._latest_session_verdict
-                sv_safe = sv is None or sv.overall_level == ThreatLevel.SAFE
-                if sv_safe:
-                    should_run = True
-                    frame_hint = {
-                        "level": frame_level.value,
-                        "category": analysis.classification.category.value,
-                        "confidence": str(round(analysis.classification.confidence)),
-                        "reasoning": analysis.classification.reasoning or "",
-                    }
-                    logger.info(
-                        "Frame escalation trigger: %s/%s — forcing conversation re-analysis",
-                        frame_level.value,
-                        analysis.classification.category.value,
-                    )
+                should_run = True
+            elif sv is not None and sv.overall_level != ThreatLevel.SAFE:
+                should_run = True
 
             if should_run and self._conversation_store.size > 0:
                 self._run_conversation_analysis(latest_analysis_id, frame_hint=frame_hint)
 
-        if latest is not None:
-            with self._lock:
-                self._latest = latest
+        # self._latest is kept in sync inside the loop so the
+        # conversation analyzer can anchor alerts on the current frame.
         return latest
+
+    def _route_frame(
+        self,
+        analysis: ScreenAnalysis,
+        extracted: list[ChatMessage],
+    ) -> None:
+        """Route a per-frame analysis to conversation or environment tracking.
+
+        Side effects:
+
+        - Sets ``analysis.content_type`` (via the classifier).
+        - Updates :class:`ParticipantTracker` for CONVERSATION frames.
+        - Updates :class:`EnvironmentMonitor` for ENVIRONMENT frames, and
+          may promote targeting users into participant tracking.
+        - Feeds :class:`EscalationTracker` with the per-participant level
+          so the dashboard can flag rising trajectories.
+        """
+        ct = self._classifier.classify(analysis)
+        # The platform has already been canonicalized in drain() before
+        # this frame was persisted, so every consumer below sees the
+        # same string.
+        platform = (
+            analysis.platform
+            or analysis.classification.platform_detected
+            or "unknown"
+        )
+        cls = analysis.classification
+
+        if ct == ContentType.CONVERSATION:
+            participants = self._non_child_senders(extracted)
+            # In a DM there is normally one non-child participant. If the
+            # model surfaces more (e.g., a small group DM), track each.
+            if not participants and analysis.classification.extracted_users:
+                participants = [
+                    u for u in analysis.classification.extracted_users
+                    if u and u.lower() not in {"you", "me", "child"}
+                ]
+
+            if not participants:
+                logger.debug(
+                    "Conversation frame has no identifiable participant — "
+                    "skipping per-participant tracking (frame=%s).",
+                    analysis.screenshot_path.name,
+                )
+                return
+
+            for participant in participants:
+                messages_for_user = [
+                    m for m in extracted
+                    if (m.sender or "").strip() == participant
+                ] or extracted  # fall back to all messages if none match
+                self._participants.add_for_participant(
+                    platform, participant, messages_for_user
+                )
+                self._participants.update_context(
+                    platform,
+                    participant,
+                    threat_level=cls.threat_level,
+                    category=cls.category,
+                    confidence=cls.confidence,
+                    narrative=cls.reasoning or "",
+                    indicators=list({*cls.indicators_found}),
+                    grooming_stage=(
+                        analysis.grooming_stage.stage
+                        if analysis.grooming_stage
+                        else None
+                    ),
+                )
+                verdict = self._escalation.observe(
+                    platform, participant, cls.threat_level, cls.indicators_found
+                )
+                if verdict.escalating:
+                    logger.info(
+                        "Escalation flagged: %s/%s — speed=%.2f highest=%s",
+                        platform,
+                        participant,
+                        verdict.escalation_speed,
+                        verdict.highest_level.value,
+                    )
+            return
+
+        # ENVIRONMENT path
+        env_ctx = self._environments.observe(analysis)
+        promoted = self._environments.detect_and_promote(analysis)
+        for user in promoted:
+            # Promoted users inherit the environment's current level so
+            # the escalation tracker has a starting point.
+            self._escalation.observe(
+                env_ctx.platform, user, cls.threat_level, cls.indicators_found
+            )
+
+    @staticmethod
+    def _non_child_senders(messages: list[ChatMessage]) -> list[str]:
+        """Distinct non-child senders in frame order."""
+        out: list[str] = []
+        for m in messages:
+            s = (m.sender or "").strip()
+            if not s or s.lower() in {"you", "me", "child"}:
+                continue
+            if s not in out:
+                out.append(s)
+        return out
 
     def _run_conversation_analysis(
         self,
@@ -284,9 +449,8 @@ class MonitorWorker:
     ) -> None:
         """Call the text-only analyzer and cache the resulting verdict.
 
-        When *frame_hint* is provided (from a per-frame escalation trigger),
-        it is forwarded to the analyzer so the model can specifically address
-        what the real-time scanner flagged.
+        *frame_hint* carries the current frame's classification so the
+        conversation analyzer can align its verdict with what's on screen.
         """
         conversation = self._conversation_store.recent_messages(CONVERSATION_WINDOW_SIZE)
         logger.info(
@@ -485,12 +649,275 @@ class MonitorWorker:
             self._queue.put(analysis)
 
 
+def _serialize_conversation(
+    ctx,
+    escalation: EscalationTracker,
+) -> dict[str, Any]:
+    """Flatten one :class:`ConversationContext` into dashboard JSON.
+
+    Overlays the latest :class:`EscalationVerdict` so the card can show
+    "escalating" / "speed" without the JS having to compute it.
+    """
+    verdict = escalation.verdict_for(ctx.platform, ctx.participant)
+    return {
+        "participant": ctx.participant,
+        "platform": ctx.platform,
+        "source": ctx.source,
+        "first_seen": ctx.first_seen.isoformat(),
+        "last_seen": ctx.last_seen.isoformat(),
+        "message_count": ctx.message_count,
+        "threat_level": ctx.threat_level.value,
+        "category": ctx.category.value,
+        "grooming_stage": ctx.grooming_stage.value if ctx.grooming_stage else None,
+        "indicators": list(ctx.indicators),
+        "confidence": ctx.confidence,
+        "narrative": ctx.narrative,
+        "alert_sent": ctx.alert_sent,
+        "telegram_delivered": ctx.telegram_delivered,
+        "escalation": (
+            {
+                "escalating": verdict.escalating,
+                "speed": verdict.escalation_speed,
+                "highest_level": verdict.highest_level.value,
+                "indicators_growth": verdict.indicators_growth,
+                "observations": verdict.observation_count,
+            }
+            if verdict is not None
+            else None
+        ),
+    }
+
+
+def _serialize_environment(ctx) -> dict[str, Any]:
+    """Flatten one :class:`EnvironmentContext` into dashboard JSON."""
+    return {
+        "platform": ctx.platform,
+        "context": ctx.context,
+        "content_type": ctx.content_type_label,
+        "first_seen": ctx.first_seen.isoformat(),
+        "last_seen": ctx.last_seen.isoformat(),
+        "user_count": ctx.user_count,
+        "overall_safety": ctx.overall_safety.value,
+        "content_summary": ctx.content_summary,
+        "promoted_users": list(ctx.promoted_users),
+        "indicators": list(ctx.indicators),
+    }
+
+
 _DEMO_SECTION_LABELS: dict[str, str] = {
     "minecraft": "Minecraft Chat",
     "discord": "Discord Chat",
     "instagram": "Instagram DM",
     "tiktok": "TikTok Comments",
 }
+
+
+def _build_session_narrative(
+    conversations: list,
+    environments: list,
+    duration_s: float,
+    alerts_count: int,
+) -> dict[str, Any]:
+    """Build the right-panel "Session overview" narrative for the dashboard.
+
+    Produces the plain-language parent-facing story described in
+    DASHBOARD_DESIGN_FINAL.md.  Intentionally non-LLM for now — we have
+    structured per-participant / per-environment state already, so a
+    deterministic template is faster and as legible. A future revision
+    can swap in a Gemma 4 call without changing the return shape.
+
+    Returns a dict with:
+      - headline: "Currently safe" / "Alerts active" / "Concerning patterns"
+      - subhead: one-liner context ("Normal gameplay" / "3 concerns detected")
+      - monitored: pretty duration
+      - platforms_count: int
+      - safe_rate: float (0-100)
+      - concerns: list of {name, platform, summary, level} newest first
+      - safe_summary: string ("TikTok, Instagram feed, PixelBuilder")
+      - what_to_do: list of consolidated action strings
+      - tone: one of safe|warning|alert
+    """
+    non_safe_convs = [
+        c for c in conversations
+        if c["threat_level"] in {"caution", "warning", "alert", "critical"}
+    ]
+    non_safe_envs = [
+        e for e in environments
+        if e["overall_safety"] in {"caution", "warning", "alert", "critical"}
+    ]
+    safe_convs = [c for c in conversations if c["threat_level"] == "safe"]
+    safe_envs = [e for e in environments if e["overall_safety"] == "safe"]
+
+    # Concerns are per-USER. An environment is concerning because of the
+    # people in it (surfaced via promoted users, which are already in
+    # conversations). Listing both would double-count: "NitroBot on
+    # Discord" would show up a second time as "Discord environment".
+    concerns: list[dict[str, str]] = []
+    for c in non_safe_convs:
+        concerns.append(
+            {
+                "kind": "conversation",
+                "name": c["participant"],
+                "platform": c["platform"],
+                "level": c["threat_level"],
+                "category": c["category"],
+                "summary": (
+                    c["narrative"][:140]
+                    if c.get("narrative")
+                    else f"{c['category']} pattern on {c['platform']}"
+                ),
+            }
+        )
+    # Environments are context, not concerns. If a space has something
+    # worth alerting on, the promoted-user mechanism surfaces it as a
+    # per-user concern. The narrative talks about PEOPLE.
+
+    # Overall tone
+    if any(c["level"] in {"alert", "critical"} for c in concerns):
+        tone = "alert"
+        headline = "Alerts active"
+        subhead = f"{len(concerns)} concern{'s' if len(concerns) != 1 else ''} — review now"
+    elif concerns:
+        tone = "warning"
+        headline = "Concerning patterns"
+        subhead = f"{len(concerns)} concern{'s' if len(concerns) != 1 else ''} flagged"
+    else:
+        tone = "safe"
+        headline = "Currently safe"
+        subhead = (
+            f"Normal activity across {len(conversations) + len(environments)} "
+            f"place{'s' if len(conversations) + len(environments) != 1 else ''}"
+            if conversations or environments
+            else "Monitoring — nothing flagged yet"
+        )
+
+    # Platform count (union of platforms seen)
+    platforms_seen = {c["platform"] for c in conversations} | {
+        e["platform"] for e in environments
+    }
+    total_obs = len(conversations) + len(environments)
+    safe_rate = (
+        round(100 * (len(safe_convs) + len(safe_envs)) / total_obs)
+        if total_obs > 0
+        else 100
+    )
+
+    # Safe summary line
+    safe_tokens: list[str] = []
+    for e in safe_envs[:3]:
+        safe_tokens.append(e["platform"])
+    for c in safe_convs[:3]:
+        safe_tokens.append(c["participant"])
+    safe_summary = ", ".join(safe_tokens) if safe_tokens else "—"
+
+    # Consolidated "what to do" — references ALL concerning parties
+    what_to_do: list[str] = []
+    grooming_names = [c["name"] for c in concerns if "grooming" in c.get("category", "")]
+    bullying_names = [c["name"] for c in concerns if "bullying" in c.get("category", "")]
+    other_names = [
+        c["name"] for c in concerns
+        if not any(k in c.get("category", "") for k in ("grooming", "bullying"))
+    ]
+    if grooming_names:
+        what_to_do.append(
+            f"Have a calm conversation with your child about the {grooming_names[0]} interaction"
+        )
+    elif bullying_names:
+        what_to_do.append(
+            f"Offer emotional support around the {bullying_names[0]} exchanges"
+        )
+    elif concerns:
+        what_to_do.append("Review the concerning activity with your child")
+
+    if len(concerns) >= 2:
+        what_to_do.append(
+            "Ask who " + " and ".join(f'"{c["name"]}"' for c in concerns[:2]) + " are"
+        )
+    elif concerns:
+        what_to_do.append(f"Ask who \"{concerns[0]['name']}\" is")
+
+    if concerns:
+        what_to_do.append(
+            "Block and report "
+            + ("them together" if len(concerns) >= 2 else f"{concerns[0]['name']}")
+        )
+
+    if not what_to_do:
+        what_to_do = ["Keep monitoring — nothing actionable yet"]
+
+    return {
+        "headline": headline,
+        "subhead": subhead,
+        "tone": tone,
+        "monitored": _pretty_duration(duration_s),
+        "platforms_count": len(platforms_seen),
+        "safe_rate": safe_rate,
+        "concerns": concerns,
+        "safe_summary": safe_summary,
+        "safe_count": len(safe_convs) + len(safe_envs),
+        "what_to_do": what_to_do,
+        "alerts_count": alerts_count,
+    }
+
+
+_PLATFORM_CANON: list[tuple[tuple[str, ...], str]] = [
+    # (fragments that must appear in the raw string, canonical name)
+    (("instagram",), "instagram"),
+    (("discord",), "discord"),
+    (("minecraft",), "minecraft"),
+    (("roblox",), "roblox"),
+    (("fortnite",), "fortnite"),
+    (("tiktok",), "tiktok"),
+    (("youtube",), "youtube"),
+    (("snapchat",), "snapchat"),
+    (("whatsapp",), "whatsapp"),
+    (("telegram",), "telegram"),
+    (("messenger", "facebook"), "messenger"),
+    (("imessage",), "imessage"),
+]
+
+
+def _canonical_platform(raw: str) -> str:
+    """Collapse verbose model outputs to a single canonical platform name.
+
+    The vision model sometimes returns strings like
+    ``"chat/messaging platform (likely discord)"`` — each variant would
+    otherwise open its own :class:`EnvironmentContext`, so the dashboard
+    ends up with a fan of near-duplicate cards. This helper maps any
+    string containing a known platform fragment to that platform's
+    canonical lowercase name.  Generic chat-like descriptions with no
+    identifiable brand collapse into a single ``chat`` bucket so they
+    don't each spawn their own environment card.
+    """
+    if not raw:
+        return "unknown"
+    low = raw.strip().lower()
+    # 1) Brand hit.
+    for fragments, canon in _PLATFORM_CANON:
+        if any(frag in low for frag in fragments):
+            return canon
+    # 2) Generic chat-like description — collapse to a single "chat"
+    #    bucket instead of keeping each variant phrase separate.
+    chat_hints = ("chat", "messaging", "group chat", "dm")
+    if any(h in low for h in chat_hints):
+        return "chat"
+    # 3) Feed-like description.
+    if any(h in low for h in ("feed", "video", "stream")):
+        return "feed"
+    # 4) Nothing matched — return the stripped original.
+    return low
+
+
+def _pretty_duration(seconds: float) -> str:
+    """Format 4327s → '1h 12m'. Used by the session narrative."""
+    seconds = max(0, int(seconds))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    if h:
+        return f"{h}h {m:02d}m"
+    if m:
+        return f"{m}m {s:02d}s"
+    return f"{s}s"
 
 
 def _build_session_parent_alert(verdict: SessionVerdict) -> ParentAlert:
@@ -587,6 +1014,15 @@ class AppState:
         self.database = GuardLensDatabase(config.database.path)
         self.conversation_store = ConversationStore()
         self.conversation_analyzer = ConversationAnalyzer(config.ollama)
+        # New conversation-centric components.
+        self.classifier = ContentClassifier()
+        self.participant_tracker = ParticipantTracker()
+        self.environment_monitor = EnvironmentMonitor(tracker=self.participant_tracker)
+        self.escalation_tracker = EscalationTracker()
+        self.privacy_guard = PrivacyGuard(config.privacy)
+        # Audit the network stance at startup so the dashboard can
+        # surface "Fully local" with confidence.
+        self.network_report = NetworkGuard.verify_no_egress(config.ollama.host)
         self.worker = MonitorWorker(
             config=config,
             analyzer=self.analyzer,
@@ -595,6 +1031,11 @@ class AppState:
             database=self.database,
             conversation_store=self.conversation_store,
             conversation_analyzer=self.conversation_analyzer,
+            classifier=self.classifier,
+            participant_tracker=self.participant_tracker,
+            environment_monitor=self.environment_monitor,
+            escalation_tracker=self.escalation_tracker,
+            privacy_guard=self.privacy_guard,
         )
 
     # ------------------------------------------------------------------ lifecycle helpers
@@ -696,4 +1137,27 @@ class AppState:
             "conversation_size": self.conversation_store.size,
             "conversation_pending": self.conversation_store.unacknowledged_new > 0,
             "alert_timestamps": [card["timestamp"] for card in alert_history],
+            # Conversation-centric state: one card per tracked participant,
+            # one card per tracked public space. Serializers turn these
+            # into the dashboard's circle-avatar / square-icon cards.
+            "conversations": (_conv_list := [
+                _serialize_conversation(ctx, self.escalation_tracker)
+                for ctx in self.participant_tracker.contexts()
+            ]),
+            "environments": (_env_list := [
+                _serialize_environment(ctx)
+                for ctx in self.environment_monitor.environments()
+            ]),
+            "session_narrative": _build_session_narrative(
+                _conv_list,
+                _env_list,
+                self.worker.session_seconds,
+                self.database.total_alert_count(),
+            ),
+            "privacy": {
+                "network": self.network_report,
+                "delete_screenshots": self.config.privacy.delete_screenshots_after_analysis,
+                "strip_raw_text": self.config.privacy.strip_raw_text_from_storage,
+                "anonymize_child": self.config.privacy.anonymize_child_username,
+            },
         }

@@ -73,7 +73,11 @@ def test_index_returns_html_with_initial_state(client: TestClient) -> None:
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "GuardianLens" in body
-    assert 'id="initial-state"' in body
+    # Shell markers from the conversation-centric redesign.
+    assert 'id="activityList"' in body
+    assert 'id="stateSession"' in body
+    assert 'id="stateConversation"' in body
+    assert 'id="stateEnvironment"' in body
     assert "/static/dashboard.css" in body
     assert "/static/dashboard.js" in body
 
@@ -81,7 +85,8 @@ def test_index_returns_html_with_initial_state(client: TestClient) -> None:
 def test_static_assets_served(client: TestClient) -> None:
     css = client.get("/static/dashboard.css")
     assert css.status_code == 200
-    assert "gl-shell" in css.text
+    # Class-name marker from the new CSS.
+    assert ".gl-activity" in css.text
     js = client.get("/static/dashboard.js")
     assert js.status_code == 200
     assert "EventSource" in js.text

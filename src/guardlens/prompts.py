@@ -145,11 +145,13 @@ Full conversation observed so far across {n} message(s):
 
 {transcript}
 
-The real-time frame scanner just flagged: {frame_level} / {frame_category} / {frame_confidence}% confidence.
-Reason from the frame scanner: {frame_reasoning}
+The real-time frame scanner's CURRENT assessment: {frame_level} / {frame_category} / {frame_confidence}% confidence.
+Frame scanner reasoning: {frame_reasoning}
 
-Your job: assess the FULL conversation context. Is the frame scanner's
-concern justified when you look at the conversation as a whole? Explain
-whether this is normal or concerning. Use the `assess_conversation` tool.
+Your job: produce a verdict aligned with the CURRENT state of the
+conversation. If the frame scanner sees safe content, the conversation
+has likely moved on — reflect that. If it sees a threat, evaluate
+whether the full context supports or contradicts it.
+Use the `assess_conversation` tool.
 """
 

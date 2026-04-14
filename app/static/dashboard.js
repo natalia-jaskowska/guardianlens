@@ -1,1063 +1,1044 @@
 /**
- * GuardianLens dashboard — matched to v2 clickable alerts mockup.
- *
- * SSE-driven, vanilla JS, no framework. Shield hero, platform-colored
- * timeline, severity-keyed alert cards, status ribbon.
+ * GuardianLens dashboard — conversation-centric redesign.
+ * Subscribes to /api/stream (SSE) and renders left = activity list,
+ * right = three states (session overview / conversation detail /
+ * environment detail).
  */
 
-(() => {
-  "use strict";
+const $ = (id) => document.getElementById(id);
 
-  // ----------------------------------------------------------------- DOM refs
+/* ------------------------------- state ------------------------------ */
+const SEEN_KEY = "guardlens.seen_alerts.v1";
 
-  const els = {
-    shell: document.getElementById("shell"),
-    headerStatus: document.getElementById("header-status"),
-    headerModel: document.getElementById("header-model"),
+function loadSeen() {
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+function saveSeen() {
+  try {
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...ui.seenAlerts]));
+  } catch {}
+}
 
-    shieldSub: document.getElementById("shield-sub"),
-
-    captureCard: document.getElementById("capture-card"),
-    captureScreen: document.getElementById("capture-screen"),
-    captureBarIcon: document.getElementById("capture-bar-icon"),
-    captureBarTitle: document.getElementById("capture-bar-title"),
-    captureBarSub: document.getElementById("capture-bar-sub"),
-    captureBarTime: document.getElementById("capture-bar-time"),
-
-    ribbon: document.getElementById("ribbon"),
-    timeline: document.getElementById("timeline"),
-    lastRefresh: document.getElementById("last-refresh"),
-
-    historyLabel: document.getElementById("history-label"),
-    alertHistory: document.getElementById("alert-history"),
-
-    overviewPanel: document.getElementById("overview-panel"),
-    detailPanel: document.getElementById("detail-panel"),
-
-    // Conversation-level (session) verdict card
-    sessionVerdictCard: document.getElementById("session-verdict-card"),
-    sessionVerdictCertainty: document.getElementById("session-verdict-certainty"),
-    sessionVerdictLevel: document.getElementById("session-verdict-level"),
-    sessionVerdictConfidence: document.getElementById("session-verdict-confidence"),
-    sessionVerdictNarrative: document.getElementById("session-verdict-narrative"),
-    sessionVerdictIndicators: document.getElementById("session-verdict-indicators"),
-    sessionVerdictCount: document.getElementById("session-verdict-count"),
-    sessionVerdictCategory: document.getElementById("session-verdict-category"),
-    sessionVerdictAlertFlag: document.getElementById("session-verdict-alert-flag"),
-    analysisBack: document.getElementById("analysis-back"),
-    // analysisTimestampLabel removed — no longer in HTML
-    analysisCard: document.getElementById("analysis-card"),
-    reasoningChain: document.getElementById("reasoning-chain"),
-    whyThisMatters: document.getElementById("why-this-matters"),
-    flaggedMessages: document.getElementById("flagged-messages"),
-    recommendedAction: document.getElementById("recommended-action"),
-
-    footerModel: document.getElementById("footer-model"),
-    footerBytesCheck: document.getElementById("footer-bytes-check"),
-  };
-
-  // ----------------------------------------------------------------- helpers
-
-  const esc = (str) => {
-    if (str == null) return "";
-    return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-  };
-  const trunc = (str, n) => {
-    if (!str) return "";
-    str = str.replace(/\s+/g," ").trim();
-    return str.length > n ? str.slice(0,n-1).trimEnd()+"..." : str;
-  };
-  const setText = (el, t) => { if (el && el.textContent !== String(t)) el.textContent = t; };
-  const fmtTime = (d) => (d || new Date()).toTimeString().slice(0,8);
-
-  // ----------------------------------------------------------------- platform helpers
-
-  const PLATFORM_COLORS = {
-    discord: "#7F77DD", minecraft: "#639922", tiktok: "#D4537E",
-    instagram: "#D85A30", roblox: "#e2231a", snapchat: "#fffc00",
-    telegram: "#26a5e4", unknown: "#888",
-  };
-
-  function pKey(text) {
-    if (!text) return "unknown";
-    const l = text.toLowerCase();
-    if (l.includes("instagram")) return "instagram";
-    if (l.includes("tiktok")) return "tiktok";
-    if (l.includes("discord")) return "discord";
-    if (l.includes("minecraft")) return "minecraft";
-    if (l.includes("roblox")) return "roblox";
-    if (l.includes("snap")) return "snapchat";
-    if (l.includes("telegram")) return "telegram";
-    return "unknown";
+// One stable id per alertable state.  The threat level is part of the
+// key on purpose: if a conversation escalates (warning → alert) the
+// counter treats it as a fresh unread event — the parent should see
+// the new severity even if they'd dismissed the old one.
+function alertId(kind, data) {
+  if (kind === "conversation") {
+    return `c:${data.platform}:${data.participant}:${data.threat_level}`;
   }
-
-  function platformBadge(text) {
-    const k = pKey(text);
-    const t = esc(text || "Unknown");
-    if (k === "unknown") return `<span class="gl-platform-badge gl-platform-badge-unknown" title="${t}">?</span>`;
-    return `<span class="gl-platform-badge gl-platform-badge-${k}" title="${t}"><img src="/static/icons/${k}.svg" alt=""></span>`;
+  return `e:${data.platform}:${data.context}:${data.overall_safety}`;
+}
+function markSeen(key) {
+  if (!key) return;
+  if (!ui.seenAlerts.has(key)) {
+    ui.seenAlerts.add(key);
+    saveSeen();
   }
-
-  // Alert card SVG icons per threat type
-  // Grooming: warning triangle — universal danger
-  const CARD_ICON_GROOMING = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L1 21h22L12 2z"/><path d="M12 9v4"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>';
-  // Bullying: speech bubble with X — toxic communication
-  const CARD_ICON_BULLYING = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M9 8l6 6M15 8l-6 6"/></svg>';
-  // Inappropriate: eye off — shouldn't be seen
-  const CARD_ICON_CONTENT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
-  // Default: circle alert
-  const CARD_ICON_DEFAULT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/></svg>';
-
-  // ----------------------------------------------------------------- view state machine
-
-  // Persist seen alerts in localStorage so they survive page refresh
-  const SEEN_KEY = "gl_seen_alerts";
-  function loadSeen() {
-    try { const v = localStorage.getItem(SEEN_KEY); return v ? new Set(JSON.parse(v)) : new Set(); }
-    catch(_) { return new Set(); }
-  }
-  function saveSeen(s) {
-    // Keep only the most recent 50 IDs to prevent unbounded growth
-    const arr = [...s];
-    const trimmed = arr.length > 50 ? arr.slice(arr.length - 50) : arr;
-    try { localStorage.setItem(SEEN_KEY, JSON.stringify(trimmed)); } catch(_) {}
-  }
-
-  const uiState = {
-    selectedAnalysis: null,
-    seenAlerts: loadSeen(),
-  };
-
-  async function selectAlert(id) {
-    try {
-      const r = await fetch(`/api/analysis/${id}`);
-      if (!r.ok) return;
-      const a = await r.json();
-      uiState.seenAlerts.add(String(id));
-      saveSeen(uiState.seenAlerts);
-      uiState.selectedAnalysis = a;
-      render(window.__lastState || {});
-      // Scroll sidebar to top so the hero card is visible
-      const sidebar = document.querySelector(".gl-sidebar");
-      if (sidebar) sidebar.scrollTo({ top: 0, behavior: "smooth" });
-    } catch(_) {}
-  }
-
-  function showOverview() {
-    uiState.selectedAnalysis = null;
-    els.detailPanel.style.display = "none";
-    els.overviewPanel.style.display = "";
-    renderRightPanel(window.__lastState || {});
-    const sidebar = document.querySelector(".gl-sidebar");
-    if (sidebar) sidebar.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  // ----------------------------------------------------------------- shield hero (filled SVG, matching mockup)
-
-  // Shield hero icons — clean, minimal inner symbols
-  const SHIELD_SAFE =
-    '<svg viewBox="0 0 80 90">' +
-    '<path fill="#1D9E75" d="M40 5 L72 20 L72 50 Q72 75 40 87 Q8 75 8 50 L8 20 Z"/>' +
-    '<path fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" d="M27 44 L36 53 L54 35"/>' +
-    '</svg>';
-
-  const SHIELD_ALERT =
-    '<svg viewBox="0 0 80 90">' +
-    '<path fill="#E24B4A" d="M40 5 L72 20 L72 50 Q72 75 40 87 Q8 75 8 50 L8 20 Z"/>' +
-    '<path fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" d="M40 28 L40 50"/>' +
-    '<circle cx="40" cy="60" r="3" fill="#fff"/>' +
-    '</svg>';
-
-  const SHIELD_CAUTION =
-    '<svg viewBox="0 0 80 90">' +
-    '<path fill="#BA7517" d="M40 5 L72 20 L72 50 Q72 75 40 87 Q8 75 8 50 L8 20 Z"/>' +
-    '<path fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" d="M26 42 Q33 36 40 42 Q47 48 54 42"/>' +
-    '<circle cx="40" cy="42" r="4" fill="#fff"/>' +
-    '</svg>';
-
-  function renderShield(state) {
-    const latest = state.latest;
-    const h = state.session_health || {};
-    const streak = state.safe_streak || 0;
-    const isAlert = latest && (latest.threat_level === "alert" || latest.threat_level === "critical");
-    const isCaution = latest && (latest.threat_level === "caution" || latest.threat_level === "warning");
-    const pCount = h.platform_count || 0;
-
-    let mode, icon, title, sub;
-    const dur = h.session_duration || "0m 00s";
-    if (isAlert) {
-      mode = "alert"; icon = SHIELD_ALERT;
-      title = "Threat detected";
-      sub = `Session: ${dur}`;
-    } else if (isCaution) {
-      mode = "caution"; icon = SHIELD_CAUTION;
-      title = "Watch closely";
-      sub = `Session: ${dur}`;
-    } else {
-      mode = "safe"; icon = SHIELD_SAFE;
-      title = "All clear";
-      sub = `Session: ${dur}`;
-    }
-    // Session duration in stats row
-    const sessionEl = els.shieldSub;
-    if (sessionEl) {
-      const valEl = sessionEl.querySelector(".gl-stat-val");
-      if (valEl) valEl.textContent = dur;
-    }
-
-    // Populate metric counters
-    const scansEl = document.getElementById("status-scans");
-    const safePctEl = document.getElementById("status-safe-pct");
-    const platsEl = document.getElementById("status-platforms");
-    const alertsEl = document.getElementById("status-alerts");
-    const respEl = document.getElementById("status-response");
-    const scans = h.scans || 0;
-    const safeCount = h.safe || 0;
-    if (scansEl) scansEl.querySelector(".gl-stat-val").textContent = scans;
-    if (safePctEl) {
-      const pct = scans > 0 ? Math.round(100 * safeCount / scans) : 0;
-      const val = safePctEl.querySelector(".gl-stat-val");
-      val.textContent = scans > 0 ? `${pct}%` : "\u2014";
-      val.style.color = pct >= 90 ? "var(--safe)" : pct >= 70 ? "var(--caution)" : pct > 0 ? "var(--alert)" : "";
-    }
-    if (platsEl) platsEl.querySelector(".gl-stat-val").textContent = pCount;
-    if (alertsEl) {
-      const aCount = h.alerts || 0;
-      const val = alertsEl.querySelector(".gl-stat-val");
-      val.textContent = aCount;
-      val.style.color = aCount > 0 ? "var(--alert)" : "";
-    }
-    if (respEl) {
-      const avg = h.avg_inference_label || "\u2014";
-      respEl.querySelector(".gl-stat-val").textContent = avg.replace(" avg", "");
-    }
-  }
-
-  // ----------------------------------------------------------------- header
-
-  function renderHeader(state) {
-    const mon = state.monitoring;
-    const paused = state.paused;
-    const latest = state.latest;
-    const isAlert = latest && (latest.threat_level === "alert" || latest.threat_level === "critical");
-    let shieldColor, label, extra = "";
-    if (paused) { shieldColor = "var(--text-dim)"; label = "Paused"; }
-    else if (!mon) { shieldColor = "var(--text-dim)"; label = "Stopped"; }
-    else if (isAlert) { shieldColor = "var(--alert)"; label = "Threat detected"; extra = "gl-header-status-alert"; }
-    else { shieldColor = "var(--safe)"; label = "Active"; }
-    els.headerStatus.className = `gl-header-status ${extra}`.trim();
-    els.headerStatus.innerHTML = `<svg class="gl-header-shield" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${shieldColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 6v6c0 5.25 3.75 9.75 8 10 4.25-0.25 8-4.75 8-10V6l-8-4z"/></svg><span class="status-text" style="color:${shieldColor}">${esc(label)}</span>`;
-    setText(els.headerModel, state.model_name || "");
-
-    // LIVE tag + paused overlay
-    const liveTag = document.getElementById("capture-live-tag");
-    if (liveTag) liveTag.style.display = paused ? "none" : "";
-    els.captureCard.classList.toggle("gl-capture-paused", !!paused);
-
-    // Pause button state
-    const pauseBtn = document.getElementById("header-pause");
-    if (pauseBtn) {
-      const lbl = pauseBtn.querySelector(".gl-pause-label");
-      if (paused) {
-        pauseBtn.classList.add("gl-paused");
-        if (lbl) lbl.textContent = "Resume";
-      } else {
-        pauseBtn.classList.remove("gl-paused");
-        if (lbl) lbl.textContent = "Pause";
-      }
-    }
-  }
-
-  // ----------------------------------------------------------------- capture
-
-  const CAP_CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
-  const CAP_WARN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L1 21h22L12 2zm0 7v5m0 3v1"/></svg>';
-  const CAP_EYE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"/><circle cx="12" cy="12" r="2.5" fill="currentColor"/></svg>';
-
-  let _lastCaptureTs = "";
-
-  function renderCapture(state) {
-    const a = state.latest;
-    if (a && a.timestamp === _lastCaptureTs) return;
-    _lastCaptureTs = a ? a.timestamp : "";
-    if (!a) {
-      els.captureCard.classList.remove("gl-capture-caution", "gl-capture-alert");
-      els.captureCard.classList.add("gl-capture", "gl-capture-safe");
-      els.captureScreen.innerHTML = '<div class="gl-capture-placeholder"><div class="gl-skeleton gl-skeleton-block" style="width:100%;height:100%;position:absolute;inset:0"></div></div>';
-      els.captureBarIcon.innerHTML = CAP_CHECK;
-      setText(els.captureBarTitle, "Initializing");
-      setText(els.captureBarSub, "");
-      setText(els.captureBarTime, "--:--:--");
-      return;
-    }
-    const level = a.threat_level || "safe";
-    const isAlert = level === "alert" || level === "critical";
-    const isCaution = level === "caution" || level === "warning";
-    const mode = isAlert ? "alert" : isCaution ? "caution" : "safe";
-    // Use classList to preserve gl-capture-paused set by renderHeader
-    els.captureCard.classList.remove("gl-capture-safe", "gl-capture-caution", "gl-capture-alert");
-    els.captureCard.classList.add("gl-capture", `gl-capture-${mode}`);
-
-    // Always store the screenshot URL for the lightbox
-    const screenshotSrc = a.screenshot_url ? `${a.screenshot_url}?t=${encodeURIComponent(a.timestamp||Date.now())}` : "";
-    els.captureScreen.dataset.screenshot = screenshotSrc;
-
-    const hasChat = (a.chat_messages||[]).length > 0;
-    if ((isAlert||isCaution) && hasChat) {
-      els.captureScreen.innerHTML = renderChat(a);
-    } else if (a.screenshot_url) {
-      els.captureScreen.innerHTML = `<img class="gl-capture-img" src="${screenshotSrc}" alt="">`;
-    } else {
-      els.captureScreen.innerHTML = `<div class="gl-capture-placeholder">${esc(a.platform||"")}</div>`;
-    }
-
-    if (isAlert) {
-      els.captureBarIcon.innerHTML = CAP_WARN;
-      const lbl = (a.category_label||"Threat").trim();
-      const stg = a.stage_segments && a.stage_segments.current_index >= 0 ? ` \u00b7 Stage ${a.stage_segments.current_index+1}/5` : "";
-      setText(els.captureBarTitle, `${lbl} \u00b7 ${a.confidence}%${stg}`);
-    } else if (isCaution) {
-      els.captureBarIcon.innerHTML = CAP_EYE;
-      setText(els.captureBarTitle, `${(a.category_label||"Caution").trim()} \u00b7 watch closely`);
-    } else {
-      els.captureBarIcon.innerHTML = CAP_CHECK;
-      setText(els.captureBarTitle, `${a.platform||"Unknown"} \u00b7 No threats`);
-    }
-    setText(els.captureBarSub, "");
-    setText(els.captureBarTime, a.time_label || "--:--:--");
-  }
-
-  function renderChat(a) {
-    const conv = a.conversation || {};
-    const msgs = a.chat_messages || [];
-    const user = conv.username || a.platform || "Conversation";
-    const k = conv.platform_key || a.platform_key || "unknown";
-    const avatar = k !== "unknown" ? `<img src="/static/icons/${k}.svg" alt="">` : user.charAt(0).toUpperCase();
-
-    const header = `<div class="gl-capture-chat-header"><div class="gl-capture-chat-avatar">${avatar}</div><div class="gl-capture-chat-titles"><div class="gl-capture-chat-username">${esc(user)}</div><div class="gl-capture-chat-status">Active now</div></div></div>`;
-    const bubbles = msgs.map(m => {
-      const lo = (m.sender||"").toLowerCase();
-      const isMe = lo==="me"||lo==="self"||lo==="child";
-      const side = isMe ? "gl-capture-msg-me" : "gl-capture-msg-them";
-      const flag = m.flag ? "gl-capture-msg-flagged" : "";
-      const tag = m.flag ? `<div class="gl-capture-msg-flag-tag">${esc(m.flag)}</div>` : "";
-      return `<div class="gl-capture-msg ${side} ${flag}"><div class="gl-capture-msg-bubble">${esc(m.text)}</div>${tag}</div>`;
-    }).join("");
-    return `<div class="gl-capture-chat">${header}<div class="gl-capture-chat-body">${bubbles}</div></div>`;
-  }
-
-  // ----------------------------------------------------------------- ribbon + timeline
-
-  function renderRibbon(state) {
-    if (!els.ribbon) return;
-    const hist = state.scan_history || [];
-    const slots = 20;
-    const padded = hist.slice(-slots);
-    while (padded.length < slots) padded.unshift({tone:"empty"});
-    els.ribbon.innerHTML = padded.map(e => `<div class="gl-ribbon-seg gl-ribbon-seg-${e.tone||"empty"}"></div>`).join("");
-  }
-
-  let _lastTimelineKey = "";
-
-  function renderTimeline(state) {
-    const rawEntries = state.timeline || [];
-    const tlKey = rawEntries.map(e => e.timestamp || e.time_label).join(",");
-    if (tlKey === _lastTimelineKey) return;
-    _lastTimelineKey = tlKey;
-
-    if (!rawEntries.length) {
-      els.timeline.innerHTML = '<div class="gl-empty">Waiting for the first capture...</div>';
-      return;
-    }
-
-    // Collapse consecutive safe entries into a single group row.
-    // Runs of 2+ safe scans become one "N safe scans (14:30 – 14:45)" entry.
-    // Single safe scans render normally so the UI isn't too aggressive.
-    const entries = [];
-    let i = 0;
-    while (i < rawEntries.length) {
-      const curr = rawEntries[i];
-      if (curr.threat_level === "safe") {
-        let j = i;
-        while (j < rawEntries.length && rawEntries[j].threat_level === "safe") j++;
-        const runLen = j - i;
-        if (runLen >= 2) {
-          // entries are newest-first, so newest of the run is at i, oldest at j-1
-          entries.push({
-            is_group: true,
-            count: runLen,
-            time_start: rawEntries[j - 1].time_label,
-            time_end: rawEntries[i].time_label,
-            platform: rawEntries[i].platform,
-            platform_key: rawEntries[i].platform_key,
-          });
-          i = j;
-          continue;
-        }
-      }
-      entries.push(curr);
-      i++;
-    }
-
-    // Compute escalation runs — mark entries that are part of a worsening sequence
-    // Entries are newest-first, so we scan bottom-up (oldest to newest) to find progression
-    const levelNum = (l) => l === "safe" ? 0 : (l === "caution" || l === "warning") ? 1 : 2;
-    const escalation = new Array(entries.length).fill(false);
-    // Walk oldest→newest (end→start of array)
-    for (let i = entries.length - 2; i >= 0; i--) {
-      if (entries[i].is_group || entries[i + 1].is_group) continue;
-      const curr = levelNum(entries[i].threat_level);
-      const prev = levelNum(entries[i + 1].threat_level);
-      if (curr > 0 && prev > 0 && curr >= prev) {
-        escalation[i] = true;
-        escalation[i + 1] = true;
-      }
-    }
-
-    // Build a set of timestamps where session alerts were fired, so we
-    // can overlay a marker on the corresponding timeline entry.
-    const alertTsSet = new Set(
-      (state.alert_timestamps || []).map(ts => (ts || "").slice(0, 19))
-    );
-
-    els.timeline.innerHTML = entries.map((e, i) => {
-      // Collapsed group row — consecutive safe scans
-      if (e.is_group) {
-        const range = e.time_start === e.time_end ? e.time_end : `${e.time_start} – ${e.time_end}`;
-        return `<div class="gl-timeline-entry gl-timeline-group" data-tl-idx="${i}">
-          <span class="gl-timeline-group-icon">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-          </span>
-          <div class="gl-timeline-body">
-            <div class="gl-timeline-row1">
-              <span class="gl-timeline-group-text">${e.count} safe scans</span>
-              <span class="gl-timeline-time">${esc(range)}</span>
-            </div>
-          </div>
-        </div>`;
-      }
-      const level = e.threat_level;
-      const k = e.platform_key || pKey(e.platform);
-      const levelCls = level === "alert" || level === "critical" ? "alert" :
-                       level === "caution" || level === "warning" ? "caution" : "safe";
-      const time = e.time_label || "";
-      const iconInner = k !== "unknown"
-        ? `<img src="/static/icons/${k}.svg" alt="">`
-        : `<span class="gl-timeline-icon-letter">${(e.platform||"?").charAt(0).toUpperCase()}</span>`;
-      const isClickable = levelCls !== "safe";
-      const escCls = escalation[i] ? " gl-timeline-escalation" : "";
-      const escStart = escalation[i] && (i === 0 || !escalation[i - 1]);
-      const escStartCls = escStart ? " gl-timeline-esc-start" : "";
-      const hasSessionAlert = alertTsSet.has((e.timestamp || "").slice(0, 19));
-      const alertMarker = hasSessionAlert
-        ? `<span class="gl-timeline-alert-marker" title="Session alert fired">\u26a0</span>`
-        : "";
-      return `<div class="gl-timeline-entry gl-timeline-entry-${levelCls}${isClickable?" gl-timeline-clickable":""}${escCls}${escStartCls}${hasSessionAlert?" gl-timeline-has-alert":""}" data-tl-idx="${i}">
-        <div class="gl-timeline-esc-bar"></div>
-        <span class="gl-timeline-icon" data-platform="${k}">${iconInner}</span>
-        <div class="gl-timeline-body">
-          <div class="gl-timeline-row1">
-            <span class="gl-timeline-platform">${esc(e.platform||"Unknown")}</span>
-            ${alertMarker}
-            <span class="gl-timeline-time">${esc(time)}</span>
-            <span class="gl-timeline-badge gl-timeline-badge-${levelCls}">${esc(level)}</span>
-          </div>
-          <div class="gl-timeline-row2">${levelCls === "safe"
-            ? "No threats detected"
-            : (e.indicators||[]).slice(0,3).map(p => `<span class="gl-timeline-tag gl-timeline-tag-${levelCls}">${esc(p)}</span>`).join("") || esc(trunc(e.reasoning,40))
-          }</div>
-        </div>
-      </div>`;
-    }).join("");
-    // All timeline rows are clickable — alerts open detail, safe shows inline analysis
-    window.__timelineData = entries;
-    els.timeline.querySelectorAll(".gl-timeline-entry").forEach(row => {
-      row.addEventListener("click", () => {
-        const idx = parseInt(row.getAttribute("data-tl-idx"), 10);
-        const entry = entries[idx];
-        if (!entry || entry.is_group) return;
-        // Match by ISO timestamp (unique per analysis) with time_label fallback
-        const hist = (window.__lastState && window.__lastState.alert_history) || [];
-        const match = hist.find(a => a.timestamp === entry.timestamp) ||
-                      hist.find(a => a.time_label === entry.time_label);
-        if (match && match.analysis_id) {
-          selectAlert(match.analysis_id);
-        }
-      });
-    });
-  }
-
-  // ----------------------------------------------------------------- right: SAFE overview
-
-  function renderRightPanel(state) {
-    renderAlertHistory(state.alert_history || [], state.current_session_id);
-  }
-
-  let _lastHistoryKey = "";
-
-  function renderAlertHistory(history, sessionId) {
-    // Build a fingerprint to skip re-render when nothing changed
-    const ids = history.map(a => a.analysis_id).join(",");
-    const seenCount = history.filter(a => uiState.seenAlerts.has(String(a.analysis_id))).length;
-    const key = `${ids}|${seenCount}`;
-    if (key === _lastHistoryKey) return;
-    _lastHistoryKey = key;
-
-    if (!history.length) {
-      els.historyLabel.innerHTML = `Alerts`;
-      els.alertHistory.innerHTML =
-        `<div class="gl-history-empty">
-          <div class="gl-history-empty-shield"><svg viewBox="0 0 80 90"><path fill="#1D9E75" d="M40 5 L72 20 L72 50 Q72 75 40 87 Q8 75 8 50 L8 20 Z"/><path fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M25 45 L35 55 L55 35"/></svg></div>
-          <div class="gl-history-empty-title">All clear</div>
-          <div class="gl-history-empty-sub">No threats detected yet.<br>GuardianLens is actively monitoring.</div>
-        </div>`;
-      return;
-    }
-    const newAlerts = history.filter(a => !uiState.seenAlerts.has(String(a.analysis_id)));
-    const seenAlerts = history.filter(a => uiState.seenAlerts.has(String(a.analysis_id)));
-    const newCount = newAlerts.length;
-    const allSeen = newCount === 0;
-    const total = (window.__lastState && window.__lastState.alert_total) || history.length;
-    const showing = history.length;
-    const totalHint = total > showing ? `<span class="gl-history-total">${showing} of ${total}</span>` : "";
-    if (newCount > 0) {
-      els.historyLabel.innerHTML = `Alerts <span class="gl-history-counter">${newCount} new</span><button class="gl-history-dismiss" id="mark-all-read">Dismiss all</button>${totalHint}`;
-    } else {
-      els.historyLabel.innerHTML = `Alerts <span class="gl-history-allreviewed">All reviewed</span>${totalHint}`;
-    }
-
-    let html = "";
-    html += newAlerts.map(a => renderAlertCard(a, "new")).join("");
-    if (newAlerts.length > 0 && seenAlerts.length > 0) {
-      html += '<div class="gl-history-divider">Reviewed</div>';
-    }
-    if (allSeen) {
-      html += '<div class="gl-history-allseen"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>No new alerts</div>';
-    }
-    html += seenAlerts.map(a => renderAlertCard(a, allSeen ? "reviewed" : "seen")).join("");
-    els.alertHistory.innerHTML = html;
-  }
-
-  // state: "new" | "seen" (dimmed, mixed with new) | "reviewed" (all seen, full opacity)
-  function renderAlertCard(a, state) {
-    const type = a.threat_type || "";
-    const threatKey = (type === "grooming" || type === "bullying" || type === "inappropriate_content") ? type : "other";
-    let icon = CARD_ICON_DEFAULT;
-    if (type === "grooming") icon = CARD_ICON_GROOMING;
-    else if (type === "bullying") icon = CARD_ICON_BULLYING;
-    else if (type === "inappropriate_content") icon = CARD_ICON_CONTENT;
-
-    const stateClass = state === "seen" ? "gl-alert-card-seen" : state === "new" ? "gl-alert-card-new" : state === "reviewed" ? "gl-alert-card-reviewed" : "";
-
-    const badgeHtml = state === "new"
-      ? `<span class="gl-alert-card-badge">NEW</span>`
-      : "";
-
-    const pills = (a.indicators||[]).slice(0,4).map(p =>
-      `<span class="gl-alert-card-pill">${esc(p)}</span>`
-    ).join("");
-
-    // Grooming stage mini-bar
-    let stageHtml = "";
-    const stageIdx = a.grooming_stage_index || 0;
-    if (type === "grooming" && stageIdx > 0) {
-      let segs = "";
-      for (let i = 0; i < 5; i++) {
-        const cls = i < stageIdx - 1 ? "gl-alert-card-stage-seg-filled" :
-                    i === stageIdx - 1 ? "gl-alert-card-stage-seg-current" : "";
-        segs += `<div class="gl-alert-card-stage-seg ${cls}"></div>`;
-      }
-      stageHtml = `<div class="gl-alert-card-stage-mini">${segs}<span class="gl-alert-card-stage-label">Stage ${stageIdx}/5</span></div>`;
-    }
-
-    return `<div class="gl-alert-card ${stateClass}" data-threat="${threatKey}" data-analysis-id="${a.analysis_id}">
-      <div class="gl-alert-card-icon-wrap">${icon}</div>
-      <div class="gl-alert-card-top">
-        <span class="gl-alert-card-title">${esc(a.threat_label)}</span>
-        <span class="gl-alert-card-conf">${a.confidence}%</span>
-        ${badgeHtml}
-      </div>
-      <span class="gl-alert-card-time">${esc(a.time_ago)}</span>
-      <div class="gl-alert-card-mid">
-        <span class="gl-alert-card-plat" data-platform="${a.platform_key||"unknown"}">${a.platform_key && a.platform_key !== "unknown" ? `<img src="/static/icons/${a.platform_key}.svg" alt="">` : ""}</span>
-        <span class="gl-alert-card-user">${esc(a.user)}</span>
-        <span class="gl-alert-card-sep">\u2022</span>
-        <span class="gl-alert-card-platform-name">${esc(a.platform||"Unknown")}</span>
-      </div>
-      <div class="gl-alert-card-bottom">${pills}${stageHtml}</div>
-      <span class="gl-alert-card-arrow">\u203a</span>
-    </div>`;
-  }
-
-  // ----------------------------------------------------------------- right: FULL ANALYSIS
-
-  function renderRightAnalysis(state) {
-    const a = uiState.selectedAnalysis;
-    if (!a) { els.analysisCard.innerHTML = '<div class="gl-empty">No analysis.</div>'; return; }
-    renderAnalysisCard(a);
-    renderReasoning(a);
-    renderWhy(a);
-    renderFlagged(a);
-    renderAction(a);
-  }
-
-  function renderAnalysisCard(a) {
-    const cat = a.category || "";
-    const threatKey = (cat === "grooming" || cat === "bullying" || cat === "inappropriate_content") ? cat : "other";
-    const title = a.category_label ? `${a.category_label} detected` : "Threat detected";
-    const conv = a.conversation || {};
-    const pk = conv.platform_key || a.platform_key || "unknown";
-
-    let icon = CARD_ICON_DEFAULT;
-    if (cat === "grooming") icon = CARD_ICON_GROOMING;
-    else if (cat === "bullying") icon = CARD_ICON_BULLYING;
-    else if (cat === "inappropriate_content") icon = CARD_ICON_CONTENT;
-
-    const platIcon = pk !== "unknown"
-      ? `<span class="gl-detail-hero-plat" style="background:${PLATFORM_COLORS[pk]||"#334155"}"><img src="/static/icons/${pk}.svg" alt=""></span>`
-      : "";
-    const meta = `${platIcon}${esc(conv.username||"\u2014")} \u00b7 ${esc(a.platform||"Unknown")}`;
-
-    const pills = (a.indicator_pills||a.indicators||[]).slice(0,6).map(p => {
-      const l = typeof p==="string"?p:p.label;
-      return `<span class="gl-detail-hero-pill">${esc(l)}</span>`;
-    }).join("");
-
-    let stagebar = "";
-    if (cat === "grooming" && a.stage_segments && a.stage_segments.current_index >= 0 && Array.isArray(a.stage_segments.segments)) {
-      stagebar = `<div class="gl-detail-hero-stagebar">${a.stage_segments.segments.map(s => {
-        const c = s.state==="active"?"gl-detail-hero-stage-active":s.state==="current"?"gl-detail-hero-stage-current":"";
-        return `<div class="gl-detail-hero-stage-seg ${c}"></div>`;
-      }).join("")}</div>`;
-    }
-
-    els.analysisCard.setAttribute("data-threat", threatKey);
-    els.analysisCard.innerHTML = `
-      <div class="gl-detail-hero-top">
-        <div class="gl-detail-hero-left">
-          <div class="gl-detail-hero-icon">${icon}</div>
-          <div class="gl-detail-hero-titles">
-            <div class="gl-detail-hero-title">${esc(title)}</div>
-            <div class="gl-detail-hero-meta">${meta}</div>
-          </div>
-        </div>
-        <div class="gl-detail-hero-conf">
-          <div class="gl-detail-hero-conf-val">${a.confidence}%</div>
-          <div class="gl-detail-hero-conf-lbl">confidence</div>
-        </div>
-      </div>
-      <div class="gl-detail-hero-pills">${pills}</div>
-      ${stagebar}`;
-
-    // Render screenshot in its own section
-    const capSec = document.getElementById("capture-section");
-    const capEl = document.getElementById("detail-capture");
-    if (a.screenshot_url && capSec && capEl) {
-      capEl.innerHTML = `<div class="gl-detail-capture-frame" id="capture-frame"><img src="${a.screenshot_url}?t=${encodeURIComponent(a.timestamp||"")}" alt="Captured screenshot"></div>`;
-      capSec.style.display = "";
-    } else if (capSec) {
-      capSec.style.display = "none";
-    }
-  }
-
-  // ----------------------------------------------------------------- session verdict
-
-  // Render the conversation-level verdict produced by ConversationAnalyzer.
-  // The card is ALWAYS present (even when no verdict exists yet) so the
-  // layout doesn't jump when the first verdict lands. We just swap its
-  // contents + colour class based on state.session_verdict.
-  function renderSessionVerdict(state) {
-    const card = els.sessionVerdictCard;
-    if (!card) return;
-    const sv = state.session_verdict;
-    const convSize = state.conversation_size || 0;
-
-    // Reset level classes on every render (class list may have accumulated).
-    card.classList.remove(
-      "gl-session-level-safe",
-      "gl-session-level-caution",
-      "gl-session-level-warning",
-      "gl-session-level-alert",
-      "gl-session-level-critical",
-      "gl-session-verdict-empty",
-    );
-
-    if (!sv) {
-      // No verdict yet �� show placeholder.
-      card.style.display = "";
-      card.classList.add("gl-session-verdict-empty");
-      setText(els.sessionVerdictLevel, convSize === 0 ? "waiting" : "analyzing\u2026");
-      setText(els.sessionVerdictCertainty, "");
-      setText(els.sessionVerdictConfidence, "");
-      setText(els.sessionVerdictNarrative,
-        convSize < 3
-          ? `Accumulating messages (${convSize}). Verdict appears after enough context.`
-          : `Analyzing ${convSize} messages\u2026`
-      );
-      els.sessionVerdictIndicators.innerHTML = "";
-      setText(els.sessionVerdictCount, `${convSize} msg${convSize===1?"":"s"}`);
-      setText(els.sessionVerdictCategory, "");
-      setText(els.sessionVerdictAlertFlag, "");
-      els.sessionVerdictCertainty.classList.remove(
-        "gl-certainty-low", "gl-certainty-medium", "gl-certainty-high",
-      );
-      return;
-    }
-
-    // Always show the session verdict — safe or not.
-    card.style.display = "";
-
-    // If the per-frame analysis sees something non-safe but the session
-    // verdict hasn't caught up yet, show the frame signal as a preview.
-    const frameLevel = state.latest && state.latest.threat_level
-      ? state.latest.threat_level.toLowerCase() : "safe";
-    const svLevel = (sv.overall_level || "safe").toLowerCase();
-
-    if (svLevel === "safe" && frameLevel !== "safe") {
-      const frameCategory = (state.latest && state.latest.category) || "none";
-      const frameConf = state.latest && state.latest.confidence != null
-        ? Math.round(state.latest.confidence) : 0;
-      const frameReasoning = (state.latest && state.latest.reasoning) || "";
-      card.classList.add(`gl-session-level-${frameLevel}`);
-      setText(els.sessionVerdictLevel, frameLevel);
-      setText(els.sessionVerdictConfidence, `${frameConf}%`);
-      els.sessionVerdictCertainty.classList.remove(
-        "gl-certainty-low", "gl-certainty-medium", "gl-certainty-high",
-      );
-      els.sessionVerdictCertainty.classList.add("gl-certainty-low");
-      setText(els.sessionVerdictCertainty, "preliminary");
-      setText(els.sessionVerdictNarrative,
-        frameReasoning
-          ? frameReasoning.slice(0, 200)
-          : "Analyzing full conversation context\u2026"
-      );
-      els.sessionVerdictIndicators.innerHTML = "";
-      setText(els.sessionVerdictCount, `${convSize} msg${convSize===1?"":"s"}`);
-      setText(els.sessionVerdictCategory, frameCategory.replace(/_/g, " "));
-      setText(els.sessionVerdictAlertFlag, "analyzing context\u2026");
-      els.sessionVerdictAlertFlag.classList.remove("gl-session-alert-on");
-      return;
-    }
-
-    // Full session verdict — always shown (safe, caution, or threat).
-    const certainty = (sv.certainty || "low").toLowerCase();
-    const category = sv.overall_category || "none";
-    const conf = Math.round(sv.confidence || 0);
-
-    card.classList.add(`gl-session-level-${svLevel}`);
-    setText(els.sessionVerdictLevel, svLevel);
-    setText(els.sessionVerdictConfidence, `${conf}% confidence`);
-
-    els.sessionVerdictCertainty.classList.remove(
-      "gl-certainty-low", "gl-certainty-medium", "gl-certainty-high",
-    );
-    els.sessionVerdictCertainty.classList.add(`gl-certainty-${certainty}`);
-    setText(els.sessionVerdictCertainty, `${certainty} certainty`);
-
-    setText(els.sessionVerdictNarrative, sv.narrative || "");
-
-    // Render indicator pills.
-    const inds = Array.isArray(sv.key_indicators) ? sv.key_indicators : [];
-    els.sessionVerdictIndicators.innerHTML = inds
-      .slice(0, 6)
-      .map((i) => `<span>${esc(trunc(i, 80))}</span>`)
-      .join("");
-
-    // Meta row.
-    const n = sv.messages_analyzed || 0;
-    setText(els.sessionVerdictCount, `${n} msg${n===1?"":"s"} analyzed`);
-    setText(els.sessionVerdictCategory, category);
-    if (sv.parent_alert_recommended) {
-      setText(els.sessionVerdictAlertFlag, "parent alert recommended");
-      els.sessionVerdictAlertFlag.classList.add("gl-session-alert-on");
-    } else {
-      setText(els.sessionVerdictAlertFlag, "no action");
-      els.sessionVerdictAlertFlag.classList.remove("gl-session-alert-on");
-    }
-  }
-
-  function renderReasoning(a) {
-    const steps = (a&&a.reasoning_chain)||[];
-    if (!steps.length) { els.reasoningChain.innerHTML = '<div class="gl-empty">No reasoning.</div>'; return; }
-    els.reasoningChain.innerHTML = steps.map(s => {
-      if (s.type==="verdict") return `<span class="gl-reasoning-step-verdict">${esc(s.text)}</span>`;
-      if (s.type==="flag") return `<span class="gl-reasoning-step-flag">${esc(s.text)}</span>`;
-      const lbl = s.label ? `<span class="gl-reasoning-step-label">${esc(s.label)}</span> ` : "";
-      return `<div>${lbl}<span class="gl-reasoning-step-text">${esc(s.text)}</span></div>`;
-    }).join("");
-  }
-
-  function renderWhy(a) {
-    const t = a&&a.why_this_matters;
-    const sec = document.getElementById("why-section");
-    if (!t) { if (sec) sec.style.display="none"; return; }
-    if (sec) sec.style.display="";
-    els.whyThisMatters.innerHTML = `<div class="gl-why-text">${esc(t).replace(/\n/g, "<br>")}</div>`;
-  }
-
-  function renderFlagged(a) {
-    const bd = (a&&a.threat_breakdown)||[];
-    const wq = bd.filter(b=>b.quote);
-    const sec = document.getElementById("flagged-section");
-    if (!wq.length) { if (sec) sec.style.display="none"; return; }
-    if (sec) sec.style.display="";
-    const cat = a.category||"";
-    const color = cat==="grooming"?"var(--alert)":cat==="bullying"?"var(--caution)":"var(--orange)";
-    els.flaggedMessages.innerHTML = wq.map(item =>
-      `<div class="gl-flagged-msg">
-        <div class="gl-flagged-msg-body">
-          <span class="gl-flagged-msg-quote" style="color:${color}">\u201c${esc(item.quote)}\u201d</span>
-          <span class="gl-flagged-msg-explanation">${esc(item.explanation||item.title||"")}</span>
-        </div>
-      </div>`
-    ).join("");
-  }
-
-  function renderAction(a) {
-    const action = a&&a.recommended_action;
-    if (!action) { els.recommendedAction.innerHTML=''; return; }
-    const cat = a.category||"";
-    const color = cat==="grooming"?"#E24B4A":cat==="bullying"?"#BA7517":cat==="inappropriate_content"?"#D85A30":"#7F77DD";
-    const bg = cat==="grooming"?"#2a1a1a":cat==="bullying"?"#1f1a0f":cat==="inappropriate_content"?"#2a1a0f":"#1e1e32";
-    const steps = (action.steps||[]).map((s,i) =>
-      `<div class="gl-action-step"><span class="gl-action-num" style="background:${bg};color:${color}">${i+1}</span><span class="gl-action-text">${esc(s)}</span></div>`
-    ).join("");
-    els.recommendedAction.innerHTML = steps;
-  }
-
-
-  // ----------------------------------------------------------------- notifications
-
-  const notify = (() => {
-    let ctx=null,unlocked=false,lastTs=null,init=false,permReq=false;
-    const mkCtx=()=>{if(ctx)return ctx;const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;try{ctx=new C;return ctx}catch(_){return null}};
-    const unlock=async()=>{if(unlocked)return;const c=mkCtx();if(!c)return;if(c.state==="suspended")try{await c.resume()}catch(_){}unlocked=c.state==="running"};
-    document.addEventListener("click",unlock,{once:false});
-    document.addEventListener("keydown",unlock,{once:false});
-    const ding=()=>{if(!ctx||ctx.state!=="running")return;const t=ctx.currentTime;[{f:880,s:0,d:.35},{f:1320,s:.1,d:.4}].forEach(v=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type="sine";o.frequency.value=v.f;o.connect(g);g.connect(ctx.destination);const s=t+v.s;g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(.25,s+.02);g.gain.exponentialRampToValueAtTime(.001,s+v.d);o.start(s);o.stop(s+v.d+.05)})};
-    const handle=(state)=>{if(!permReq){permReq=true;if(typeof Notification!=="undefined"&&Notification.permission==="default")try{Notification.requestPermission()}catch(_){}}const a=state&&state.latest;const isA=a&&(a.threat_level==="alert"||a.threat_level==="critical");const ts=isA?a.timestamp:null;if(!init){init=true;lastTs=ts;return}if(!ts||ts===lastTs)return;lastTs=ts;ding();if(typeof Notification!=="undefined"&&Notification.permission==="granted"){const pa=(a.parent_alert||{});try{const n=new Notification(pa.title?`GuardianLens \u2014 ${pa.title}`:"GuardianLens \u2014 alert",{body:pa.summary||`${a.category_label||"Threat"} on ${a.platform||"app"}`,tag:"gl",silent:false});n.onclick=()=>{window.focus();n.close()};setTimeout(()=>{try{n.close()}catch(_){}},8e3)}catch(_){}}};
-    return{handle,test:async()=>{await unlock();ding()}};
-  })();
-  window.notify = notify;
-
-  // ----------------------------------------------------------------- render
-
-  function render(state) {
-    if (!state) return;
-    window.__lastState = state;
-    document.body.classList.toggle("loaded", true);
-    notify.handle(state);
-
-    const latest = state.latest;
-    const isAlert = latest && (latest.threat_level==="alert"||latest.threat_level==="critical");
-    els.shell.classList.toggle("gl-alert-active", !!isAlert);
-    els.shell.classList.toggle("gl-shell-paused", !!state.paused);
-
-    renderHeader(state);
-    renderShield(state);
-    renderCapture(state);
-    renderTimeline(state);
-    renderSessionVerdict(state);
-
-    if (els.footerBytesCheck && state.metrics && state.metrics.screenshots > 0) {
-      els.footerBytesCheck.classList.add("gl-footer-check-visible");
-    }
-
-    if (uiState.selectedAnalysis) {
-      // Detail view — hide overview, show detail
-      els.overviewPanel.style.display = "none";
-      els.detailPanel.style.display = "";
-      renderRightAnalysis(state);
-    } else {
-      // Overview — show alert list, hide detail
-      els.overviewPanel.style.display = "";
-      els.detailPanel.style.display = "none";
-      renderRightPanel(state);
-    }
-
-    setText(els.lastRefresh, fmtTime());
-    setText(els.footerModel, state.model_name);
-  }
-
-  // ----------------------------------------------------------------- bootstrap
-
-  function connectStream() {
-    let retryDelay = 1000;
-    const maxDelay = 30000;
-    let src;
-
-    function connect() {
-      src = new EventSource("/api/stream");
-      src.onopen = () => { retryDelay = 1000; };
-      src.onmessage = (e) => { try { render(JSON.parse(e.data)); } catch(err) { console.error("SSE",err); } };
-      src.onerror = () => {
-        src.close();
-        console.warn(`SSE dropped, reconnecting in ${retryDelay/1000}s...`);
-        setTimeout(connect, retryDelay);
-        retryDelay = Math.min(retryDelay * 2, maxDelay);
-      };
-    }
-    connect();
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    if (els.analysisBack) {
-      els.analysisBack.addEventListener("click", showOverview);
-    }
-    // Pause/Resume button
-    const pauseBtn = document.getElementById("header-pause");
-    if (pauseBtn) {
-      pauseBtn.addEventListener("click", async () => {
-        const isPaused = pauseBtn.classList.contains("gl-paused");
-        await fetch(isPaused ? "/api/resume" : "/api/pause", { method: "POST" });
-        // Fetch fresh state immediately so UI updates without waiting for SSE tick
-        try {
-          const r = await fetch("/api/state");
-          if (r.ok) render(await r.json());
-        } catch(_) {}
-      });
-    }
-    // Lightbox — reusable for any image click
-    function openLightbox(imgSrc) {
-      const overlay = document.createElement("div");
-      overlay.className = "gl-lightbox";
-      overlay.innerHTML = `<img src="${imgSrc}" alt=""><div class="gl-lightbox-hint">Click anywhere or press Esc to close</div><div class="gl-lightbox-close">\u00d7</div>`;
-      document.body.appendChild(overlay);
-      requestAnimationFrame(() => overlay.classList.add("gl-lightbox-open"));
-      const close = () => { overlay.classList.remove("gl-lightbox-open"); setTimeout(() => overlay.remove(), 200); };
-      overlay.addEventListener("click", close);
-      document.addEventListener("keydown", function esc(ev) { if (ev.key === "Escape") { close(); document.removeEventListener("keydown", esc); } });
-    }
-    // Detail panel capture lightbox
-    document.addEventListener("click", (e) => {
-      const frame = e.target.closest("#capture-frame");
-      if (!frame) return;
-      const img = frame.querySelector("img");
-      if (img) openLightbox(img.src);
-    });
-    // Main capture lightbox — always opens the real screenshot
-    if (els.captureScreen) {
-      els.captureScreen.addEventListener("click", () => {
-        const src = els.captureScreen.dataset.screenshot;
-        if (src) openLightbox(src);
-      });
-    }
-    // Event delegation for alert history clicks — survives innerHTML re-renders
-    if (els.alertHistory) {
-      els.alertHistory.addEventListener("click", (e) => {
-        const card = e.target.closest("[data-analysis-id]");
-        if (card) {
-          const id = card.getAttribute("data-analysis-id");
-          if (id) selectAlert(id);
-        }
-      });
-    }
-    // Mark all read button (event delegation — button is recreated on render)
-    document.addEventListener("click", (e) => {
-      if (e.target.id === "mark-all-read" || e.target.closest("#mark-all-read")) {
-        const history = (window.__lastState && window.__lastState.alert_history) || [];
-        history.forEach(a => uiState.seenAlerts.add(String(a.analysis_id)));
-        saveSeen(uiState.seenAlerts);
-        _lastHistoryKey = "";
-        render(window.__lastState || {});
-      }
-    });
-    // ---------------- Settings drawer ----------------
-    const gearBtn = document.getElementById("header-gear");
-    const drawer = document.getElementById("settings-drawer");
-    const drawerBackdrop = document.getElementById("drawer-backdrop");
-    const drawerClose = document.getElementById("drawer-close");
-    const modelPicker = document.getElementById("model-picker");
-    const intervalPills = document.getElementById("interval-pills");
-
-    async function openDrawer() {
-      drawer.classList.add("gl-drawer-open");
-      drawerBackdrop.classList.add("gl-drawer-open");
-      // Update current interval pills + active state from last state
-      const currentInterval = (window.__lastState && window.__lastState.capture_interval_seconds) || 30;
-      if (intervalPills) {
-        intervalPills.querySelectorAll(".gl-drawer-pill").forEach(b => {
-          const s = parseFloat(b.getAttribute("data-seconds"));
-          b.classList.toggle("gl-drawer-pill-active", Math.abs(s - currentInterval) < 1);
-        });
-      }
-      // Fetch available models
-      modelPicker.innerHTML = '<option>Loading models...</option>';
-      try {
-        const r = await fetch("/api/models");
-        if (r.ok) {
-          const data = await r.json();
-          const current = data.current || "";
-          const models = data.models || [];
-          if (models.length === 0) {
-            modelPicker.innerHTML = '<option>No models found</option>';
-          } else {
-            modelPicker.innerHTML = models.map(m =>
-              `<option value="${m}"${m === current ? " selected" : ""}>${m}</option>`
-            ).join("");
-          }
-          updateDrawerFooter(current);
-        }
-      } catch(err) {
-        modelPicker.innerHTML = '<option>Failed to load models</option>';
-        console.error("Failed to fetch models:", err);
-      }
-    }
-    function updateDrawerFooter(modelName) {
-      const footer = document.querySelector(".gl-drawer-footer");
-      if (footer && modelName) {
-        footer.innerHTML = `Active model: <strong style="color:var(--purple);font-family:var(--font-mono)">${modelName}</strong> \u00b7 On-device`;
-      }
-    }
-    function closeDrawer() {
-      drawer.classList.remove("gl-drawer-open");
-      drawerBackdrop.classList.remove("gl-drawer-open");
-    }
-    if (gearBtn) gearBtn.addEventListener("click", openDrawer);
-    if (drawerClose) drawerClose.addEventListener("click", closeDrawer);
-    if (drawerBackdrop) drawerBackdrop.addEventListener("click", closeDrawer);
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && drawer && drawer.classList.contains("gl-drawer-open")) closeDrawer();
-    });
-    if (modelPicker) {
-      modelPicker.addEventListener("change", async () => {
-        const model = modelPicker.value;
-        try {
-          const r = await fetch("/api/config/model", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({model}),
-          });
-          if (r.ok) {
-            // Update header chip and drawer footer immediately
-            setText(els.headerModel, model);
-            updateDrawerFooter(model);
-          }
-        } catch(err) {
-          console.error("Failed to switch model:", err);
-        }
-      });
-    }
-    if (intervalPills) {
-      intervalPills.addEventListener("click", async (e) => {
-        const btn = e.target.closest(".gl-drawer-pill");
-        if (!btn) return;
-        const seconds = parseFloat(btn.getAttribute("data-seconds"));
-        if (!seconds) return;
-        intervalPills.querySelectorAll(".gl-drawer-pill").forEach(b => b.classList.remove("gl-drawer-pill-active"));
-        btn.classList.add("gl-drawer-pill-active");
-        try {
-          await fetch("/api/config/interval", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({seconds}),
-          });
-        } catch(_) {}
-      });
-    }
-
-    const node = document.getElementById("initial-state");
-    if (node) try { render(JSON.parse(node.textContent)); } catch(_) {}
-    connectStream();
+}
+
+const ui = {
+  snapshot: null,
+  selection: null,
+  lastAutoAlertKey: null,
+  seenAlerts: loadSeen(),
+};
+
+/* ----------------------------- formatters --------------------------- */
+const LEVEL_CLASS = {
+  safe: "safe", caution: "warn", warning: "warn",
+  alert: "alert", critical: "alert",
+};
+const levelClass = (lvl) => LEVEL_CLASS[lvl] || "safe";
+
+function prettyDuration(seconds) {
+  seconds = Math.max(0, Math.floor(seconds || 0));
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h) return `${h}h ${String(m).padStart(2, "0")}m`;
+  if (m) return `${m}m ${String(s).padStart(2, "0")}s`;
+  return `${s}s`;
+}
+
+function initials(name) {
+  if (!name) return "—";
+  const clean = String(name).replace(/[^a-zA-Z0-9]/g, "");
+  return (clean.slice(0, 2) || "—").toUpperCase();
+}
+
+function timeAgo(isoOrSeconds) {
+  if (!isoOrSeconds) return "";
+  const d = typeof isoOrSeconds === "string" ? new Date(isoOrSeconds) : new Date(isoOrSeconds * 1000);
+  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (s < 10) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  return `${Math.floor(m / 60)}h ago`;
+}
+
+function platformFamily(p) {
+  const s = String(p || "").toLowerCase();
+  if (s.includes("instagram")) return "instagram";
+  if (s.includes("minecraft")) return "minecraft";
+  if (s.includes("discord")) return "discord";
+  if (s.includes("tiktok")) return "tiktok";
+  if (s.includes("youtube")) return "youtube";
+  if (s.includes("snapchat")) return "snapchat";
+  if (s.includes("whatsapp")) return "whatsapp";
+  if (s.includes("roblox")) return "roblox";
+  return "unknown";
+}
+const platformLetters = {
+  instagram: "Ig", minecraft: "Mc", discord: "Dc", tiktok: "Tk",
+  youtube: "Yt", snapchat: "Sc", whatsapp: "Wa", roblox: "Rb", unknown: "?",
+};
+// Pretty names for the platform line. Keep the source string if unknown
+// so we never turn a model output like "chat" into the literal word "chat".
+const PLATFORM_LABELS = {
+  instagram: "Instagram", minecraft: "Minecraft", discord: "Discord",
+  tiktok: "TikTok", youtube: "YouTube", snapchat: "Snapchat",
+  whatsapp: "WhatsApp", roblox: "Roblox",
+};
+function platformLabel(raw) {
+  const fam = platformFamily(raw);
+  return PLATFORM_LABELS[fam] || (raw ? String(raw).replace(/_/g, " ") : "Unknown");
+}
+
+// Inline SVG brand glyphs, sized 18x18 and rendered in white on the
+// colored tile background. Simplified silhouettes — instantly
+// recognisable, no trademark issues, no external requests.
+const PLATFORM_SVG = {
+  discord:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 5.1a17 17 0 0 0-4.2-1.3l-.2.4a13 13 0 0 0-7.2 0l-.2-.4A17 17 0 0 0 4 5.1 18 18 0 0 0 .9 17a17 17 0 0 0 5.2 2.6l.4-.6a12 12 0 0 1-2-.9l.5-.4a12 12 0 0 0 10 0l.5.4-2 .9.4.6A17 17 0 0 0 23 17a18 18 0 0 0-3-11.9zM8.5 14.4c-1 0-1.9-1-1.9-2.1 0-1.2.9-2.2 2-2.2 1 0 1.9 1 1.9 2.2 0 1.1-.9 2.1-2 2.1zm7 0c-1 0-1.9-1-1.9-2.1 0-1.2.9-2.2 1.9-2.2s1.9 1 1.9 2.2c0 1.1-.8 2.1-1.9 2.1z"/></svg>',
+  instagram:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>',
+  minecraft:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 7l8-4 8 4-8 4-8-4zm0 2v8l8 4v-8L4 9zm16 0l-8 4v8l8-4V9z"/></svg>',
+  tiktok:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 3v3.1a5 5 0 0 0 4 2v3a8 8 0 0 1-4-1.2V16a6 6 0 1 1-6-6v3a3 3 0 1 0 3 3V3h3z"/></svg>',
+  youtube:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 7.3a3 3 0 0 0-2.1-2.1C18 4.8 12 4.8 12 4.8s-6 0-7.9.4A3 3 0 0 0 2 7.3 31 31 0 0 0 1.6 12 31 31 0 0 0 2 16.7a3 3 0 0 0 2.1 2.1C6 19.2 12 19.2 12 19.2s6 0 7.9-.4a3 3 0 0 0 2.1-2.1 31 31 0 0 0 .4-4.7 31 31 0 0 0-.4-4.7zM10 15.3V8.7l5.2 3.3L10 15.3z"/></svg>',
+  snapchat:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.5c3.3 0 5.5 2.3 5.5 5.6 0 1.3-.2 3-.2 3.3.4.3.8.4 1.3.4.4 0 .7-.1 1-.3l.2.2a.7.7 0 0 1-.3 1 8 8 0 0 1-2 .9c-.1.2-.2.7-.3 1a.4.4 0 0 1-.4.3l-1.5-.1a4 4 0 0 0-1.6.4c-.8.4-1.6 1.7-3.7 1.7s-2.9-1.3-3.7-1.7a4 4 0 0 0-1.6-.4l-1.5.1a.4.4 0 0 1-.4-.3l-.3-1a8 8 0 0 1-2-.9.7.7 0 0 1-.3-1l.2-.2c.3.2.6.3 1 .3.5 0 .9-.1 1.3-.4 0-.3-.2-2-.2-3.3 0-3.3 2.2-5.6 5.5-5.6z"/></svg>',
+  whatsapp:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.8A9.2 9.2 0 0 0 4 16.6l-1.2 4.3 4.4-1.1a9.2 9.2 0 0 0 13.6-8 9.2 9.2 0 0 0-8.8-9zm5.3 13c-.2.6-1.3 1.2-1.8 1.2-.5 0-.5.4-3-.6a10 10 0 0 1-4.1-3.6c-.2-.3-1-1.3-1-2.5 0-1.1.6-1.7.8-1.9.2-.2.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.1.1.3 0 .5l-.3.5-.5.5.1.2a7 7 0 0 0 1.2 1.5 6 6 0 0 0 1.7 1c.2.1.3.1.5-.1l.6-.7.3-.2h.3l1.9.9.3.2c0 .2 0 .8-.2 1.4z"/></svg>',
+  roblox:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4.4 2l15.2 4-4 15.2L.4 17.2 4.4 2zm5.6 8l-.9 3.5 3.5.9.9-3.5-3.5-.9z"/></svg>',
+  unknown:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.2V14" stroke-linecap="round"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/></svg>',
+};
+function platformLogo(fam) {
+  return PLATFORM_SVG[fam] || PLATFORM_SVG.unknown;
+}
+
+// One-word parent-readable status badge per backend threat level.
+// Returns [label, cssClass]. "Critical" collapses into ALERT visually
+// because the parent action is identical.
+const STATUS_LABEL = {
+  safe:     ["Safe",     "safe"],
+  caution:  ["Caution",  "caution"],
+  warning:  ["Warning",  "warning"],
+  alert:    ["Alert",    "alert"],
+  critical: ["Alert",    "alert"],
+};
+function statusBadge(level) {
+  const [lbl, cls] = STATUS_LABEL[level] || STATUS_LABEL.safe;
+  return { label: lbl, cls };
+}
+
+/* ---------------------------- activity list ------------------------- */
+function sortByDanger(items, levelKey) {
+  const order = { alert: 0, critical: 0, warning: 1, caution: 2, safe: 3 };
+  return [...items].sort((a, b) => {
+    const la = order[a[levelKey]] ?? 9;
+    const lb = order[b[levelKey]] ?? 9;
+    return la - lb;
   });
-})();
+}
+
+function renderActivity(conversations, environments) {
+  const list = $("activityList");
+  const all = [
+    ...conversations.map((c) => ({ kind: "conversation", level: c.threat_level, data: c })),
+    ...environments.map((e) => ({ kind: "environment", level: e.overall_safety, data: e })),
+  ];
+  // Sort rule: (1) danger first, (2) within a danger tier, people
+  // before places. People are the actionable alert target; places are
+  // context about where those people are.
+  const ranked = [...all].sort((a, b) => {
+    const order = { alert: 0, critical: 0, warning: 1, caution: 2, safe: 3 };
+    const d = (order[a.level] ?? 9) - (order[b.level] ?? 9);
+    if (d !== 0) return d;
+    const k = (x) => (x.kind === "conversation" ? 0 : 1);
+    return k(a) - k(b);
+  });
+
+  const unsafe = ranked.filter((r) => r.level !== "safe");
+  const safe = ranked.filter((r) => r.level === "safe");
+
+  list.innerHTML = "";
+  if (ranked.length === 0) {
+    list.innerHTML = `<div class="gl-empty">Monitoring — no activity yet</div>`;
+    return;
+  }
+
+  for (const item of unsafe) {
+    list.appendChild(
+      item.kind === "conversation" ? convCard(item.data) : envCard(item.data)
+    );
+  }
+  if (safe.length > 0) list.appendChild(safeGroup(safe));
+}
+
+function convCard(c) {
+  // Conversation card. Layout reads left-to-right like a parent-facing
+  // message row:
+  //   [platform logo]  username            [STATUS badge]
+  //                    platform · N msgs · duration · conf%
+  //                    one-line narrative snippet
+  // The status badge is the thing the eye lands on first — that's the
+  // single decision (do I need to open this?) a parent is making.
+  const rawLvl = c.threat_level || "safe";
+  const lvl = levelClass(rawLvl);
+  const pct = Math.round(c.confidence || 0);
+  const fam = platformFamily(c.platform);
+  const badge = statusBadge(rawLvl);
+  const card = document.createElement("div");
+  card.className = `gl-card conv ${lvl}`;
+  card.setAttribute("role", "button");
+  card.setAttribute("tabindex", "0");
+  card.setAttribute(
+    "aria-label",
+    `${badge.label} — ${c.participant} on ${platformLabel(c.platform)}. Click to open analysis.`,
+  );
+  const openDetail = () => {
+    markSeen(alertId("conversation", c));
+    ui.selection = { kind: "conversation", platform: c.platform, participant: c.participant };
+    // Include the current threat_level so a later escalation from
+    // caution → alert produces a fresh key and re-pops the detail view.
+    ui.lastAutoAlertKey = `${selectionKey(ui.selection)}:${c.threat_level}`;
+    render();
+  };
+  card.addEventListener("click", openDetail);
+  card.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(); }
+  });
+
+  const promoted = c.source && c.source.startsWith("promoted_")
+    ? `<span class="gl-chip-promoted" title="Promoted from a public space">promoted</span>` : "";
+
+  // Platform line reads as a proper sentence fragment: "Instagram DM",
+  // "Discord", "Minecraft chat". Duration uses first_seen→last_seen.
+  const duration = (c.first_seen && c.last_seen)
+    ? prettyDuration((new Date(c.last_seen).getTime() - new Date(c.first_seen).getTime()) / 1000)
+    : "";
+  const metaParts = [platformLabel(c.platform)];
+  if (c.message_count) metaParts.push(`${c.message_count} msg${c.message_count === 1 ? "" : "s"}`);
+  if (duration && duration !== "0s") metaParts.push(duration);
+  if (pct && lvl !== "safe") metaParts.push(`${pct}% confidence`);
+  const meta = metaParts.join(" · ");
+
+  const snippet = shortNarrative(c);
+
+  const alertPulse = lvl === "alert"
+    ? '<span class="gl-badge-dot" aria-hidden="true"></span>' : "";
+
+  card.innerHTML = `
+    <div class="gl-tile ${fam}" aria-hidden="true">${platformLogo(fam)}</div>
+    <div class="gl-card-body">
+      <div class="gl-card-head">
+        <span class="gl-card-name">${escapeHtml(c.participant)}</span>
+        ${promoted}
+        <span class="gl-status-badge ${badge.cls}">${alertPulse}${badge.label}</span>
+      </div>
+      <div class="gl-card-meta">${escapeHtml(meta)}</div>
+      ${snippet ? `<div class="gl-card-note ${lvl}">${escapeHtml(snippet)}</div>` : ""}
+    </div>`;
+  return card;
+}
+
+function envCard(e) {
+  // Environment card. Same skeleton as convCard but the "status" pills
+  // read "Safe / Watching / Flagged" instead of threat levels — the
+  // parent is judging a space, not a person.
+  const rawLvl = e.overall_safety || "safe";
+  const lvl = levelClass(rawLvl);
+  const fam = platformFamily(e.platform);
+  const pCount = (e.promoted_users || []).length;
+  const badgeLabel = lvl === "safe" ? "Safe"
+    : lvl === "alert" ? "Flagged"
+    : "Watching";
+  const card = document.createElement("div");
+  card.className = `gl-card env ${lvl}`;
+  card.setAttribute("role", "button");
+  card.setAttribute("tabindex", "0");
+  card.setAttribute(
+    "aria-label",
+    `${badgeLabel} — ${platformLabel(e.platform)} environment. Click to open analysis.`,
+  );
+  const openDetail = () => {
+    markSeen(alertId("environment", e));
+    ui.selection = { kind: "environment", platform: e.platform, context: e.context };
+    render();
+  };
+  card.addEventListener("click", openDetail);
+  card.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openDetail(); }
+  });
+
+  const duration = (e.first_seen && e.last_seen)
+    ? prettyDuration((new Date(e.last_seen).getTime() - new Date(e.first_seen).getTime()) / 1000)
+    : "";
+  const metaParts = [];
+  if (e.content_type) metaParts.push(String(e.content_type).replace(/_/g, " "));
+  if (e.user_count) metaParts.push(`${e.user_count} user${e.user_count === 1 ? "" : "s"}`);
+  if (duration && duration !== "0s") metaParts.push(duration);
+  if (pCount > 0) metaParts.push(`${pCount} tracked`);
+  const meta = metaParts.join(" · ");
+
+  const summary = e.content_summary
+    ? e.content_summary.split(".")[0].slice(0, 96)
+    : "";
+
+  const badgeCls = lvl === "safe" ? "safe" : lvl === "alert" ? "alert" : "warning";
+
+  card.innerHTML = `
+    <div class="gl-tile env ${fam}" aria-hidden="true">${platformLogo(fam)}</div>
+    <div class="gl-card-body">
+      <div class="gl-card-head">
+        <span class="gl-card-name">${escapeHtml(platformLabel(e.platform))}</span>
+        <span class="gl-card-kind" title="Shared space">Place</span>
+        <span class="gl-status-badge ${badgeCls}">${badgeLabel}</span>
+      </div>
+      <div class="gl-card-meta">${escapeHtml(meta)}</div>
+      ${summary ? `<div class="gl-card-note ${lvl}">${escapeHtml(summary)}</div>` : ""}
+    </div>`;
+  return card;
+}
+
+function safeGroup(items) {
+  // Collapse every safe activity into a single reassuring row. Shows up
+  // to 4 tokens with a person/place marker so the legend stays legible.
+  const wrap = document.createElement("div");
+  wrap.className = "gl-card-safe-group";
+  const tokens = items.slice(0, 4).map((it) => {
+    const label = it.kind === "conversation"
+      ? it.data.participant
+      : platformLabel(it.data.platform);
+    const markCls = it.kind === "conversation" ? "circle" : "square";
+    return `<span class="gl-safe-tok"><span class="gl-safe-mark ${markCls}"></span>${escapeHtml(label)}</span>`;
+  });
+  const overflow = items.length > tokens.length
+    ? `<span class="gl-safe-tok more">+${items.length - tokens.length} more</span>` : "";
+  wrap.innerHTML = `
+    <div class="gl-tile ok" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5L10 17L19 8"/></svg>
+    </div>
+    <div class="gl-card-body">
+      <div class="gl-card-head">
+        <span class="gl-card-name">${items.length} safe activit${items.length === 1 ? "y" : "ies"}</span>
+        <span class="gl-status-badge safe">Safe</span>
+      </div>
+      <div class="gl-safe-list">${tokens.join("")}${overflow}</div>
+    </div>`;
+  return wrap;
+}
+
+function shortNarrative(c) {
+  if (c.narrative) return c.narrative.split(".")[0].slice(0, 80);
+  if (c.indicators && c.indicators.length > 0) {
+    return `${c.category} — ${c.indicators.slice(0, 2).join(", ")}`;
+  }
+  return c.category || "observed";
+}
+
+/* ---------------------------- capture block ------------------------- */
+function renderCapture(snapshot) {
+  const latest = snapshot.latest;
+  const frame = $("captureFrame");
+  const statusEl = $("captureStatus");
+  const card = $("captureCard");
+  const icon = $("captureIcon");
+  const text = $("captureText");
+  const sub = $("captureSub");
+  const ago = $("captureAgo");
+
+  if (!latest) {
+    frame.innerHTML = `<div class="gl-capture-empty">Waiting for first frame…</div>`;
+    card.classList.remove("alert", "warn");
+    statusEl.classList.remove("alert", "warn");
+    text.className = "gl-status-text";
+    text.textContent = "All clear";
+    sub.textContent = "";
+    ago.textContent = "";
+    return;
+  }
+
+  // `serialize_analysis` flattens ScreenAnalysis into a single dict —
+  // fields live directly on `latest`, not nested under `classification`.
+  // Prefer chat_messages for a richer rendering; fall back to the
+  // screenshot image when the frame has no structured messages.
+  const msgs = latest.chat_messages || [];
+  if (msgs.length > 0) {
+    const platformName = latest.platform || "—";
+    const rows = msgs.slice(0, 4).map((m) => {
+      const cls = m.flag ? "red" : "grn";
+      return `<div class="cc-msg"><span class="cc-sender ${cls}">${escapeHtml(m.sender || "")}:</span> <span>${escapeHtml(m.text || "")}</span></div>`;
+    }).join("");
+    frame.innerHTML = `
+      <div class="gl-capture-chat">
+        <div class="cc-platform">${escapeHtml(platformName)}</div>
+        ${rows}
+      </div>`;
+  } else if (latest.screenshot_url) {
+    frame.innerHTML = `<img src="${latest.screenshot_url}" alt="live capture">`;
+  } else {
+    frame.innerHTML = `<div class="gl-capture-empty">No preview available</div>`;
+  }
+
+  const lvl = latest.threat_level || "safe";
+  const cls = levelClass(lvl);
+  card.classList.toggle("alert", cls === "alert");
+  card.classList.toggle("warn", cls === "warn");
+  statusEl.classList.toggle("alert", cls === "alert");
+  statusEl.classList.toggle("warn", cls === "warn");
+  text.className = `gl-status-text ${cls === "safe" ? "" : cls}`;
+  sub.className = `gl-status-sub ${cls === "safe" ? "" : cls}`;
+
+  text.textContent = cls === "alert"
+    ? `Alert · ${latest.category || "threat"}`
+    : cls === "warn" ? `Concerning · ${latest.category || "threat"}` : "All clear";
+  const reasonSnippet = (latest.reasoning || "").slice(0, 72);
+  const inf = typeof latest.inference_seconds === "number"
+    ? ` · ${latest.inference_seconds.toFixed(1)}s` : "";
+  sub.textContent = latest.platform
+    ? `${String(latest.platform).slice(0, 36)}${inf}${reasonSnippet ? " — " + reasonSnippet : ""}`
+    : reasonSnippet;
+  // Blink the status dot on each new frame so the operator sees activity
+  // even during long safe stretches.
+  statusEl.classList.remove("tick");
+  void statusEl.offsetWidth; // reflow to restart the animation
+  statusEl.classList.add("tick");
+  ago.textContent = timeAgo(latest.timestamp);
+}
+
+/* ---------------------------- session overview ---------------------- */
+function renderSessionOverview(snapshot) {
+  const narr = snapshot.session_narrative || {};
+  const convs = snapshot.conversations || [];
+  const envs = snapshot.environments || [];
+
+  // Hero
+  const hero = $("overviewHero");
+  const title = $("heroTitle");
+  const sub = $("heroSub");
+  title.className = "gl-hero-title " + (narr.tone === "alert" ? "alert" : narr.tone === "warning" ? "warn" : "");
+  sub.className = "gl-hero-sub " + (narr.tone === "alert" ? "alert" : narr.tone === "warning" ? "warn" : "");
+  title.textContent = narr.headline || "Monitoring";
+  sub.textContent = narr.subhead || "";
+  $("heroIcon").innerHTML = narr.tone === "safe"
+    ? `<svg width="30" height="30" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="14" stroke="rgba(34,197,94,0.18)" stroke-width="2"/><path d="M11 18.5L15.5 23L25 13" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    : `<svg width="30" height="30" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="14" stroke="rgba(239,68,68,0.25)" stroke-width="2"/><path d="M18 11v8M18 23v0.5" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+
+  // Stats
+  $("ovMonitored").textContent = narr.monitored || "0s";
+  $("ovPlatforms").textContent = narr.platforms_count || 0;
+  $("ovSafeRate").textContent = `${narr.safe_rate ?? 100}%`;
+  $("ovSafeRate").className = "gl-stat-val gl-green";
+
+  // Narrative
+  const intro = $("narrativeIntro");
+  const concernsEl = $("narrativeConcerns");
+  const safeEl = $("narrativeSafe");
+  const total = convs.length + envs.length;
+  intro.innerHTML = total === 0
+    ? "Session in progress — nothing flagged yet."
+    : `Your child spent <b>${narr.monitored}</b> across <b>${narr.platforms_count} platform${narr.platforms_count === 1 ? "" : "s"}</b>.${narr.concerns && narr.concerns.length ? " " + narr.concerns.length + " concern" + (narr.concerns.length === 1 ? "" : "s") + " detected:" : ""}`;
+
+  concernsEl.innerHTML = "";
+  for (const c of narr.concerns || []) {
+    const cls = levelClass(c.level);
+    const row = document.createElement("div");
+    row.className = "gl-concern-row";
+    row.innerHTML = `
+      <div class="gl-concern-dot ${cls === "alert" ? "" : "warn"}"></div>
+      <div class="gl-concern-text ${cls === "alert" ? "" : "warn"}"><b>${escapeHtml(c.name)}</b> — ${escapeHtml(c.summary || c.category)}</div>`;
+    concernsEl.appendChild(row);
+  }
+
+  // Safe activities — prefer structured data (with person/platform
+  // visual markers) over the raw comma string. A person gets a small
+  // circle dot, a platform gets a small square, matching the left-panel
+  // legend so the glyph is learnable.
+  if (narr.safe_count > 0) {
+    safeEl.innerHTML = "Safe activities: ";
+    const safeConvs = (snapshot.conversations || []).filter((c) => c.threat_level === "safe");
+    const safeEnvs = (snapshot.environments || []).filter((e) => e.overall_safety === "safe");
+    const tokens = [];
+    safeConvs.slice(0, 4).forEach((c) => {
+      tokens.push(`<span class="gl-safe-tag"><span class="gl-safe-mark circle"></span>${escapeHtml(c.participant)} <em>${escapeHtml(c.platform)}</em></span>`);
+    });
+    safeEnvs.slice(0, 4).forEach((e) => {
+      tokens.push(`<span class="gl-safe-tag"><span class="gl-safe-mark square ${platformFamily(e.platform)}"></span>${escapeHtml(e.platform)}</span>`);
+    });
+    safeEl.innerHTML += tokens.join("");
+  } else {
+    safeEl.textContent = total > 0 ? "No fully-safe activities so far." : "";
+  }
+
+  // Actions
+  const actionsList = $("actionsList");
+  actionsList.innerHTML = "";
+  (narr.what_to_do || []).forEach((txt, i) => {
+    const row = document.createElement("div");
+    row.className = "gl-action-row";
+    row.innerHTML = `<div class="gl-action-num">${i + 1}</div><div>${escapeHtml(txt)}</div>`;
+    actionsList.appendChild(row);
+  });
+
+}
+
+/* ---------------------------- conversation detail ------------------- */
+function renderConversationDetail(snapshot, sel) {
+  const c = (snapshot.conversations || []).find(
+    (x) => x.platform === sel.platform && x.participant === sel.participant
+  );
+  if (!c) {
+    showState("stateSession");
+    return;
+  }
+
+  const pct = Math.round(c.confidence || 0);
+  const lvl = levelClass(c.threat_level);
+  const fam = platformFamily(c.platform);
+
+  const avatar = $("convAvatar");
+  avatar.className = `gl-avatar-circle ${lvl}`;
+  avatar.textContent = initials(c.participant);
+
+  const name = $("convName");
+  name.className = "gl-detail-name " + (lvl === "safe" ? "safe" : lvl);
+  name.textContent = c.participant;
+
+  const sub = $("convSub");
+  const duration = prettyDuration(
+    (new Date(c.last_seen).getTime() - new Date(c.first_seen).getTime()) / 1000
+  );
+  const platformTag = `<span class="gl-platform-chip ${fam}">${platformLetters[fam] || ""}</span>`;
+  sub.innerHTML = `${platformTag}${escapeHtml(c.platform)} · ${c.message_count || 0} msgs · ${duration}`;
+
+  const conf = $("convConfidence");
+  conf.className = "gl-detail-confidence " + (lvl === "safe" ? "safe" : lvl);
+  conf.innerHTML = `${pct}<small>%</small>`;
+
+  const threat = $("convThreat");
+  threat.className = `gl-threat-summary ${lvl === "safe" ? "safe" : lvl === "warn" ? "warn" : ""}`;
+  const stage = c.grooming_stage || "none";
+  const stageIdx = ["none","targeting","trust_building","isolation","desensitization","maintaining_control"].indexOf(stage);
+  $("convThreatTitle").className = "gl-threat-title " + (lvl === "safe" ? "safe" : lvl === "warn" ? "warn" : "");
+  $("convThreatTitle").textContent = stage !== "none" && stageIdx > 0
+    ? `${c.category} — stage ${stageIdx}/5`
+    : `${c.category || "observed"}`;
+  $("convThreatBody").textContent = c.narrative || "No narrative yet.";
+  const bar = $("convStageBar");
+  if (stageIdx > 0) {
+    bar.hidden = false;
+    [...bar.children].forEach((span, i) => {
+      span.className = i < stageIdx ? "on" : i === stageIdx ? "dim" : "";
+    });
+  } else {
+    bar.hidden = true;
+  }
+
+  // Arc — reconstruct from indicators (we don't have per-message stream here
+  // yet, so render indicators as escalating dots).
+  const arc = $("convArc");
+  arc.innerHTML = "";
+  const indicators = c.indicators || [];
+  if (indicators.length === 0) {
+    const row = document.createElement("div");
+    row.className = "gl-arc-item";
+    row.innerHTML = `<div class="gl-arc-dot"></div><div class="gl-arc-body"><div class="gl-arc-text">No flagged messages yet</div><div class="gl-arc-label">Safe</div></div>`;
+    arc.appendChild(row);
+  } else {
+    indicators.forEach((ind, i) => {
+      const isAlert = lvl === "alert" && i >= indicators.length - 2;
+      const dotCls = isAlert ? "alert" : lvl === "warn" ? "warn" : "";
+      const row = document.createElement("div");
+      row.className = "gl-arc-item";
+      row.innerHTML = `
+        <div class="gl-arc-dot ${dotCls}"></div>
+        <div class="gl-arc-body">
+          <div class="gl-arc-text ${dotCls}">${escapeHtml(ind)}</div>
+          <div class="gl-arc-label ${dotCls}">${isAlert ? "Alert trigger" : "Indicator"}</div>
+        </div>`;
+      arc.appendChild(row);
+    });
+  }
+
+  // Reasoning
+  const lines = [
+    `1: Platform: ${c.platform}`,
+    `2: Users: ${c.participant} → child`,
+    `3: Messages analyzed: ${c.message_count || 0}`,
+  ];
+  indicators.forEach((ind, i) => lines.push(`   → ${ind}`));
+  const esc = c.escalation;
+  if (esc && esc.escalating) {
+    lines.push(`4: Escalating — speed ${esc.speed.toFixed(2)} · highest ${esc.highest_level}`);
+  }
+  lines.push(`${lvl === "alert" ? "ALERT" : lvl.toUpperCase()} — ${c.category} — ${pct}%`);
+  $("convReasoning").textContent = lines.join("\n");
+
+  // Actions
+  const actList = $("convActions");
+  actList.innerHTML = "";
+  const actions = defaultActionsFor(c);
+  actions.forEach((txt, i) => {
+    const row = document.createElement("div");
+    row.className = "gl-action-row";
+    row.innerHTML = `<div class="gl-action-num">${i + 1}</div><div>${escapeHtml(txt)}</div>`;
+    actList.appendChild(row);
+  });
+
+}
+
+function defaultActionsFor(c) {
+  const category = (c.category || "").toLowerCase();
+  if (category.includes("grooming")) {
+    return [
+      "Talk to your child calmly about this conversation",
+      `Ask who "${c.participant}" is — they may not know them`,
+      "Block and report the account together",
+    ];
+  }
+  if (category.includes("bullying")) {
+    return [
+      "Offer emotional support — this is not your child's fault",
+      "Screenshot the conversation for school if needed",
+      "Help your child block the user",
+    ];
+  }
+  if (category.includes("scam")) {
+    return [
+      "Do not click any links or share credentials",
+      "Show your child how to spot phishing",
+      "Report the account to the platform",
+    ];
+  }
+  return ["Review the conversation", "Check in with your child", "Decide next steps together"];
+}
+
+/* ---------------------------- environment detail -------------------- */
+function renderEnvironmentDetail(snapshot, sel) {
+  const e = (snapshot.environments || []).find(
+    (x) => x.platform === sel.platform && x.context === sel.context
+  );
+  if (!e) {
+    showState("stateSession");
+    return;
+  }
+
+  const lvl = levelClass(e.overall_safety);
+  const fam = platformFamily(e.platform);
+
+  const avatar = $("envAvatar");
+  avatar.className = `gl-avatar-square ${fam}`;
+  avatar.textContent = platformLetters[fam] || "?";
+
+  const name = $("envName");
+  name.className = "gl-detail-name " + (lvl === "safe" ? "safe" : lvl);
+  name.textContent = e.platform;
+
+  const duration = prettyDuration(
+    (new Date(e.last_seen).getTime() - new Date(e.first_seen).getTime()) / 1000
+  );
+  $("envSub").textContent = `${e.user_count || 0} users · ${duration} · ${e.content_type || "space"}`;
+
+  const safety = $("envSafety");
+  safety.className = "gl-detail-confidence " + (lvl === "safe" ? "safe" : lvl);
+  safety.textContent = lvl === "safe" ? "SAFE" : lvl.toUpperCase();
+
+  const threat = $("envThreat");
+  threat.className = `gl-threat-summary ${lvl === "safe" ? "safe" : lvl === "warn" ? "warn" : ""}`;
+  $("envThreatTitle").className = "gl-threat-title " + (lvl === "safe" ? "safe" : lvl === "warn" ? "warn" : "");
+  $("envThreatTitle").textContent = lvl === "alert"
+    ? "Concerning activity in public space"
+    : lvl === "warn" ? "Watch this space" : "Normal space";
+  $("envThreatBody").textContent = e.content_summary || "No summary yet.";
+
+  // Users list — promoted users highlighted, other users safe
+  const usersEl = $("envUsers");
+  usersEl.innerHTML = "";
+  const promoted = e.promoted_users || [];
+  const allConvs = (snapshot.conversations || []).filter((c) => {
+    const pr = String(c.source || "").startsWith("promoted_from_");
+    return pr && promoted.includes(c.participant);
+  });
+  allConvs.forEach((c) => {
+    const row = document.createElement("div");
+    row.className = "gl-user-row alert";
+    row.innerHTML = `
+      <div class="gl-user-avatar alert">${initials(c.participant)}</div>
+      <div class="gl-user-main">
+        <div class="gl-user-top">
+          <span class="gl-user-name alert">${escapeHtml(c.participant)}</span>
+          <span class="gl-promoted-pill">promoted</span>
+        </div>
+        <div class="gl-user-sub alert">${escapeHtml((c.indicators || []).slice(0,2).join(", ") || c.category || "targeting")}</div>
+      </div>`;
+    usersEl.appendChild(row);
+  });
+  // Remaining users (we only know names via extracted_users approximated by user_count)
+  const safeCount = Math.max(0, (e.user_count || 0) - promoted.length);
+  if (safeCount > 0) {
+    const row = document.createElement("div");
+    row.className = "gl-user-row";
+    row.innerHTML = `
+      <div class="gl-user-avatar">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M5 8.5L7 10.5L11 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="gl-user-main">
+        <div class="gl-user-top"><span class="gl-user-name">${safeCount} other user${safeCount === 1 ? "" : "s"}</span></div>
+        <div class="gl-user-sub">Safe — normal activity</div>
+      </div>`;
+    usersEl.appendChild(row);
+  }
+
+  // Reasoning
+  const rs = [
+    `1: Platform: ${e.platform}`,
+    `2: ${e.user_count || 0} users, public space`,
+    `3: Content type: ${e.content_type || "unknown"}`,
+  ];
+  if (promoted.length > 0) {
+    rs.push(`4: Targeting detected — promoted: ${promoted.join(", ")}`);
+  }
+  (e.indicators || []).forEach((ind) => rs.push(`   → ${ind}`));
+  rs.push(`${lvl === "alert" ? "ALERT" : lvl.toUpperCase()} — ${e.platform}`);
+  $("envReasoning").textContent = rs.join("\n");
+
+  // Actions
+  const actList = $("envActions");
+  actList.innerHTML = "";
+  const actions = promoted.length > 0
+    ? [
+      `Ask your child about ${promoted[0]}`,
+      `Review the ${e.platform} environment`,
+      "Consider stricter platform settings",
+    ]
+    : [`Monitor the ${e.platform} environment`, "Check that content is age-appropriate"];
+  actions.forEach((txt, i) => {
+    const row = document.createElement("div");
+    row.className = "gl-action-row";
+    row.innerHTML = `<div class="gl-action-num">${i + 1}</div><div>${escapeHtml(txt)}</div>`;
+    actList.appendChild(row);
+  });
+}
+
+/* ---------------------------- state switcher ------------------------ */
+function showState(which) {
+  ["stateSession", "stateConversation", "stateEnvironment"].forEach((id) => {
+    $(id).hidden = id !== which;
+  });
+}
+
+function selectionKey(sel) {
+  if (!sel) return null;
+  return sel.kind === "conversation"
+    ? `c:${sel.platform}:${sel.participant}`
+    : `e:${sel.platform}:${sel.context}`;
+}
+
+/* ---------------------------- main render --------------------------- */
+function render() {
+  const snapshot = ui.snapshot;
+  if (!snapshot) return;
+
+  // Header
+  const dot = $("statusDot");
+  dot.classList.remove("paused", "off");
+  const isActive = snapshot.monitoring && !snapshot.paused;
+  if (!snapshot.monitoring && !snapshot.paused) dot.classList.add("off");
+  else if (snapshot.paused) dot.classList.add("paused");
+  $("statusLabel").textContent = snapshot.paused
+    ? "Paused"
+    : snapshot.monitoring ? "Active" : "Off";
+  $("modelChip").textContent = snapshot.model_name || "—";
+
+  // Pause button reflects the actual state — icon + label flip together.
+  const pauseBtn = $("pauseBtn");
+  const pauseIcon = $("pauseIcon");
+  const pauseLabel = $("pauseLabel");
+  if (snapshot.paused) {
+    pauseBtn.classList.add("paused");
+    pauseIcon.textContent = "▶";
+    pauseLabel.textContent = "Resume";
+  } else {
+    pauseBtn.classList.remove("paused");
+    pauseIcon.textContent = "⏸";
+    pauseLabel.textContent = "Pause";
+  }
+
+  // Capture pause overlay
+  const overlay = $("captureOverlay");
+  if (snapshot.paused) {
+    overlay.classList.remove("hidden");
+    $("captureOverlaySub").textContent = `Paused at ${snapshot.session_duration || "0s"}`;
+    $("captureCard").classList.add("paused");
+  } else {
+    overlay.classList.add("hidden");
+    $("captureCard").classList.remove("paused");
+  }
+
+  // Unread counter = flagged items the parent hasn't clicked yet.
+  // `alert_total` is kept for the left-panel stats row (lifetime count),
+  // but the bell is inbox-style and counts UNREAD only.
+  const flaggedItems = gatherFlaggedItems(snapshot);
+  const unreadCount = flaggedItems.filter(
+    (it) => !ui.seenAlerts.has(alertId(it.kind, it.data))
+  ).length;
+  const bell = $("bellWrap");
+  const badge = $("bellBadge");
+  if (unreadCount > 0) {
+    bell.classList.add("has-alerts");
+    badge.hidden = false;
+    badge.textContent = String(unreadCount);
+  } else {
+    bell.classList.remove("has-alerts");
+    badge.hidden = true;
+  }
+
+  renderAlertsMenu(snapshot, flaggedItems);
+
+  // Left — capture + stats + activity
+  renderCapture(snapshot);
+  const convs = snapshot.conversations || [];
+  const envs = snapshot.environments || [];
+  $("statScans").textContent = snapshot.metrics?.screenshots ?? 0;
+  $("statActivities").textContent = convs.length + envs.length;
+  $("statPlatforms").textContent = new Set([
+    ...convs.map((c) => c.platform), ...envs.map((e) => e.platform)
+  ]).size;
+  $("statAlerts").textContent = Number(snapshot.alert_total ?? 0);
+
+  renderActivity(convs, envs);
+
+  // Right — session / conversation / environment
+  if (ui.selection) {
+    if (ui.selection.kind === "conversation") {
+      showState("stateConversation");
+      renderConversationDetail(snapshot, ui.selection);
+    } else {
+      showState("stateEnvironment");
+      renderEnvironmentDetail(snapshot, ui.selection);
+    }
+  } else {
+    showState("stateSession");
+    renderSessionOverview(snapshot);
+  }
+
+  // Privacy footer details
+  const priv = snapshot.privacy || {};
+  const net = priv.network || {};
+  $("privacySub").textContent = net.ollama_local
+    ? `· 0 bytes to cloud · ${net.ollama_host || ""}`
+    : `· NOT LOCAL — ${net.ollama_host || "?"}`;
+
+  // Auto-show State 2 for the newest alerting conversation when no selection yet.
+  // Key includes threat_level so an escalation (caution→alert on the same
+  // person) produces a new key and re-pops the detail view — otherwise the
+  // parent would miss the new severity if they were on the session overview.
+  const topAlert = (convs || []).find((c) => c.threat_level === "alert" || c.threat_level === "critical");
+  if (topAlert && !ui.selection) {
+    const key = `c:${topAlert.platform}:${topAlert.participant}:${topAlert.threat_level}`;
+    if (ui.lastAutoAlertKey !== key) {
+      ui.lastAutoAlertKey = key;
+      ui.selection = { kind: "conversation", platform: topAlert.platform, participant: topAlert.participant };
+      showState("stateConversation");
+      renderConversationDetail(snapshot, ui.selection);
+    }
+  }
+}
+
+/* ---------------------------- alerts menu --------------------------- */
+// The bell is the primary entry point for "what needs attention".
+// The dropdown aggregates any flagged conversation or environment and
+// lets the parent click through to the same detail view they'd see from
+// the activity list. Safe-only sessions get an empty-state message.
+
+function gatherFlaggedItems(snapshot) {
+  // Alerts are per-user. Environments are context — their concern is
+  // surfaced through their promoted users, who are already tracked as
+  // conversations. Firing a second "discord environment warning" alert
+  // on top of "NitroBot on Discord" would double-count the same incident.
+  //
+  // The only case where an environment would earn its own bell alert is
+  // a space-level concern with no promotable party (e.g., exposure to
+  // broadly inappropriate content). We conservatively skip that for now;
+  // the environment still appears in the left-panel activity list as
+  // context, and will drive a session-narrative entry.
+  const convs = snapshot.conversations || [];
+  const items = convs
+    .filter((c) => c.threat_level !== "safe")
+    .map((c) => ({ kind: "conversation", data: c, level: c.threat_level }));
+  items.sort((a, b) => {
+    const order = { alert: 0, critical: 0, warning: 1, caution: 2 };
+    return (order[a.level] ?? 9) - (order[b.level] ?? 9);
+  });
+  return items;
+}
+
+function renderAlertsMenu(snapshot, items) {
+  const list = $("alertsList");
+  const empty = $("alertsEmpty");
+  const head = $("alertsHeadText");
+
+  const unread = items.filter((it) => !ui.seenAlerts.has(alertId(it.kind, it.data)));
+  head.textContent = unread.length > 0
+    ? `Alerts (${unread.length} new)`
+    : items.length > 0 ? `Alerts (${items.length} read)` : "Alerts";
+
+  list.innerHTML = "";
+  if (items.length === 0) {
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+
+  for (const it of items) {
+    const row = document.createElement("div");
+    const lvl = levelClass(it.level);
+    const key = alertId(it.kind, it.data);
+    const isUnread = !ui.seenAlerts.has(key);
+    row.className = `gl-alert-item ${lvl === "safe" ? "" : lvl} ${isUnread ? "unread" : "read"}`;
+    if (it.kind === "conversation") {
+      const c = it.data;
+      row.innerHTML = `
+        ${isUnread ? '<span class="gl-alert-dot"></span>' : ""}
+        <div class="gl-alert-icon ${lvl}">${initials(c.participant)}</div>
+        <div class="gl-alert-main">
+          <div class="gl-alert-top ${lvl}"><span class="gl-alert-name">${escapeHtml(c.participant)}</span><span class="gl-alert-time">${escapeHtml(c.platform)}</span></div>
+          <div class="gl-alert-sub">${escapeHtml(shortNarrative(c))}</div>
+        </div>`;
+      row.addEventListener("click", () => {
+        markSeen(key);
+        ui.selection = { kind: "conversation", platform: c.platform, participant: c.participant };
+        closeAlertsMenu();
+        render();
+      });
+    } else {
+      const e = it.data;
+      const fam = platformFamily(e.platform);
+      row.innerHTML = `
+        ${isUnread ? '<span class="gl-alert-dot"></span>' : ""}
+        <div class="gl-alert-icon env ${fam}">${platformLetters[fam] || "?"}</div>
+        <div class="gl-alert-main">
+          <div class="gl-alert-top ${lvl}"><span class="gl-alert-name">${escapeHtml(e.platform)}</span><span class="gl-alert-time">${e.user_count || 0} users</span></div>
+          <div class="gl-alert-sub">${escapeHtml(e.content_summary || "concerning activity")}</div>
+        </div>`;
+      row.addEventListener("click", () => {
+        markSeen(key);
+        ui.selection = { kind: "environment", platform: e.platform, context: e.context };
+        closeAlertsMenu();
+        render();
+      });
+    }
+    list.appendChild(row);
+  }
+}
+
+function toggleAlertsMenu() {
+  const m = $("alertsMenu");
+  m.hidden = !m.hidden;
+}
+function closeAlertsMenu() { $("alertsMenu").hidden = true; }
+
+/* ---------------------------- events -------------------------------- */
+document.addEventListener("click", (evt) => {
+  const back = evt.target.closest("[data-back]");
+  if (back) {
+    ui.selection = null;
+    render();
+    return;
+  }
+  // Bell toggles the alerts dropdown.
+  if (evt.target.closest("#bellWrap")) {
+    toggleAlertsMenu();
+    return;
+  }
+  if (evt.target.closest("#alertsClose")) {
+    closeAlertsMenu();
+    return;
+  }
+  if (evt.target.closest("#alertsMarkAll")) {
+    const items = gatherFlaggedItems(ui.snapshot || {});
+    items.forEach((it) => markSeen(alertId(it.kind, it.data)));
+    render();
+    return;
+  }
+  // Click outside the menu closes it.
+  const inMenu = evt.target.closest("#alertsMenu");
+  if (!inMenu) closeAlertsMenu();
+});
+
+$("pauseBtn").addEventListener("click", async () => {
+  if (!ui.snapshot) return;
+  const wasPaused = Boolean(ui.snapshot.paused);
+  const path = wasPaused ? "/api/resume" : "/api/pause";
+  // Optimistic flip so the button doesn't feel dead while the POST
+  // is in flight. The next SSE frame will either confirm or correct it.
+  ui.snapshot = { ...ui.snapshot, paused: !wasPaused };
+  render();
+  try {
+    const res = await fetch(path, { method: "POST" });
+    if (!res.ok) {
+      // Roll back on server error — the next SSE frame will be authoritative.
+      ui.snapshot = { ...ui.snapshot, paused: wasPaused };
+      render();
+    }
+  } catch {
+    ui.snapshot = { ...ui.snapshot, paused: wasPaused };
+    render();
+  }
+});
+
+/* ---------------------------- SSE ----------------------------------- */
+function connect() {
+  const es = new EventSource("/api/stream");
+  es.onmessage = (evt) => {
+    try {
+      ui.snapshot = JSON.parse(evt.data);
+      render();
+    } catch (e) {
+      console.warn("SSE parse error", e);
+    }
+  };
+  es.onerror = () => {
+    es.close();
+    setTimeout(connect, 2000);
+  };
+}
+
+/* ---------------------------- util ---------------------------------- */
+function escapeHtml(s) {
+  if (s == null) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/* ---------------------------- bootstrap ----------------------------- */
+fetch("/api/state").then((r) => r.json()).then((s) => {
+  ui.snapshot = s;
+  render();
+  connect();
+}).catch(() => connect());

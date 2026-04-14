@@ -1,0 +1,416 @@
+<h2 class="sr-only">GuardianLens redesigned dashboard mockup with clickable alert history cards that expand into detail views</h2>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.dash{background:#0f0f1a;border-radius:12px;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;color:#c8c8d0;font-size:12px;transition:box-shadow .5s ease}
+.dash.alert-mode{box-shadow:inset 0 0 80px rgba(226,75,74,.08)}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:#161625;border-bottom:1px solid #1e1e32}
+.logo{display:flex;align-items:center;gap:8px}
+.logo-dot{width:8px;height:8px;border-radius:50%;background:#1D9E75;transition:background .4s}
+.alert-mode .logo-dot{background:#E24B4A}
+.logo-name{font-weight:500;font-size:13px;color:#e0e0e8}
+.logo-tag{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px}
+.privacy-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:#777}
+.privacy-badge svg{width:12px;height:12px}
+.status-badge{display:flex;align-items:center;gap:6px;font-size:11px}
+.status-dot{width:6px;height:6px;border-radius:50%;background:#1D9E75;transition:background .4s}
+.alert-mode .status-dot{background:#E24B4A;animation:pulse-dot 1.5s ease-in-out infinite}
+.status-text{color:#888;transition:color .4s}
+.alert-mode .status-text{color:#E24B4A}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes shield-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.main{display:grid;grid-template-columns:1.1fr .9fr;gap:0}
+.col-left{padding:12px;border-right:1px solid #1e1e32}
+.col-right{padding:12px}
+.shield-area{display:flex;flex-direction:column;align-items:center;padding:20px 0 16px}
+.shield-icon{width:80px;height:90px}
+.shield-svg{width:80px;height:90px;transition:all .3s}
+.shield-safe .shield-fill{fill:#1D9E75}
+.shield-alert .shield-fill{fill:#E24B4A}
+.shield-alert .shield-svg{animation:shield-pulse 2s ease-in-out infinite}
+.shield-check{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;stroke-linejoin:round;opacity:1;transition:opacity .3s}
+.shield-alert .shield-check{opacity:0}
+.shield-warn{fill:none;stroke:#fff;stroke-width:4;stroke-linecap:round;opacity:0;transition:opacity .3s}
+.shield-alert .shield-warn{opacity:1}
+.shield-label{margin-top:8px;font-size:14px;font-weight:500;color:#1D9E75;transition:color .4s}
+.shield-alert .shield-label{color:#E24B4A}
+.shield-sub{font-size:11px;color:#666;margin-top:2px}
+.capture-box{background:#12121f;border:1px solid #1e1e32;border-radius:8px;overflow:hidden;margin-top:8px}
+.capture-header{display:flex;justify-content:space-between;padding:6px 10px;font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.3px}
+.live-dot{display:flex;align-items:center;gap:4px;color:#E24B4A;font-size:10px;font-weight:500}
+.live-dot::before{content:'';width:5px;height:5px;border-radius:50%;background:#E24B4A;animation:pulse-dot 1.5s infinite}
+.capture-img{width:100%;height:130px;display:flex;align-items:center;justify-content:center;background:#0a0a14}
+.discord-mock{width:100%;height:100%;padding:8px 12px;display:flex;flex-direction:column;gap:3px;font-size:11px}
+.msg-row{display:flex;gap:6px;align-items:flex-start}
+.msg-avatar{width:18px;height:18px;border-radius:50%;background:#3a3a5c;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;color:#888}
+.msg-bubble{background:#1e1e32;border-radius:0 6px 6px 6px;padding:3px 7px;font-size:10px;color:#b0b0c0;max-width:80%}
+.msg-flag{font-size:8px;color:#E24B4A;font-weight:500;margin-top:1px}
+.capture-status{padding:5px 10px;display:flex;align-items:center;gap:6px;border-top:1px solid #1e1e32;font-size:10px}
+.ribbon-area{margin-top:8px}
+.ribbon-label{display:flex;justify-content:space-between;font-size:9px;color:#555;margin-bottom:3px}
+.ribbon{height:6px;border-radius:3px;display:flex;gap:1px;overflow:hidden}
+.ribbon span{flex:1;border-radius:2px}
+.r-safe{background:#1D9E75}.r-caution{background:#BA7517}.r-alert{background:#E24B4A}.r-empty{background:#1e1e32}
+.timeline-area{margin-top:10px}
+.timeline-title{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.3px;margin-bottom:6px}
+.tl-row{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #12121f;font-size:11px}
+.tl-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.tl-platform{font-size:10px;font-weight:500;min-width:52px}
+.tl-desc{color:#888;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tl-badge{font-size:9px;font-weight:500;padding:1px 6px;border-radius:3px}
+.tl-safe{background:#0f2e1f;color:#1D9E75}
+.tl-warning{background:#2e1f0f;color:#BA7517}
+.tl-alert-badge{background:#2e0f0f;color:#E24B4A}
+.section-title{font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.4px;margin:12px 0 6px}
+.monitored-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.stat-box{background:#12121f;border-radius:6px;padding:10px;text-align:center}
+.stat-val{font-size:18px;font-weight:500;color:#e0e0e8}
+.stat-label{font-size:9px;color:#666;text-transform:uppercase;margin-top:2px}
+.alert-card{border-radius:0;border-left:3px solid;padding:8px 10px;margin-bottom:6px;background:#12121f;cursor:pointer;transition:background .2s}
+.alert-card:hover{background:#1a1a2e}
+.alert-card-grooming{border-color:#E24B4A}
+.alert-card-bullying{border-color:#BA7517}
+.alert-card-content{border-color:#D85A30}
+.alert-card-header{display:flex;align-items:center;gap:5px;margin-bottom:3px}
+.alert-card-icon{width:14px;height:14px;flex-shrink:0}
+.alert-card-title{font-size:12px;font-weight:500}
+.alert-card-desc{font-size:10px;color:#777;margin-top:2px}
+.alert-card-tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.alert-tag{font-size:9px;padding:1px 5px;border-radius:3px;background:#1e1e32;color:#888}
+.click-hint{font-size:9px;color:#555;text-align:right;margin-bottom:4px}
+.click-arrow{margin-left:auto;color:#555;font-size:14px;transition:color .2s}
+.alert-card:hover .click-arrow{color:#999}
+.action-panel{background:#12121f;border-left:3px solid;border-radius:0;padding:10px 12px;margin-top:8px}
+.action-title{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.3px;margin-bottom:8px}
+.action-step{display:flex;align-items:flex-start;gap:8px;margin-bottom:6px}
+.action-num{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;flex-shrink:0}
+.action-text{font-size:11px;color:#c0c0cc;line-height:1.4}
+.telegram-badge{display:flex;align-items:center;gap:6px;margin-top:10px;padding:6px 8px;background:#0f1f15;border-radius:6px;font-size:11px;color:#1D9E75}
+.privacy-note{font-size:9px;color:#555;margin-top:6px;line-height:1.4}
+.reasoning-chain{background:#12121f;border-radius:6px;padding:8px 10px;margin-top:6px;font-size:10px;font-family:monospace;color:#888;line-height:1.6}
+.step-label{color:#666}
+.flag{color:#E24B4A}
+.result{color:#E24B4A;font-weight:500}
+.back-btn{font-size:11px;color:#7F77DD;cursor:pointer;margin-bottom:10px;display:inline-flex;align-items:center;gap:4px;padding:4px 0}
+.back-btn:hover{color:#AFA9EC}
+.detail-confidence{font-size:22px;font-weight:500;text-align:right}
+.cloud-footer{display:flex;align-items:center;justify-content:space-between;padding:4px 16px;background:#0c0c16;border-top:1px solid #1e1e32;font-size:10px;color:#555}
+.cloud-zero{color:#1D9E75;font-weight:500}
+.toggle-bar{display:flex;justify-content:center;gap:8px;padding:12px 0 4px}
+.toggle-btn{padding:6px 16px;border-radius:6px;border:1px solid #2a2a40;background:#12121f;color:#888;font-size:12px;cursor:pointer;transition:all .2s}
+.toggle-btn.active{background:#1e1e32;color:#e0e0e8;border-color:#3a3a5c}
+.toggle-btn:hover{border-color:#3a3a5c}
+.view-panel{transition:opacity .2s}
+</style>
+
+<div class="toggle-bar">
+  <button class="toggle-btn active" id="btn-safe" onclick="setState('safe')">Safe state</button>
+  <button class="toggle-btn" id="btn-alert" onclick="setState('alert')">Alert state (auto-detect)</button>
+</div>
+
+<div class="dash" id="dashboard">
+  <div class="topbar">
+    <div class="logo">
+      <span class="logo-dot"></span>
+      <span class="logo-name">GuardianLens</span>
+      <span class="logo-tag">on-device safety monitor</span>
+    </div>
+    <div class="privacy-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+      <span>On-device only</span>
+    </div>
+    <div class="status-badge">
+      <span class="status-dot"></span>
+      <span class="status-text" id="status-text">Active</span>
+      <span style="color:#555">1m 23s</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="col-left">
+      <div class="shield-area">
+        <div class="shield-icon" id="shield-icon">
+          <svg class="shield-svg" viewBox="0 0 80 90">
+            <path class="shield-fill" d="M40 5 L72 20 L72 50 Q72 75 40 87 Q8 75 8 50 L8 20 Z"/>
+            <path class="shield-check" d="M25 45 L35 55 L55 35"/>
+            <path class="shield-warn" d="M40 30 L40 52 M40 60 L40 62"/>
+          </svg>
+        </div>
+        <div class="shield-label" id="shield-label">All clear</div>
+        <div class="shield-sub" id="shield-sub">Monitoring 3 platforms</div>
+      </div>
+
+      <div class="capture-box">
+        <div class="capture-header"><span>Latest capture</span><span class="live-dot">LIVE</span></div>
+        <div class="capture-img">
+          <div id="capture-safe" style="display:flex;flex-direction:column;align-items:center;gap:6px;color:#444">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            <span style="font-size:11px">TikTok - All clear</span>
+          </div>
+          <div id="capture-discord" class="discord-mock" style="display:none">
+            <div class="msg-row"><div class="msg-avatar">K</div><div><div class="msg-bubble">hey, you in a guild here?</div></div></div>
+            <div class="msg-row" style="margin-left:26px"><div class="msg-bubble" style="background:#252540">yeah but its private. you seem cool tho</div></div>
+            <div class="msg-row"><div class="msg-avatar">K</div><div><div class="msg-bubble">no way im 14 too lol what school u go to</div><div class="msg-flag">FALSE AGE CLAIM</div></div></div>
+            <div class="msg-row"><div class="msg-avatar">K</div><div><div class="msg-bubble">how old are you btw?</div><div class="msg-flag">AGE INQUIRY</div></div></div>
+          </div>
+        </div>
+        <div class="capture-status" id="capture-bar">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          <span id="capture-bar-text" style="color:#1D9E75">All clear - No threats - TikTok</span>
+        </div>
+      </div>
+
+      <div class="ribbon-area">
+        <div class="ribbon-label"><span>5 min ago</span><span>14:13:23</span></div>
+        <div class="ribbon" id="ribbon"></div>
+      </div>
+
+      <div class="timeline-area">
+        <div class="timeline-title">Timeline</div>
+        <div id="timeline"></div>
+      </div>
+    </div>
+
+    <div class="col-right">
+      <div id="view-overview" class="view-panel">
+        <div id="alert-hero-box" style="display:none;background:#1a1018;border:1px solid #3a1525;border-radius:8px;padding:12px;margin-bottom:10px;text-align:center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#E24B4A" stroke-width="2" style="display:block;margin:0 auto 4px"><path d="M12 2L1 21h22L12 2zm0 7v5m0 3v1"/></svg>
+          <div style="font-size:13px;font-weight:500;color:#E24B4A">1 threat detected</div>
+          <div style="font-size:11px;color:#888;margin-top:2px">Click grooming alert to inspect</div>
+        </div>
+
+        <div class="monitored-stats">
+          <div class="stat-box"><div class="stat-val">1m 23s</div><div class="stat-label">Monitored</div></div>
+          <div class="stat-box"><div class="stat-val">3</div><div class="stat-label">Platforms</div></div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="section-title" style="margin:0">Alert history</div>
+          <div class="click-hint">click any to inspect</div>
+        </div>
+
+        <div style="margin-top:6px" id="alert-list">
+          <div class="alert-card alert-card-grooming" id="card-grooming" style="display:none" onclick="showDetail('grooming')">
+            <div class="alert-card-header">
+              <svg class="alert-card-icon" viewBox="0 0 24 24" fill="none" stroke="#E24B4A" stroke-width="2"><path d="M12 2L1 21h22L12 2zm0 7v5m0 3v1"/></svg>
+              <span class="alert-card-title" style="color:#E24B4A">Grooming - 100%</span>
+              <span style="font-size:9px;color:#555;margin-left:4px">Stage 3/5</span>
+              <span class="click-arrow">&rsaquo;</span>
+            </div>
+            <div class="alert-card-desc">KidGamer09 - Asking for age/school, Moving to private platform</div>
+            <div class="alert-card-tags">
+              <span class="alert-tag" style="background:#2a1a1a;color:#E24B4A">Age inquiry</span>
+              <span class="alert-tag" style="background:#2a1a1a;color:#E24B4A">Isolation</span>
+              <span class="alert-tag" style="background:#2a1a1a;color:#E24B4A">Secrecy</span>
+            </div>
+          </div>
+
+          <div class="alert-card alert-card-bullying" onclick="showDetail('bullying')">
+            <div class="alert-card-header">
+              <svg class="alert-card-icon" viewBox="0 0 24 24" fill="none" stroke="#BA7517" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M8 15s1.5-2 4-2 4 2 4 2M9 9h.01M15 9h.01"/></svg>
+              <span class="alert-card-title" style="color:#BA7517">Bullying - 92%</span>
+              <span class="click-arrow">&rsaquo;</span>
+            </div>
+            <div class="alert-card-desc">KidGamer09 - Name-calling, Social exclusion</div>
+            <div class="alert-card-tags"><span class="alert-tag">Name-calling</span><span class="alert-tag">Social exclusion</span></div>
+          </div>
+
+          <div class="alert-card alert-card-content" onclick="showDetail('content')">
+            <div class="alert-card-header">
+              <svg class="alert-card-icon" viewBox="0 0 24 24" fill="none" stroke="#D85A30" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v4m0 4h.01"/></svg>
+              <span class="alert-card-title" style="color:#D85A30">Inappropriate content - 95%</span>
+              <span class="click-arrow">&rsaquo;</span>
+            </div>
+            <div class="alert-card-desc">CoolGuy99 - Profanity, prompt injection</div>
+            <div class="alert-card-tags"><span class="alert-tag">Profanity</span><span class="alert-tag">Prompt injection</span></div>
+          </div>
+        </div>
+
+        <div class="section-title">Action from latest alert</div>
+        <div class="action-panel" id="overview-action" style="border-color:#BA7517">
+          <div class="action-step"><span class="action-num" style="background:#1f1a0f;color:#BA7517">1</span><span class="action-text">Have a calm conversation with your child.</span></div>
+          <div class="action-step"><span class="action-num" style="background:#1f1a0f;color:#BA7517">2</span><span class="action-text">Ask who "KidGamer09" is.</span></div>
+          <div class="action-step"><span class="action-num" style="background:#1f1a0f;color:#BA7517">3</span><span class="action-text">Block and report this user together.</span></div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;margin-top:10px;padding:6px 8px;background:#12121f;border-radius:6px;font-size:10px;color:#555">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+          Fully local - zero cloud
+          <span style="margin-left:auto;color:#444">Private</span>
+        </div>
+      </div>
+
+      <div id="view-detail" class="view-panel" style="display:none">
+        <div class="back-btn" onclick="showOverview()">&#8592; Back to overview</div>
+
+        <div id="detail-header"></div>
+        <div id="detail-tags" class="alert-card-tags" style="margin:8px 0 10px"></div>
+
+        <div class="section-title">AI reasoning chain</div>
+        <div class="reasoning-chain" id="detail-reasoning"></div>
+
+        <div class="section-title">Why this matters</div>
+        <div id="detail-why" style="background:#12121f;border-radius:6px;padding:8px 10px;font-size:11px;color:#999;line-height:1.5"></div>
+
+        <div class="section-title">Flagged messages</div>
+        <div id="detail-flagged" style="background:#12121f;border-radius:6px;padding:8px 10px;margin-bottom:4px"></div>
+
+        <div class="action-panel" id="detail-action" style="margin-top:10px;border-color:#E24B4A">
+          <div class="action-title" id="detail-action-title" style="color:#E24B4A">Recommended action for parent</div>
+          <div id="detail-action-steps"></div>
+          <div class="privacy-note">No chat content was shared. Only AI-generated analysis is shown.</div>
+        </div>
+
+        <div class="telegram-badge" id="detail-telegram">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          <span id="detail-telegram-text">Telegram alert delivered</span>
+          <span style="margin-left:auto;font-size:9px;color:#0F6E56">Sent</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="cloud-footer">
+    <span>gemma4:26b via Ollama</span>
+    <span>bytes sent to cloud: <span class="cloud-zero">0</span> <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" stroke-width="2.5" style="vertical-align:-1px"><path d="M20 6L9 17l-5-5"/></svg></span>
+  </div>
+</div>
+
+<script>
+var alertData = {
+  grooming: {
+    color: '#E24B4A',
+    bgColor: '#2a1a1a',
+    title: 'Grooming detected',
+    sub: 'KidGamer09 > child - Discord',
+    confidence: '100%',
+    tags: ['Asking for age/school','Moving to private platform','Offering in-game currency','Requesting secrecy'],
+    reasoning: '<span class="step-label">STEP 1:</span> Platform: Discord Chat<br><span class="step-label">STEP 2:</span> Participants: KidGamer09, ShadowPro<br><span class="step-label">STEP 3:</span> Threat scan results:<br>&nbsp;&nbsp;> "no way im 14 too lol" <span class="flag">[false age claim]</span><br>&nbsp;&nbsp;> "how old are you btw?" <span class="flag">[age inquiry]</span><br>&nbsp;&nbsp;> "you write super mature" <span class="flag">[grooming flattery]</span><br>&nbsp;&nbsp;> "wanna move to snap?" <span class="flag">[isolation]</span><br>&nbsp;&nbsp;> "dont mention it to ur mom" <span class="flag">[secrecy]</span><br><span class="result">ALERT - grooming 5/5 - 100%</span>',
+    why: 'The user employed 4 grooming techniques in a single conversation: flattery, lying about age, attempting isolation to an unmonitored platform, and offering material incentives. This matches stage 3 of the recognized grooming progression.',
+    flagged: '<div style="font-size:11px;color:#E24B4A;font-weight:500;font-style:italic">"just dont mention it to ur mom ok"</div><div style="font-size:10px;color:#666;margin-top:2px">creating a hidden channel of communication</div>',
+    actions: ['Have a calm conversation with your child about this interaction.','Ask who "KidGamer09" is - they may or may not know this person.','Block and report this user together with your child.'],
+    telegram: 'Telegram alert delivered - 14:12:40'
+  },
+  bullying: {
+    color: '#BA7517',
+    bgColor: '#1f1a0f',
+    title: 'Bullying detected',
+    sub: 'KidGamer09 - child - Discord',
+    confidence: '92%',
+    tags: ['Name-calling','Social exclusion','Repeated negative messaging'],
+    reasoning: '<span class="step-label">STEP 1:</span> Platform: Discord Chat<br><span class="step-label">STEP 2:</span> Participants: KidGamer09, child<br><span class="step-label">STEP 3:</span> Threat scan results:<br>&nbsp;&nbsp;> "ur so cringe lol" <span class="flag">[name-calling]</span><br>&nbsp;&nbsp;> "nobody wants you here" <span class="flag">[social exclusion]</span><br>&nbsp;&nbsp;> repeated negative messages <span class="flag">[pattern]</span><br><span class="result">ALERT - bullying 3/4 - 92%</span>',
+    why: 'The user directed multiple derogatory comments at your child and attempted to exclude them from a group activity. This pattern of repeated negative messaging constitutes cyberbullying.',
+    flagged: '<div style="font-size:11px;color:#BA7517;font-weight:500;font-style:italic">"nobody wants you in this server lol just leave"</div><div style="font-size:10px;color:#666;margin-top:2px">direct social exclusion from peer group</div>',
+    actions: ['Have a calm conversation with your child about this interaction.','Ask who "KidGamer09" is - they may or may not know this person.','Block and report this user together with your child.'],
+    telegram: 'Telegram alert delivered - 14h ago'
+  },
+  content: {
+    color: '#D85A30',
+    bgColor: '#2a1a0f',
+    title: 'Inappropriate content',
+    sub: 'CoolGuy99 - Discord',
+    confidence: '95%',
+    tags: ['Profanity detected','Attempted prompt injection','Jailbreaking pattern'],
+    reasoning: '<span class="step-label">STEP 1:</span> Platform: Discord Chat<br><span class="step-label">STEP 2:</span> Participants: CoolGuy99<br><span class="step-label">STEP 3:</span> Threat scan results:<br>&nbsp;&nbsp;> Profanity detected in rephrased message <span class="flag">[profanity]</span><br>&nbsp;&nbsp;> Attempted prompt injection pattern <span class="flag">[injection]</span><br><span class="result">ALERT - inappropriate content 2/3 - 95%</span>',
+    why: 'The user attempted to bypass content filters using rephrased profanity and a prompt injection technique. This suggests deliberate attempts to expose your child to inappropriate content.',
+    flagged: '<div style="font-size:11px;color:#D85A30;font-weight:500;font-style:italic">[Content redacted - inappropriate language detected]</div><div style="font-size:10px;color:#666;margin-top:2px">profanity via character substitution</div>',
+    actions: ['Review the flagged interaction with your child.','Discuss online safety and recognizing manipulation.','Consider reporting the user on the platform.'],
+    telegram: 'Telegram alert delivered - 14h ago'
+  }
+};
+
+var timelineSafe = [
+  {platform:'TikTok',color:'#D4537E',desc:'Typical social media post, no threats...',badge:'SAFE',cls:'tl-safe'},
+  {platform:'Minecraft',color:'#639922',desc:'Standard cooperative interaction...',badge:'SAFE',cls:'tl-safe'},
+  {platform:'Discord',color:'#7F77DD',desc:'Chat log displays peer-to-peer haras...',badge:'WARNING',cls:'tl-warning'},
+  {platform:'Technical',color:'#888',desc:'Technical information comparing two...',badge:'SAFE',cls:'tl-safe'}
+];
+var timelineAlert = [
+  {platform:'Discord',color:'#7F77DD',desc:'Conversation shows clear signs of grooming escalation...',badge:'ALERT',cls:'tl-alert-badge'},
+  ...timelineSafe
+];
+
+function buildTimeline(rows) {
+  var el = document.getElementById('timeline');
+  el.innerHTML = rows.map(function(r) {
+    return '<div class="tl-row"><span class="tl-dot" style="background:'+r.color+'"></span><span class="tl-platform" style="color:'+r.color+'">'+r.platform+'</span><span class="tl-desc">'+r.desc+'</span><span class="tl-badge '+r.cls+'">'+r.badge+'</span></div>';
+  }).join('');
+}
+
+function buildRibbon(alert) {
+  var el = document.getElementById('ribbon');
+  var segs = [];
+  for (var i = 0; i < 20; i++) {
+    if (i === 3) segs.push('<span class="r-caution"></span>');
+    else if (alert && i >= 17) segs.push('<span class="r-alert"></span>');
+    else if (i >= 18) segs.push('<span class="r-empty"></span>');
+    else segs.push('<span class="r-safe"></span>');
+  }
+  el.innerHTML = segs.join('');
+}
+
+function setState(state) {
+  var dash = document.getElementById('dashboard');
+  document.getElementById('btn-safe').classList.toggle('active', state==='safe');
+  document.getElementById('btn-alert').classList.toggle('active', state==='alert');
+
+  if (state === 'alert') {
+    dash.classList.add('alert-mode');
+    document.getElementById('shield-icon').className = 'shield-icon shield-alert';
+    document.getElementById('shield-label').textContent = 'Threat detected';
+    document.getElementById('shield-label').style.color = '#E24B4A';
+    document.getElementById('shield-sub').textContent = 'Action recommended below';
+    document.getElementById('status-text').textContent = 'Threat detected';
+    document.getElementById('capture-safe').style.display = 'none';
+    document.getElementById('capture-discord').style.display = 'flex';
+    document.getElementById('capture-bar').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E24B4A" stroke-width="2"><path d="M12 2L1 21h22L12 2zm0 7v5m0 3v1"/></svg><span style="color:#E24B4A;font-weight:500">GROOMING detected - 100% - STAGE 3/5</span>';
+    document.getElementById('card-grooming').style.display = 'block';
+    document.getElementById('alert-hero-box').style.display = 'block';
+    document.getElementById('overview-action').style.borderColor = '#E24B4A';
+    document.getElementById('overview-action').innerHTML = '<div class="action-step"><span class="action-num" style="background:#2a1a1a;color:#E24B4A">1</span><span class="action-text">Have a calm conversation with your child.</span></div><div class="action-step"><span class="action-num" style="background:#2a1a1a;color:#E24B4A">2</span><span class="action-text">Ask who "KidGamer09" is.</span></div><div class="action-step"><span class="action-num" style="background:#2a1a1a;color:#E24B4A">3</span><span class="action-text">Block and report this user together.</span></div>';
+    buildTimeline(timelineAlert);
+    buildRibbon(true);
+    showOverview();
+  } else {
+    dash.classList.remove('alert-mode');
+    document.getElementById('shield-icon').className = 'shield-icon shield-safe';
+    document.getElementById('shield-label').textContent = 'All clear';
+    document.getElementById('shield-label').style.color = '#1D9E75';
+    document.getElementById('shield-sub').textContent = 'Monitoring 3 platforms';
+    document.getElementById('status-text').textContent = 'Active';
+    document.getElementById('capture-safe').style.display = 'flex';
+    document.getElementById('capture-discord').style.display = 'none';
+    document.getElementById('capture-bar').innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1D9E75" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg><span style="color:#1D9E75">All clear - No threats - TikTok</span>';
+    document.getElementById('card-grooming').style.display = 'none';
+    document.getElementById('alert-hero-box').style.display = 'none';
+    document.getElementById('overview-action').style.borderColor = '#BA7517';
+    document.getElementById('overview-action').innerHTML = '<div class="action-step"><span class="action-num" style="background:#1f1a0f;color:#BA7517">1</span><span class="action-text">Have a calm conversation with your child.</span></div><div class="action-step"><span class="action-num" style="background:#1f1a0f;color:#BA7517">2</span><span class="action-text">Ask who "KidGamer09" is.</span></div><div class="action-step"><span class="action-num" style="background:#1f1a0f;color:#BA7517">3</span><span class="action-text">Block and report this user together.</span></div>';
+    buildTimeline(timelineSafe);
+    buildRibbon(false);
+    showOverview();
+  }
+}
+
+function showDetail(type) {
+  var d = alertData[type];
+  document.getElementById('view-overview').style.display = 'none';
+  document.getElementById('view-detail').style.display = 'block';
+  document.getElementById('detail-header').innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:500;color:'+d.color+'">'+d.title+'</div><div style="font-size:10px;color:#777">'+d.sub+'</div></div><div class="detail-confidence" style="color:'+d.color+'">'+d.confidence+'<div style="font-size:9px;color:#666;font-weight:400">CONFIDENCE</div></div></div>';
+  document.getElementById('detail-tags').innerHTML = d.tags.map(function(t){return '<span class="alert-tag" style="background:'+d.bgColor+';color:'+d.color+'">'+t+'</span>';}).join('');
+  document.getElementById('detail-reasoning').innerHTML = d.reasoning;
+  document.getElementById('detail-why').textContent = d.why;
+  document.getElementById('detail-flagged').innerHTML = d.flagged;
+  document.getElementById('detail-action').style.borderColor = d.color;
+  document.getElementById('detail-action-title').style.color = d.color;
+  document.getElementById('detail-action-steps').innerHTML = d.actions.map(function(a,i){return '<div class="action-step"><span class="action-num" style="background:'+d.bgColor+';color:'+d.color+'">'+(i+1)+'</span><span class="action-text">'+a+'</span></div>';}).join('');
+  document.getElementById('detail-telegram-text').textContent = d.telegram;
+}
+
+function showOverview() {
+  document.getElementById('view-detail').style.display = 'none';
+  document.getElementById('view-overview').style.display = 'block';
+}
+
+buildTimeline(timelineSafe);
+buildRibbon(false);
+document.getElementById('shield-icon').classList.add('shield-safe');
+</script>

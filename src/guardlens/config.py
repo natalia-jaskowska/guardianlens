@@ -86,6 +86,16 @@ class AlertConfig(BaseModel):
     enable_webhook: bool = False
     webhook_url: str = ""
 
+    enable_telegram: bool = False
+    telegram_bot_token: str = Field(
+        "",
+        description="Bot token from @BotFather. Read from .env as GUARDLENS_ALERTS__TELEGRAM_BOT_TOKEN.",
+    )
+    telegram_chat_id: str = Field(
+        "",
+        description="Parent's chat ID (numeric or @username).",
+    )
+
     minimum_urgency: str = Field(
         "high",
         description="Minimum alert urgency that triggers an external notification.",
@@ -105,6 +115,39 @@ class DatabaseConfig(BaseModel):
     """Settings for the SQLite analysis store."""
 
     path: Path = PROJECT_ROOT / "outputs" / "guardlens.db"
+
+
+class PrivacyConfig(BaseModel):
+    """Privacy-by-design toggles enforced by :mod:`guardlens.privacy`.
+
+    All defaults err on the permissive side during development so the
+    dashboard can still render screenshots and raw-text detail panels.
+    Production / demo-recording runs should flip these to ``True``.
+    """
+
+    delete_screenshots_after_analysis: bool = Field(
+        False,
+        description=(
+            "Delete each screenshot immediately after the vision model "
+            "finishes. The dashboard will no longer be able to re-serve "
+            "the image — enable only for privacy-strict demos."
+        ),
+    )
+    strip_raw_text_from_storage: bool = Field(
+        False,
+        description=(
+            "Strip ``chat_messages`` and ``visible_messages`` text before "
+            "persisting analyses to SQLite. Indicator labels only."
+        ),
+    )
+    anonymize_child_username: bool = Field(
+        True,
+        description="Replace any detected child username with 'child' before storage.",
+    )
+    child_usernames: list[str] = Field(
+        default_factory=list,
+        description="Known usernames of the child being protected — replaced with 'child'.",
+    )
 
 
 class GuardLensConfig(BaseSettings):
@@ -128,6 +171,7 @@ class GuardLensConfig(BaseSettings):
     alerts: AlertConfig = Field(default_factory=AlertConfig)
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
+    privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
 
 
 def load_config(config_path: Path | None = None) -> GuardLensConfig:

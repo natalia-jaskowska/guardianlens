@@ -1,278 +1,195 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{{ title }}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/static/dashboard.css?v=39" />
-  </head>
-  <body>
-    <div id="shell" class="gl-shell">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<link rel="stylesheet" href="/static/dashboard.css">
+</head>
+<body>
+<div class="gl">
 
-      <!-- ====== HEADER ====== -->
-      <header class="gl-header">
-        <div class="gl-header-left">
-          <svg class="gl-logo-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2L4 6v6c0 5.25 3.75 9.75 8 10 4.25-0.25 8-4.75 8-10V6l-8-4z"/>
-            <circle cx="12" cy="11" r="2.5"/>
-          </svg>
-          <span class="gl-logo-text">GuardianLens</span>
-        </div>
-        <div class="gl-header-right">
-          <div class="gl-header-status" id="header-status">
-            <span class="gl-dot gl-dot-safe"></span>
-            <span>Connecting...</span>
-          </div>
-          <span class="gl-header-sep"></span>
-          <button class="gl-header-pause" id="header-pause" title="Pause monitoring">
-            <svg class="gl-pause-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-            <svg class="gl-resume-icon" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="display:none"><polygon points="5,3 19,12 5,21"/></svg>
-            <span class="gl-pause-label">Pause</span>
-          </button>
-          <span class="gl-header-sep"></span>
-          <div class="gl-header-chip gl-header-chip-model" id="header-model">{{ model_name }}</div>
-          <button class="gl-header-gear" id="header-gear" title="Settings">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
-          </button>
-        </div>
-      </header>
-
-      <!-- Settings drawer -->
-      <div class="gl-drawer-backdrop" id="drawer-backdrop"></div>
-      <aside class="gl-drawer" id="settings-drawer">
-        <div class="gl-drawer-header">
-          <span class="gl-drawer-title">Settings</span>
-          <button class="gl-drawer-close" id="drawer-close" title="Close">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-          </button>
-        </div>
-        <div class="gl-drawer-body">
-          <div class="gl-drawer-section">
-            <div class="gl-drawer-section-label">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>
-              AI Model
-            </div>
-            <div class="gl-drawer-select-wrap">
-              <select class="gl-drawer-select" id="model-picker">
-                <option>Loading...</option>
-              </select>
-            </div>
-            <div class="gl-drawer-hint">Smaller models scan faster. Larger models catch more subtle threats. The next scan uses the new model.</div>
-          </div>
-          <div class="gl-drawer-section">
-            <div class="gl-drawer-section-label">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
-              Scan Interval
-            </div>
-            <div class="gl-drawer-pills" id="interval-pills">
-              <button class="gl-drawer-pill" data-seconds="30">30s</button>
-              <button class="gl-drawer-pill" data-seconds="60">1m</button>
-              <button class="gl-drawer-pill" data-seconds="180">3m</button>
-              <button class="gl-drawer-pill" data-seconds="300">5m</button>
-            </div>
-            <div class="gl-drawer-hint">Shorter intervals catch threats faster but use more CPU. Changes apply to the next scan.</div>
-          </div>
-        </div>
-        <div class="gl-drawer-footer">
-          <strong>GuardianLens</strong> · On-device · Zero cloud data
-        </div>
-      </aside>
-
-      <!-- ====== MAIN ====== -->
-      <main class="gl-main">
-
-        <!-- LEFT — capture hero + stats + timeline -->
-        <section class="gl-content">
-
-          <!-- Capture hero -->
-          <div class="gl-capture gl-capture-safe" id="capture-card">
-            <div class="gl-capture-top">
-              <span class="gl-live-tag" id="capture-live-tag">
-                <span class="gl-live-dot"></span>
-                LIVE
-              </span>
-              <span class="gl-capture-time" id="capture-bar-time">--:--:--</span>
-            </div>
-            <div class="gl-capture-screen" id="capture-screen">
-              <div class="gl-capture-placeholder">
-                <div class="gl-skeleton gl-skeleton-block" style="width:100%;height:100%;position:absolute;inset:0"></div>
-              </div>
-            </div>
-            <div class="gl-capture-pause-card">
-              <div class="gl-capture-pause-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
-              </div>
-              <div class="gl-capture-pause-text">
-                <div class="gl-capture-pause-title">Monitoring paused</div>
-                <div class="gl-capture-pause-sub">Click Resume in the header</div>
-              </div>
-            </div>
-            <div class="gl-capture-bar" id="capture-bar">
-              <div class="gl-capture-bar-icon" id="capture-bar-icon"></div>
-              <div class="gl-capture-bar-title" id="capture-bar-title">Initializing</div>
-              <div class="gl-capture-bar-sub" id="capture-bar-sub"></div>
-            </div>
-          </div>
-
-          <!-- Stats — single compact row -->
-          <div class="gl-stats-wrap">
-            <div class="gl-stats-row">
-              <div class="gl-stat" id="status-scans">
-                <span class="gl-stat-val">0</span>
-                <span class="gl-stat-lbl">Scans</span>
-              </div>
-              <div class="gl-stat" id="status-safe-pct">
-                <span class="gl-stat-val">—</span>
-                <span class="gl-stat-lbl">Safe</span>
-              </div>
-              <div class="gl-stat" id="status-platforms">
-                <span class="gl-stat-val">0</span>
-                <span class="gl-stat-lbl">Platforms</span>
-              </div>
-              <div class="gl-stat" id="status-alerts">
-                <span class="gl-stat-val">0</span>
-                <span class="gl-stat-lbl">Alerts</span>
-              </div>
-              <div class="gl-stat" id="status-response">
-                <span class="gl-stat-val">—</span>
-                <span class="gl-stat-lbl">Response</span>
-              </div>
-              <div class="gl-stat" id="shield-sub">
-                <span class="gl-stat-val gl-stat-val-session">0:00</span>
-                <span class="gl-stat-lbl">Session</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Timeline — fills remaining space -->
-          <div class="gl-timeline-wrap">
-            <div class="gl-timeline-label">
-              <span>Timeline</span>
-              <span class="gl-section-meta" id="last-refresh">--</span>
-            </div>
-            <div class="gl-timeline" id="timeline">
-              <div class="gl-skeleton-initial" style="display:flex;flex-direction:column;gap:8px">
-                <div class="gl-skeleton gl-skeleton-line gl-skeleton-line-full"></div>
-                <div class="gl-skeleton gl-skeleton-line gl-skeleton-line-medium"></div>
-                <div class="gl-skeleton gl-skeleton-line gl-skeleton-line-full"></div>
-              </div>
-            </div>
-          </div>
-
-        </section>
-
-        <!-- RIGHT — alerts or detail -->
-        <aside class="gl-sidebar">
-
-          <div id="overview-panel">
-
-            <!-- Conversation-level verdict (session analyzer) -->
-            <div class="gl-session-verdict gl-session-verdict-empty" id="session-verdict-card">
-              <div class="gl-session-verdict-head">
-                <span class="gl-session-verdict-label">Conversation verdict</span>
-                <span class="gl-session-verdict-certainty" id="session-verdict-certainty">—</span>
-              </div>
-              <div class="gl-session-verdict-level-row">
-                <span class="gl-session-verdict-level" id="session-verdict-level">waiting</span>
-                <span class="gl-session-verdict-confidence" id="session-verdict-confidence">—</span>
-              </div>
-              <div class="gl-session-verdict-narrative" id="session-verdict-narrative">
-                Accumulating messages from visible chat across frames. A session-level verdict will appear once enough messages are available.
-              </div>
-              <div class="gl-session-verdict-indicators" id="session-verdict-indicators"></div>
-              <div class="gl-session-verdict-meta">
-                <span id="session-verdict-count">0 msgs</span>
-                <span class="gl-session-verdict-dot">·</span>
-                <span id="session-verdict-category">—</span>
-                <span class="gl-session-verdict-dot">·</span>
-                <span id="session-verdict-alert-flag">no action</span>
-              </div>
-            </div>
-
-            <div class="gl-history-header">
-              <span class="gl-history-label" id="history-label">Alerts</span>
-            </div>
-            <div class="gl-alert-history" id="alert-history">
-              <div class="gl-skeleton-initial" style="display:flex;flex-direction:column;gap:8px">
-                <div class="gl-skeleton" style="height:72px;border-radius:8px"></div>
-                <div class="gl-skeleton" style="height:72px;border-radius:8px"></div>
-                <div class="gl-skeleton" style="height:72px;border-radius:8px;opacity:.5"></div>
-              </div>
-            </div>
-          </div>
-
-          <div id="detail-panel" style="display:none">
-            <div class="gl-detail-back" id="analysis-back">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-              All alerts
-            </div>
-            <div class="gl-detail-hero" id="analysis-card"></div>
-            <div class="gl-detail-section" id="capture-section" style="display:none">
-              <div class="gl-detail-section-head">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-                Captured screen
-              </div>
-              <div class="gl-detail-capture" id="detail-capture"></div>
-            </div>
-            <div class="gl-detail-section">
-              <div class="gl-detail-section-head">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z"/><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z"/></svg>
-                AI Reasoning
-              </div>
-              <div class="gl-detail-reasoning" id="reasoning-chain"></div>
-            </div>
-            <div class="gl-detail-section" id="why-section">
-              <div class="gl-detail-section-head">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/><circle cx="12" cy="12" r="10"/></svg>
-                Why this matters
-              </div>
-              <div class="gl-detail-why" id="why-this-matters"></div>
-            </div>
-            <div class="gl-detail-section" id="flagged-section" style="display:none">
-              <div class="gl-detail-section-head">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-                Flagged messages
-              </div>
-              <div class="gl-detail-flagged" id="flagged-messages"></div>
-            </div>
-            <div class="gl-detail-section">
-              <div class="gl-detail-section-head">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                What to do
-              </div>
-              <div class="gl-detail-action" id="recommended-action"></div>
-            </div>
-            <div class="gl-detail-privacy">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke-linecap="round"/></svg>
-              <span>All analysis runs on-device. No screenshots or chat data ever leave this machine.</span>
-            </div>
-          </div>
-
-        </aside>
-      </main>
-
-      <!-- ====== FOOTER ====== -->
-      <footer class="gl-footer">
-        <span class="gl-footer-left">
-          <span id="footer-model">{{ model_name }}</span>
-          <span class="gl-footer-sep">&middot;</span>
-          Ollama
-          <span class="gl-footer-sep">&middot;</span>
-          local inference
-        </span>
-        <span class="gl-footer-right">
-          <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke-linecap="round"/></svg>
-          On-device only
-          <span class="gl-footer-sep">&middot;</span>
-          All data stays on this machine
-        </span>
-      </footer>
+  <!-- Header -->
+  <header class="gl-header">
+    <div class="gl-brand">
+      <div class="gl-logo">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L2.8 3.4v4.3c0 3.2 2.2 5.9 5.2 6.8 3-0.9 5.2-3.6 5.2-6.8V3.4L8 1.5z" stroke="white" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.8 8.2L7.3 9.7L10.4 6.6" stroke="white" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <span>GuardianLens</span>
     </div>
+    <div class="gl-meta">
+      <div class="gl-status-dot"><span class="dot" id="statusDot"></span><span id="statusLabel">Active</span></div>
+      <button class="gl-pill" id="pauseBtn" title="Pause / Resume"><span id="pauseIcon">⏸</span><span id="pauseLabel">Pause</span></button>
+      <div class="gl-bell-wrap">
+        <button class="gl-bell" id="bellWrap" type="button" title="Alerts">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a4 4 0 00-4 4v2.5L2.5 10.5v1h11v-1L12 8.5V5.5a4 4 0 00-4-4z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.5 12.5a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          <span class="gl-bell-badge" id="bellBadge" hidden>0</span>
+        </button>
+        <div class="gl-alerts-menu" id="alertsMenu" hidden>
+          <div class="gl-alerts-head">
+            <span id="alertsHeadText">Alerts</span>
+            <div class="gl-alerts-head-actions">
+              <button class="gl-alerts-mark" id="alertsMarkAll" type="button" title="Mark all read">Mark all read</button>
+              <button class="gl-alerts-close" id="alertsClose" type="button" title="Close">×</button>
+            </div>
+          </div>
+          <div class="gl-alerts-list" id="alertsList"></div>
+          <div class="gl-alerts-empty" id="alertsEmpty" hidden>No alerts yet — everything is calm.</div>
+        </div>
+      </div>
+      <span class="gl-model" id="modelChip">—</span>
+    </div>
+  </header>
 
-    <script id="initial-state" type="application/json">{{ initial_state | tojson }}</script>
-    <script src="/static/dashboard.js?v=39" defer></script>
-  </body>
+  <!-- Body -->
+  <div class="gl-body">
+
+    <!-- LEFT PANEL -->
+    <section class="gl-left" id="leftPanel">
+
+      <div class="gl-section-label">Live capture</div>
+      <div class="gl-capture" id="captureCard">
+        <div class="gl-capture-overlay hidden" id="captureOverlay">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>
+          <span class="lbl">Paused</span>
+          <span class="sub" id="captureOverlaySub">Monitoring suspended</span>
+        </div>
+        <div class="gl-capture-frame" id="captureFrame">
+          <div class="gl-capture-empty">Waiting for first frame…</div>
+        </div>
+        <div class="gl-capture-status" id="captureStatus">
+          <div class="gl-status-left">
+            <span class="gl-status-icon" id="captureIcon"></span>
+            <span class="gl-status-text" id="captureText">All clear</span>
+            <span class="gl-status-sub" id="captureSub"></span>
+          </div>
+          <span class="gl-status-ago" id="captureAgo"></span>
+        </div>
+      </div>
+
+      <div class="gl-stats-row">
+        <div class="gl-stat"><div class="gl-stat-val" id="statScans">0</div><div class="gl-stat-lbl">scans</div></div>
+        <div class="gl-stat"><div class="gl-stat-val" id="statActivities">0</div><div class="gl-stat-lbl">activities</div></div>
+        <div class="gl-stat"><div class="gl-stat-val" id="statPlatforms">0</div><div class="gl-stat-lbl">platforms</div></div>
+        <div class="gl-stat gl-stat-alert"><div class="gl-stat-val" id="statAlerts">0</div><div class="gl-stat-lbl">alerts</div></div>
+      </div>
+
+      <div class="gl-section-head">
+        <div class="gl-section-label">Activity</div>
+        <div class="gl-legend">
+          <span class="gl-legend-item"><span class="gl-dot-circle"></span>person</span>
+          <span class="gl-legend-item"><span class="gl-dot-square"></span>platform</span>
+        </div>
+      </div>
+      <div class="gl-activity" id="activityList">
+        <div class="gl-empty">Monitoring — no activity yet</div>
+      </div>
+
+      <div class="gl-privacy">
+        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="gl-privacy-main">Fully local</span>
+        <span class="gl-privacy-sub" id="privacySub">· 0 bytes to cloud</span>
+        <span class="gl-privacy-pill">Private</span>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL -->
+    <section class="gl-right" id="rightPanel">
+
+      <!-- STATE 1 -->
+      <div class="gl-state" id="stateSession">
+        <div class="gl-overview-hero" id="overviewHero">
+          <div class="gl-hero-icon" id="heroIcon"></div>
+          <div class="gl-hero-title" id="heroTitle">Monitoring</div>
+          <div class="gl-hero-sub" id="heroSub">Starting up…</div>
+        </div>
+        <div class="gl-stats-row gl-stats-3">
+          <div class="gl-stat"><div class="gl-stat-val" id="ovMonitored">0s</div><div class="gl-stat-lbl">monitored</div></div>
+          <div class="gl-stat"><div class="gl-stat-val" id="ovPlatforms">0</div><div class="gl-stat-lbl">platforms</div></div>
+          <div class="gl-stat"><div class="gl-stat-val gl-green" id="ovSafeRate">100%</div><div class="gl-stat-lbl">safe rate</div></div>
+        </div>
+        <div class="gl-section-label">Session summary</div>
+        <div class="gl-narrative-card">
+          <div class="gl-narrative-intro" id="narrativeIntro">Session in progress.</div>
+          <div class="gl-narrative-concerns" id="narrativeConcerns"></div>
+          <div class="gl-narrative-safe" id="narrativeSafe"></div>
+        </div>
+        <div class="gl-section-label">What to do</div>
+        <div class="gl-actions-card">
+          <div class="gl-actions-list" id="actionsList"></div>
+          <div class="gl-actions-foot">AI analysis only. No chat content shared.</div>
+        </div>
+        <div class="gl-hint">Select any activity on the left to view full analysis</div>
+        <div class="gl-privacy">
+          <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          <span class="gl-privacy-main">Fully local</span>
+          <span class="gl-privacy-sub">· 0 bytes to cloud</span>
+          <span class="gl-privacy-pill">Private</span>
+        </div>
+      </div>
+
+      <!-- STATE 2 -->
+      <div class="gl-state" id="stateConversation" hidden>
+        <button class="gl-back" data-back>
+          <svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8L10 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Session overview
+        </button>
+        <div class="gl-detail-header">
+          <div class="gl-avatar-circle" id="convAvatar">—</div>
+          <div class="gl-detail-meta">
+            <div class="gl-detail-name" id="convName">—</div>
+            <div class="gl-detail-sub" id="convSub">—</div>
+          </div>
+          <div class="gl-detail-confidence" id="convConfidence">—</div>
+        </div>
+        <div class="gl-threat-summary" id="convThreat">
+          <div class="gl-threat-title" id="convThreatTitle">—</div>
+          <div class="gl-threat-body" id="convThreatBody">—</div>
+          <div class="gl-stage-bar" id="convStageBar" hidden>
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+        </div>
+        <div class="gl-section-label">Conversation arc</div>
+        <div class="gl-arc" id="convArc"></div>
+        <div class="gl-section-label">AI reasoning</div>
+        <pre class="gl-reasoning" id="convReasoning">—</pre>
+        <div class="gl-actions-card">
+          <div class="gl-actions-list" id="convActions"></div>
+          <div class="gl-actions-foot">No chat content shared.</div>
+        </div>
+      </div>
+
+      <!-- STATE 3 -->
+      <div class="gl-state" id="stateEnvironment" hidden>
+        <button class="gl-back" data-back>
+          <svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8L10 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Session overview
+        </button>
+        <div class="gl-detail-header">
+          <div class="gl-avatar-square" id="envAvatar">—</div>
+          <div class="gl-detail-meta">
+            <div class="gl-detail-name" id="envName">—</div>
+            <div class="gl-detail-sub" id="envSub">—</div>
+          </div>
+          <div class="gl-detail-confidence" id="envSafety">—</div>
+        </div>
+        <div class="gl-threat-summary" id="envThreat">
+          <div class="gl-threat-title" id="envThreatTitle">—</div>
+          <div class="gl-threat-body" id="envThreatBody">—</div>
+        </div>
+        <div class="gl-section-label">Users in this environment</div>
+        <div class="gl-users" id="envUsers"></div>
+        <div class="gl-section-label">AI reasoning</div>
+        <pre class="gl-reasoning" id="envReasoning">—</pre>
+        <div class="gl-actions-card">
+          <div class="gl-actions-list" id="envActions"></div>
+          <div class="gl-actions-foot">No chat content shared.</div>
+        </div>
+      </div>
+
+    </section>
+  </div>
+</div>
+<script src="/static/dashboard.js"></script>
+</body>
 </html>

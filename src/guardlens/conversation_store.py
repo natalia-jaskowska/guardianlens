@@ -140,4 +140,220 @@ class ConversationStore:
         return (msg.sender.strip(), msg.text.strip().lower())
 
 
-__all__ = ["ConversationStore"]
+class ParticipantTracker:
+    """Per-participant message accumulator + :class:`ConversationContext` index.
+
+    Whereas the plain :class:`ConversationStore` keeps one global list of
+    every unique message in a session, ``ParticipantTracker`` maintains
+    one store **per (platform, participant) pair** plus a matching
+    :class:`ConversationContext` for each participant. This is what the
+    conversation-centric dashboard reads from to render circle-avatar
+    cards.
+
+    The tracker is thread-safe — all mutation acquires a single lock, and
+    each participant's underlying :class:`ConversationStore` has its own
+    internal lock for its own list. That means ``messages_for(...)`` on
+    participant A cannot block ``add_for_participant(...)`` on
+    participant B.
+    """
+
+    def __init__(self) -> None:
+        self._stores: dict[tuple[str, str], ConversationStore] = {}
+        # ConversationContext lives here too — lazy import avoids a
+        # circular ``schema → conversation_store → schema`` chain during
+        # module load.
+        from guardlens.schema import ConversationContext  # noqa: WPS433
+        self._ctx_cls = ConversationContext
+        self._contexts: dict[tuple[str, str], ConversationContext] = {}
+        self._lock = threading.Lock()
+
+    # ------------------------------------------------------------------ mutate
+
+    def add_for_participant(
+        self,
+        platform: str,
+        participant: str,
+        messages: Iterable[ChatMessage],
+    ) -> list[ChatMessage]:
+        """Accumulate messages under one participant.
+
+        Returns only the messages that were *new* for that specific
+        (platform, participant) pair — callers use the returned count to
+        decide whether to re-run the per-participant conversation
+        analyzer.
+        """
+        key = self._normalize_key(platform, participant)
+        store = self._get_or_create_store(key)
+        new_items = store.add(messages)
+        if new_items:
+            # Pass the ORIGINAL-cased display name so the context (and
+            # therefore the dashboard) shows "KidGamer09" even though
+            # the lookup key is "kidgamer09".
+            ctx = self._get_or_create_context(
+                key, display_name=participant.strip(), display_platform=platform.strip()
+            )
+            with self._lock:
+                ctx.message_count = store.size
+                from datetime import datetime as _dt  # noqa: WPS433
+
+                ctx.last_seen = _dt.now()
+            logger.info(
+                "ParticipantTracker[%s/%s]: +%d new (%d total across session)",
+                key[0],
+                key[1],
+                len(new_items),
+                store.size,
+            )
+        return new_items
+
+    def promote(
+        self,
+        platform: str,
+        participant: str,
+        source_environment: str,
+    ) -> "ConversationContext":
+        """Ensure a :class:`ConversationContext` exists with ``source`` marked.
+
+        Called by :mod:`guardlens.environment` when a user in a public
+        space specifically targets the child. Idempotent — a second
+        promotion on the same (platform, participant) leaves the existing
+        context alone.
+        """
+        key = self._normalize_key(platform, participant)
+        with self._lock:
+            existing = self._contexts.get(key)
+            if existing is not None:
+                logger.debug(
+                    "ParticipantTracker.promote: %s/%s already tracked (source=%s)",
+                    key[0],
+                    key[1],
+                    existing.source,
+                )
+                return existing
+            ctx = self._ctx_cls(
+                participant=participant.strip(),
+                platform=platform.strip(),
+                source=f"promoted_from_{source_environment}",
+            )
+            self._contexts[key] = ctx
+            # Pre-create the per-participant store so this user appears in
+            # participants() immediately, before they send another message.
+            if key not in self._stores:
+                self._stores[key] = ConversationStore()
+        logger.info(
+            "ParticipantTracker: promoted %s from %s → tracked conversation",
+            participant,
+            source_environment,
+        )
+        return ctx
+
+    def update_context(
+        self,
+        platform: str,
+        participant: str,
+        **updates,
+    ) -> "ConversationContext":
+        """Merge field updates into the :class:`ConversationContext`.
+
+        Creates the context on first access. Silent-ignores unknown
+        fields (they cannot corrupt the model because we go through
+        ``setattr`` with validation via the Pydantic field types).
+        """
+        key = self._normalize_key(platform, participant)
+        ctx = self._get_or_create_context(key)
+        with self._lock:
+            for field, value in updates.items():
+                if not hasattr(ctx, field):
+                    continue
+                setattr(ctx, field, value)
+        logger.debug(
+            "ParticipantTracker[%s/%s]: context updated — keys=%s",
+            key[0],
+            key[1],
+            list(updates.keys()),
+        )
+        return ctx
+
+    def reset(self) -> None:
+        """Drop every tracked participant — call on session end."""
+        with self._lock:
+            for store in self._stores.values():
+                store.reset()
+            self._stores.clear()
+            self._contexts.clear()
+        logger.info("ParticipantTracker: reset")
+
+    # ------------------------------------------------------------------ read
+
+    def messages_for(self, platform: str, participant: str) -> list[ChatMessage]:
+        """All accumulated messages for one participant, oldest first."""
+        key = self._normalize_key(platform, participant)
+        store = self._stores.get(key)
+        return store.all_messages if store else []
+
+    def context_for(
+        self, platform: str, participant: str
+    ) -> "ConversationContext | None":
+        """Return the :class:`ConversationContext` or ``None`` if untracked."""
+        key = self._normalize_key(platform, participant)
+        with self._lock:
+            return self._contexts.get(key)
+
+    def participants(self) -> list[tuple[str, str]]:
+        """Every tracked (platform, participant) pair."""
+        with self._lock:
+            return list(self._stores.keys())
+
+    def contexts(self) -> list["ConversationContext"]:
+        """Every tracked :class:`ConversationContext`, insertion order."""
+        with self._lock:
+            return list(self._contexts.values())
+
+    # ------------------------------------------------------------------ internal
+
+    def _get_or_create_store(self, key: tuple[str, str]) -> ConversationStore:
+        with self._lock:
+            store = self._stores.get(key)
+            if store is None:
+                store = ConversationStore()
+                self._stores[key] = store
+        return store
+
+    def _get_or_create_context(
+        self,
+        key: tuple[str, str],
+        *,
+        display_name: str | None = None,
+        display_platform: str | None = None,
+    ) -> "ConversationContext":
+        with self._lock:
+            ctx = self._contexts.get(key)
+            if ctx is None:
+                ctx = self._ctx_cls(
+                    participant=display_name or key[1],
+                    platform=display_platform or key[0],
+                )
+                self._contexts[key] = ctx
+                logger.info(
+                    "ParticipantTracker: new context %s/%s (source=%s)",
+                    ctx.platform,
+                    ctx.participant,
+                    ctx.source,
+                )
+            return ctx
+
+    @staticmethod
+    def _normalize_key(platform: str, participant: str) -> tuple[str, str]:
+        """Lower+strip both sides so OCR case wobble can't fragment a user.
+
+        The model's username OCR is inconsistent (``KidGamer09`` vs
+        ``Kidgamer09``); without lowercasing, each spelling opens its
+        own :class:`ConversationContext` and the dashboard ends up
+        showing three cards for the same person. The context's
+        ``participant`` field still stores the first-seen display name
+        so the UI reads naturally.
+        """
+        return (platform.strip().lower(), participant.strip().lower())
+
+
+__all__ = ["ConversationStore", "ParticipantTracker"]
