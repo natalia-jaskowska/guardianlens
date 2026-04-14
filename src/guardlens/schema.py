@@ -238,6 +238,38 @@ class ScreenAnalysis(BaseModel):
         }
 
 
+class ConversationFragment(BaseModel):
+    """One chat conversation slice visible on screen in a single frame."""
+
+    platform: str
+    participants: list[str] = Field(default_factory=list)
+    messages: list[ChatMessage] = Field(default_factory=list)
+    screenshot_path: Path | None = None
+    timestamp: datetime = Field(default_factory=datetime.now)
+
+
+class ConversationStatus(BaseModel):
+    """LLM-produced judgment for an accumulated conversation."""
+
+    threat_level: ThreatLevel = ThreatLevel.SAFE
+    category: ThreatCategory = ThreatCategory.NONE
+    confidence: float = Field(0.0, ge=0.0, le=100.0)
+    grooming_stage: GroomingStage = GroomingStage.NONE
+    indicators: list[str] = Field(default_factory=list)
+    narrative: str = ""
+    reasoning: str = ""
+    parent_alert_recommended: bool = False
+    certainty: SessionCertainty = SessionCertainty.LOW
+
+
+class FrameAnalysis(BaseModel):
+    """Output of the frame analysis step: all conversations visible on screen."""
+
+    conversations: list[ConversationFragment] = Field(default_factory=list)
+    raw_thinking: str | None = None
+    inference_seconds: float = 0.0
+
+
 class ConversationContext(BaseModel):
     """A tracked 1-to-1 (or small-group) conversation with one participant.
 

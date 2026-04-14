@@ -236,3 +236,198 @@ GUARDLENS_TOOLS: list[dict[str, Any]] = [
     GENERATE_PARENT_ALERT_TOOL,
 ]
 """All tools, in the order Gemma 4 should consider them."""
+
+
+# ====================== New conversation-first pipeline tools ======================
+
+EXTRACT_CONVERSATIONS_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "extract_conversations",
+        "description": (
+            "Extract ALL distinct chat conversations visible on screen. "
+            "Each conversation is a distinct chat window or thread. "
+            "Call this once with ALL conversations you can identify. "
+            "Even if only one conversation is visible, return a list of one."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "conversations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "platform": {
+                                "type": "string",
+                                "description": "The platform (Discord, Instagram, Minecraft, etc.).",
+                            },
+                            "participants": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                                "description": (
+                                    "All non-child usernames visible in this conversation."
+                                ),
+                            },
+                            "messages": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "sender": {"type": "string"},
+                                        "text": {"type": "string"},
+                                    },
+                                    "required": ["sender", "text"],
+                                },
+                                "description": (
+                                    "Every chat message visible in this conversation, "
+                                    "in order. Copy exact text — do not paraphrase."
+                                ),
+                            },
+                        },
+                        "required": ["platform", "participants", "messages"],
+                    },
+                },
+            },
+            "required": ["conversations"],
+        },
+    },
+}
+
+
+MATCH_CONVERSATION_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "match_conversation",
+        "description": (
+            "Decide whether a conversation fragment matches an existing "
+            "tracked conversation, or is new. Return the matching "
+            "conversation_id (integer) or null to create a new one."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "conversation_id": {
+                    "type": ["integer", "null"],
+                    "description": (
+                        "ID of the matching existing conversation, or null "
+                        "if this is a new conversation."
+                    ),
+                },
+                "reasoning": {
+                    "type": "string",
+                    "description": "One sentence explaining the match/no-match decision.",
+                },
+            },
+            "required": ["conversation_id", "reasoning"],
+        },
+    },
+}
+
+
+MERGE_MESSAGES_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "merge_messages",
+        "description": (
+            "Produce a single deduplicated, chronologically ordered list of "
+            "chat messages by merging the prior accumulated list with the new "
+            "messages from the current frame. Remove exact or near-exact "
+            "duplicates. Preserve all unique messages. Do not paraphrase."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "merged_messages": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "sender": {"type": "string"},
+                            "text": {"type": "string"},
+                        },
+                        "required": ["sender", "text"],
+                    },
+                    "description": "The full deduplicated ordered message list.",
+                },
+            },
+            "required": ["merged_messages"],
+        },
+    },
+}
+
+
+UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
+    "type": "function",
+    "function": {
+        "name": "update_conversation_status",
+        "description": (
+            "Produce an updated safety status for a tracked conversation, "
+            "given the full accumulated message history and the prior status. "
+            "You may revise the prior status up OR down based on new evidence."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "threat_level": {
+                    "type": "string",
+                    "enum": _enum_values(ThreatLevel),
+                },
+                "category": {
+                    "type": "string",
+                    "enum": _enum_values(ThreatCategory),
+                },
+                "confidence": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                },
+                "grooming_stage": {
+                    "type": "string",
+                    "enum": _enum_values(GroomingStage),
+                },
+                "indicators": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Specific indicator labels supporting this verdict.",
+                },
+                "narrative": {
+                    "type": "string",
+                    "description": (
+                        "2-4 sentence plain-English summary of the conversation "
+                        "pattern. Parent-facing. No raw message text."
+                    ),
+                },
+                "reasoning": {
+                    "type": "string",
+                    "description": (
+                        "Internal chain-of-thought: how the prior status + "
+                        "new messages led to this verdict. Audit trail only."
+                    ),
+                },
+                "parent_alert_recommended": {
+                    "type": "boolean",
+                    "description": (
+                        "True only with medium/high certainty and "
+                        "warning/alert/critical level."
+                    ),
+                },
+                "certainty": {
+                    "type": "string",
+                    "enum": _enum_values(SessionCertainty),
+                },
+            },
+            "required": [
+                "threat_level", "category", "confidence",
+                "narrative", "reasoning",
+                "parent_alert_recommended", "certainty",
+            ],
+        },
+    },
+}
+
+
+PIPELINE_FRAME_TOOLS: list[dict[str, Any]] = [EXTRACT_CONVERSATIONS_TOOL]
+PIPELINE_MATCH_TOOLS: list[dict[str, Any]] = [MATCH_CONVERSATION_TOOL]
+PIPELINE_MERGE_TOOLS: list[dict[str, Any]] = [MERGE_MESSAGES_TOOL]
+PIPELINE_STATUS_TOOLS: list[dict[str, Any]] = [UPDATE_CONVERSATION_STATUS_TOOL]

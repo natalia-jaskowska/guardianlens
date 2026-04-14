@@ -1,9 +1,7 @@
-"""End-to-end style smoke tests that don't require a running Ollama server.
+"""Smoke tests for the analyzer and the new conversation pipeline.
 
-These exercise the analyzer's response parser and the worker's
-queue/database side effects against a synthetic Ollama response. If any of
-these fail, the live demo will fail too — they are intentionally cheap so
-they can run on every commit.
+These exercise the analyzer's response parser and the pipeline's
+DB persistence without requiring a running Ollama server.
 """
 
 from __future__ import annotations
@@ -15,12 +13,14 @@ from unittest.mock import MagicMock, patch
 
 from guardlens.analyzer import GuardLensAnalyzer
 from guardlens.config import GuardLensConfig, OllamaConfig, SessionConfig
-from guardlens.conversation_store import ConversationStore
+from guardlens.database import GuardLensDatabase
+from guardlens.pipeline import ConversationPipeline, _naive_merge
 from guardlens.schema import (
     ChatMessage,
+    ConversationFragment,
+    ConversationStatus,
+    FrameAnalysis,
     ScreenAnalysis,
-    SessionCertainty,
-    SessionVerdict,
     ThreatCategory,
     ThreatLevel,
 )
@@ -132,154 +132,110 @@ def test_session_tracker_resets_on_safe() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Conversation analyzer trigger tests
+# Pipeline unit tests
 # ---------------------------------------------------------------------------
 
 
-def _make_worker(tmp_path: Path) -> Any:
-    """Build a MonitorWorker with mocked Ollama for trigger testing."""
-    from app.state import MonitorWorker
+def test_naive_merge_deduplicates() -> None:
+    prior = [{"sender": "Alice", "text": "hello"}, {"sender": "Bob", "text": "hi"}]
+    new = [{"sender": "Bob", "text": "hi"}, {"sender": "Carol", "text": "hey"}]
+    result = _naive_merge(prior, new)
+    assert len(result) == 3
+    assert result[0]["sender"] == "Alice"
+    assert result[2]["sender"] == "Carol"
 
-    cfg = GuardLensConfig()
-    cfg.database.path = tmp_path / "test.db"
-    cfg.monitor.screenshots_dir = tmp_path / "screenshots"
-    cfg.monitor.screenshots_dir.mkdir()
 
-    from guardlens.alerts import AlertSender
-    from guardlens.analyzer import GuardLensAnalyzer
-    from guardlens.conversation_analyzer import ConversationAnalyzer
-    from guardlens.database import GuardLensDatabase
+def test_naive_merge_case_insensitive() -> None:
+    prior = [{"sender": "Alice", "text": "Hello"}]
+    new = [{"sender": "alice", "text": "hello"}]
+    result = _naive_merge(prior, new)
+    assert len(result) == 1
 
-    analyzer = GuardLensAnalyzer(cfg.ollama)
-    session = SessionTracker(cfg.session)
-    alerts = AlertSender(cfg.alerts)
-    database = GuardLensDatabase(cfg.database.path)
-    database.start_session()
-    store = ConversationStore()
-    conv_analyzer = ConversationAnalyzer(cfg.ollama)
 
-    worker = MonitorWorker(
-        config=cfg,
-        analyzer=analyzer,
-        session=session,
-        alerts=alerts,
-        database=database,
-        conversation_store=store,
-        conversation_analyzer=conv_analyzer,
+def test_db_conversation_crud(tmp_path: Path) -> None:
+    """Test create/read/update cycle for the conversations table."""
+    db = GuardLensDatabase(tmp_path / "test.db")
+
+    now = datetime.now().isoformat()
+    conv_id = db.create_conversation(
+        platform="discord",
+        participants=["Alice", "Bob"],
+        first_seen=now,
+        messages=[{"sender": "Alice", "text": "hi"}],
+        screenshots=[{"path": "/tmp/1.png", "timestamp": now}],
+        status={"threat_level": "safe", "category": "none", "confidence": 90},
+        status_reasoning="All clear",
     )
-    return worker
+    assert conv_id > 0
 
+    row = db.get_conversation(conv_id)
+    assert row is not None
+    assert row["platform"] == "discord"
 
-def _fake_analysis_with_messages(
-    level: ThreatLevel,
-    messages: list[tuple[str, str]] | None = None,
-) -> ScreenAnalysis:
-    msgs = messages or [("Alice", "hello")]
-    return ScreenAnalysis(
-        timestamp=datetime.now(),
-        screenshot_path=Path("/tmp/fake.png"),
-        classification={
-            "threat_level": level.value,
-            "category": "grooming" if level != ThreatLevel.SAFE else "none",
-            "confidence": 90.0,
-            "reasoning": "synthetic",
-            "indicators_found": [],
-            "visible_messages": [
-                {"sender": s, "text": t} for s, t in msgs
-            ],
-        },
-        inference_seconds=0.1,
-    )
+    import json
+    assert json.loads(row["participants_json"]) == ["Alice", "Bob"]
 
-
-def test_safe_frame_triggers_reanalysis_when_verdict_is_stale(tmp_path: Path) -> None:
-    """A safe frame should re-trigger the conversation analyzer when the
-    current verdict is non-safe, so the verdict can downgrade."""
-    worker = _make_worker(tmp_path)
-
-    # Simulate a stale non-safe verdict.
-    worker._latest_session_verdict = SessionVerdict(
-        overall_level=ThreatLevel.WARNING,
-        overall_category=ThreatCategory.GROOMING,
-        confidence=85.0,
-        certainty=SessionCertainty.MEDIUM,
-        narrative="stale",
-        messages_analyzed=5,
-        parent_alert_recommended=False,
+    db.update_conversation(
+        conv_id,
+        messages_json=json.dumps([
+            {"sender": "Alice", "text": "hi"},
+            {"sender": "Bob", "text": "hello"},
+        ]),
+        status_json=json.dumps({"threat_level": "caution", "confidence": 70}),
+        status_reasoning="Watching",
+        screenshots_json=json.dumps([
+            {"path": "/tmp/1.png", "timestamp": now},
+            {"path": "/tmp/2.png", "timestamp": now},
+        ]),
+        last_seen=now,
     )
 
-    # Queue a safe frame with unique messages.
-    safe = _fake_analysis_with_messages(
-        ThreatLevel.SAFE,
-        [("Bob", "nice weather"), ("Carol", "yeah!")],
+    updated = db.get_conversation(conv_id)
+    assert json.loads(updated["status_json"])["threat_level"] == "caution"
+    assert len(json.loads(updated["messages_json"])) == 2
+
+    active = db.get_active_conversations(stale_minutes=9999)
+    assert len(active) >= 1
+
+    all_convs = db.all_conversations()
+    assert len(all_convs) >= 1
+
+    frag_id = db.insert_fragment(
+        conversation_id=conv_id,
+        timestamp="2026-01-01T00:00:00",
+        screenshot_path="/tmp/1.png",
+        raw_analysis_json='{"test": true}',
     )
-    worker._queue.put(safe)
-
-    # Mock the conversation analyzer to track if it's called.
-    with patch.object(worker._conversation_analyzer, "analyze", return_value=None) as mock_analyze:
-        worker.drain()
-
-    mock_analyze.assert_called_once()
-    # Frame hint should include the safe frame's context.
-    call_kwargs = mock_analyze.call_args
-    hint = call_kwargs.kwargs.get("frame_hint") or call_kwargs[1].get("frame_hint")
-    assert hint is not None
-    assert hint["level"] == "safe"
+    assert frag_id > 0
 
 
-def test_nonsafe_frame_always_triggers_reanalysis(tmp_path: Path) -> None:
-    """A non-safe frame should always re-trigger the conversation analyzer,
-    regardless of the current verdict level."""
-    worker = _make_worker(tmp_path)
+def test_pipeline_frame_analysis_fallback(tmp_path: Path) -> None:
+    """When the model doesn't call extract_conversations, pipeline returns empty."""
+    pipeline = ConversationPipeline(OllamaConfig())
+    image = tmp_path / "fake.png"
+    image.write_bytes(b"\x89PNG\r\n\x1a\nfake")
 
-    # Simulate an existing non-safe verdict (previously this blocked re-analysis).
-    worker._latest_session_verdict = SessionVerdict(
-        overall_level=ThreatLevel.ALERT,
-        overall_category=ThreatCategory.GROOMING,
-        confidence=90.0,
-        certainty=SessionCertainty.HIGH,
-        narrative="existing",
-        messages_analyzed=10,
-        parent_alert_recommended=True,
-    )
+    empty_response = {"message": {"role": "assistant", "content": "no tools", "tool_calls": []}}
 
-    alert = _fake_analysis_with_messages(
-        ThreatLevel.ALERT,
-        [("Stranger", "how old are you?")],
-    )
-    worker._queue.put(alert)
+    with patch.object(pipeline._client, "chat", return_value=empty_response):
+        frame = pipeline._analyze_frame(image)
 
-    with patch.object(worker._conversation_analyzer, "analyze", return_value=None) as mock_analyze:
-        worker.drain()
-
-    mock_analyze.assert_called_once()
-    # Frame hint should carry the alert context.
-    call_kwargs = mock_analyze.call_args
-    hint = call_kwargs.kwargs.get("frame_hint") or call_kwargs[1].get("frame_hint")
-    assert hint is not None
-    assert hint["level"] == "alert"
+    assert isinstance(frame, FrameAnalysis)
+    assert frame.conversations == []
 
 
-def test_safe_frame_does_not_trigger_when_verdict_already_safe(tmp_path: Path) -> None:
-    """When both the frame and the verdict are safe, no re-analysis needed
-    (unless enough new messages accumulated via threshold A)."""
-    worker = _make_worker(tmp_path)
+def test_pipeline_push_screenshot_empty_frame(tmp_path: Path) -> None:
+    """push_screenshot with no conversations detected returns empty list."""
+    pipeline = ConversationPipeline(OllamaConfig())
+    db = GuardLensDatabase(tmp_path / "test.db")
+    db.start_session()
+    image = tmp_path / "fake.png"
+    image.write_bytes(b"\x89PNG\r\n\x1a\nfake")
 
-    worker._latest_session_verdict = SessionVerdict(
-        overall_level=ThreatLevel.SAFE,
-        overall_category=ThreatCategory.NONE,
-        confidence=95.0,
-        certainty=SessionCertainty.HIGH,
-        narrative="all clear",
-        messages_analyzed=10,
-        parent_alert_recommended=False,
-    )
+    empty_response = {"message": {"role": "assistant", "content": "", "tool_calls": []}}
 
-    # Queue a safe frame with duplicate messages (won't hit threshold A).
-    safe = _fake_analysis_with_messages(ThreatLevel.SAFE, [("Alice", "hello")])
-    worker._queue.put(safe)
+    with patch.object(pipeline._client, "chat", return_value=empty_response):
+        result = pipeline.push_screenshot(image, db)
 
-    with patch.object(worker._conversation_analyzer, "analyze", return_value=None) as mock_analyze:
-        worker.drain()
-
-    mock_analyze.assert_not_called()
+    assert result == []
+    assert db.all_conversations() == []

@@ -79,6 +79,30 @@ CREATE TABLE IF NOT EXISTS alerts (
     urgency TEXT NOT NULL,
     FOREIGN KEY(analysis_id) REFERENCES analyses(id)
 );
+
+CREATE TABLE IF NOT EXISTS conversations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    platform TEXT NOT NULL,
+    participants_json TEXT NOT NULL DEFAULT '[]',
+    first_seen TEXT NOT NULL,
+    last_seen TEXT NOT NULL,
+    messages_json TEXT NOT NULL DEFAULT '[]',
+    status_json TEXT,
+    status_reasoning TEXT,
+    screenshots_json TEXT NOT NULL DEFAULT '[]'
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversations_last_seen ON conversations(last_seen);
+
+CREATE TABLE IF NOT EXISTS fragments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+    timestamp TEXT NOT NULL,
+    screenshot_path TEXT NOT NULL,
+    raw_analysis_json TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_fragments_conversation ON fragments(conversation_id);
 """
 
 
@@ -447,6 +471,125 @@ class GuardLensDatabase:
                 "SELECT COUNT(*) FROM alerts",
             ).fetchone()
         return int(row[0]) if row else 0
+
+    # ------------------------------------------------------------------ conversations
+
+    def get_active_conversations(self, stale_minutes: int = 30) -> list[sqlite3.Row]:
+        """Return conversations updated within the last ``stale_minutes``."""
+        with self._lock:
+            return list(
+                self._conn.execute(
+                    """
+                    SELECT * FROM conversations
+                    WHERE datetime(last_seen) > datetime('now', 'localtime', ? || ' minutes')
+                    ORDER BY last_seen DESC
+                    """,
+                    (f"-{stale_minutes}",),
+                )
+            )
+
+    def get_conversation(self, conv_id: int) -> sqlite3.Row | None:
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM conversations WHERE id = ?", (conv_id,)
+            ).fetchone()
+
+    def all_conversations(self, limit: int = 50) -> list[sqlite3.Row]:
+        with self._lock:
+            return list(
+                self._conn.execute(
+                    "SELECT * FROM conversations ORDER BY last_seen DESC LIMIT ?",
+                    (limit,),
+                )
+            )
+
+    def create_conversation(
+        self,
+        *,
+        platform: str,
+        participants: list[str],
+        first_seen: str,
+        messages: list[dict],
+        screenshots: list[dict],
+        status: dict | None = None,
+        status_reasoning: str | None = None,
+    ) -> int:
+        now = first_seen
+        with self._lock:
+            cursor = self._conn.execute(
+                """
+                INSERT INTO conversations
+                    (platform, participants_json, first_seen, last_seen,
+                     messages_json, status_json, status_reasoning, screenshots_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    platform,
+                    json.dumps(participants),
+                    now,
+                    now,
+                    json.dumps(messages),
+                    json.dumps(status) if status else None,
+                    status_reasoning,
+                    json.dumps(screenshots),
+                ),
+            )
+            return int(cursor.lastrowid or 0)
+
+    def update_conversation(
+        self,
+        conv_id: int,
+        *,
+        messages_json: str,
+        status_json: str | None,
+        status_reasoning: str | None,
+        screenshots_json: str,
+        last_seen: str,
+        participants_json: str | None = None,
+    ) -> None:
+        if participants_json is not None:
+            with self._lock:
+                self._conn.execute(
+                    """
+                    UPDATE conversations
+                    SET messages_json = ?, status_json = ?, status_reasoning = ?,
+                        screenshots_json = ?, last_seen = ?, participants_json = ?
+                    WHERE id = ?
+                    """,
+                    (messages_json, status_json, status_reasoning,
+                     screenshots_json, last_seen, participants_json, conv_id),
+                )
+        else:
+            with self._lock:
+                self._conn.execute(
+                    """
+                    UPDATE conversations
+                    SET messages_json = ?, status_json = ?, status_reasoning = ?,
+                        screenshots_json = ?, last_seen = ?
+                    WHERE id = ?
+                    """,
+                    (messages_json, status_json, status_reasoning,
+                     screenshots_json, last_seen, conv_id),
+                )
+
+    def insert_fragment(
+        self,
+        *,
+        conversation_id: int,
+        timestamp: str,
+        screenshot_path: str,
+        raw_analysis_json: str,
+    ) -> int:
+        with self._lock:
+            cursor = self._conn.execute(
+                """
+                INSERT INTO fragments
+                    (conversation_id, timestamp, screenshot_path, raw_analysis_json)
+                VALUES (?, ?, ?, ?)
+                """,
+                (conversation_id, timestamp, screenshot_path, raw_analysis_json),
+            )
+            return int(cursor.lastrowid or 0)
 
     # ------------------------------------------------------------------ shutdown
 

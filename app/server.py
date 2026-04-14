@@ -123,7 +123,7 @@ def create_app(config: GuardLensConfig) -> FastAPI:
         analysis = state.database.analysis_by_id(analysis_id)
         if analysis is None:
             return JSONResponse({"error": "not found"}, status_code=404)
-        return JSONResponse(serialize_analysis(analysis, history=state.session.recent()))
+        return JSONResponse(serialize_analysis(analysis))
 
     @app.get("/api/stream")
     async def api_stream(request: Request) -> StreamingResponse:
@@ -185,7 +185,7 @@ def create_app(config: GuardLensConfig) -> FastAPI:
         if not new_model:
             return JSONResponse({"error": "model required"}, status_code=400)
         config.ollama.inference_model = new_model
-        state.analyzer.config.inference_model = new_model
+        state.pipeline._config.inference_model = new_model
         logger.info("Model switched to %s", new_model)
         return JSONResponse({"status": "ok", "model": new_model})
 

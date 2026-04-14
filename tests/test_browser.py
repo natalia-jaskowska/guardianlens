@@ -164,13 +164,35 @@ def server_url(tmp_path_factory: pytest.TempPathFactory) -> str:
         port = sockets[0].getsockname()[1]
         base_url = f"http://127.0.0.1:{port}"
 
-        # Inject an alert analysis so the dashboard has content to show.
+        # Inject a conversation + alert into the DB so the dashboard has content.
         state = app.state.guardlens
         alert = _make_alert_analysis(tmp)
-        state.worker._queue.put(alert)
-        # Also record it as an alert in the DB so alert_history populates.
         analysis_id = state.database.record_analysis(alert)
         state.database.record_alert(analysis_id, alert, delivered=False)
+        import json
+        state.database.create_conversation(
+            platform="Discord",
+            participants=["ShadowPro"],
+            first_seen=datetime.now().isoformat(),
+            messages=[
+                {"sender": "ShadowPro", "text": "how old are you?"},
+                {"sender": "child", "text": "14"},
+                {"sender": "ShadowPro", "text": "cool, wanna add me on snap?"},
+            ],
+            screenshots=[{"path": str(tmp / "screenshots" / "fake_alert.png"), "timestamp": datetime.now().isoformat()}],
+            status={
+                "threat_level": "alert",
+                "category": "grooming",
+                "confidence": 92,
+                "grooming_stage": "trust_building",
+                "indicators": ["age inquiry", "gift offer", "platform switch"],
+                "narrative": "ShadowPro escalated from greeting to age inquiry to platform migration.",
+                "reasoning": "User asked age, offered gifts, suggested private DM.",
+                "parent_alert_recommended": True,
+                "certainty": "high",
+            },
+            status_reasoning="User asked age, offered gifts, suggested private DM.",
+        )
 
         yield base_url
 

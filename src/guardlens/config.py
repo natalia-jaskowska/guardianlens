@@ -150,6 +150,19 @@ class PrivacyConfig(BaseModel):
     )
 
 
+class ConversationConfig(BaseModel):
+    """Settings for the conversation-first pipeline."""
+
+    stale_minutes: int = Field(
+        30,
+        ge=1,
+        description=(
+            "Conversations not updated for this many minutes are not "
+            "considered as match candidates. A new conversation is created instead."
+        ),
+    )
+
+
 class GuardLensConfig(BaseSettings):
     """Top-level configuration object. Holds every other section."""
 
@@ -172,6 +185,7 @@ class GuardLensConfig(BaseSettings):
     dashboard: DashboardConfig = Field(default_factory=DashboardConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
+    conversation: ConversationConfig = Field(default_factory=ConversationConfig)
 
 
 def load_config(config_path: Path | None = None) -> GuardLensConfig:

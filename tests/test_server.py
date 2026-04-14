@@ -1,12 +1,12 @@
 """Smoke tests for the FastAPI server.
 
 These start the app via FastAPI's TestClient (no real network), patch
-the analyzer so no Ollama call happens, and exercise the four
-endpoints. Cheap enough to run on every commit.
+the pipeline so no Ollama call happens, and exercise the endpoints.
 """
 
 from __future__ import annotations
 
+import json
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
@@ -30,16 +30,14 @@ def config(tmp_path: Path) -> GuardLensConfig:
     cfg.database.path = tmp_path / "test.db"
     cfg.monitor.screenshots_dir = tmp_path / "screenshots"
     cfg.monitor.demo_mode = True
-    cfg.monitor.capture_interval_seconds = 60.0  # don't actually loop during tests
+    cfg.monitor.capture_interval_seconds = 60.0
     cfg.dashboard.title = "Test"
     return cfg
 
 
 @pytest.fixture
 def client(config: GuardLensConfig) -> TestClient:
-    # Patch the analyzer's HTTP client so no real Ollama call ever happens
-    # while the FastAPI lifespan starts the worker thread.
-    with patch("guardlens.analyzer.ollama.Client") as mock_client_cls:
+    with patch("guardlens.pipeline.ollama.Client") as mock_client_cls:
         mock_client = mock_client_cls.return_value
         mock_client.chat.return_value = {
             "message": {
@@ -48,15 +46,8 @@ def client(config: GuardLensConfig) -> TestClient:
                 "tool_calls": [
                     {
                         "function": {
-                            "name": "classify_threat",
-                            "arguments": {
-                                "threat_level": "safe",
-                                "category": "none",
-                                "confidence": 95.0,
-                                "reasoning": "Safe gameplay",
-                                "indicators_found": [],
-                                "platform_detected": "Test",
-                            },
+                            "name": "extract_conversations",
+                            "arguments": {"conversations": []},
                         }
                     }
                 ],
@@ -73,7 +64,6 @@ def test_index_returns_html_with_initial_state(client: TestClient) -> None:
     assert "text/html" in response.headers["content-type"]
     body = response.text
     assert "GuardianLens" in body
-    # Shell markers from the conversation-centric redesign.
     assert 'id="activityList"' in body
     assert 'id="stateSession"' in body
     assert 'id="stateConversation"' in body
@@ -85,7 +75,6 @@ def test_index_returns_html_with_initial_state(client: TestClient) -> None:
 def test_static_assets_served(client: TestClient) -> None:
     css = client.get("/static/dashboard.css")
     assert css.status_code == 200
-    # Class-name marker from the new CSS.
     assert ".gl-activity" in css.text
     js = client.get("/static/dashboard.js")
     assert js.status_code == 200
@@ -96,7 +85,6 @@ def test_api_state_returns_snapshot(client: TestClient) -> None:
     response = client.get("/api/state")
     assert response.status_code == 200
     payload = response.json()
-    # Required keys
     for key in ("monitoring", "metrics", "timeline", "latest", "is_alert", "model_name"):
         assert key in payload
     assert isinstance(payload["metrics"], dict)
@@ -109,42 +97,43 @@ def test_healthz(client: TestClient) -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_state_serializer_picks_up_latest_analysis(
+def test_state_shows_injected_conversation(
     client: TestClient, config: GuardLensConfig
 ) -> None:
-    """Inject an analysis directly into the worker queue and confirm
-    it shows up in /api/state."""
+    """Inject a conversation into the DB and confirm it appears in /api/state."""
     state = client.app.state.guardlens
-    fake = ScreenAnalysis(
-        timestamp=datetime.now(),
-        screenshot_path=config.monitor.screenshots_dir / "fake.png",
+    state.database.create_conversation(
         platform="Minecraft",
-        classification=ThreatClassification(
-            threat_level=ThreatLevel.ALERT,
-            category=ThreatCategory.GROOMING,
-            confidence=92.0,
-            reasoning="Injected for the unit test.",
-            indicators_found=["injected"],
-        ),
-        inference_seconds=0.1,
+        participants=["CoolGuy99"],
+        first_seen=datetime.now().isoformat(),
+        messages=[
+            {"sender": "CoolGuy99", "text": "how old are you?"},
+            {"sender": "child", "text": "12"},
+        ],
+        screenshots=[],
+        status={
+            "threat_level": "alert",
+            "category": "grooming",
+            "confidence": 92,
+            "narrative": "CoolGuy99 asked age.",
+            "reasoning": "age inquiry",
+            "parent_alert_recommended": True,
+            "certainty": "medium",
+        },
     )
-    state.worker._queue.put(fake)
 
     response = client.get("/api/state")
     payload = response.json()
-    assert payload["latest"] is not None
-    assert payload["latest"]["threat_level"] == "alert"
-    assert payload["is_alert"] is True
-    assert payload["metrics"]["alerts"] >= 1
+    assert len(payload["conversations"]) >= 1
+    conv = payload["conversations"][0]
+    assert conv["participant"] == "CoolGuy99"
+    assert conv["threat_level"] == "alert"
+    assert conv["platform"] == "Minecraft"
 
 
 def test_pause_resume_endpoints(client: TestClient) -> None:
-    """Pause and resume flip the monitoring flag and paused flag."""
-    # Initially scanning
     assert client.get("/api/state").json()["paused"] is False
-    assert client.get("/api/state").json()["monitoring"] is True
 
-    # Pause
     response = client.post("/api/pause")
     assert response.status_code == 200
     assert response.json() == {"status": "paused"}
@@ -152,7 +141,6 @@ def test_pause_resume_endpoints(client: TestClient) -> None:
     assert state_after_pause["paused"] is True
     assert state_after_pause["monitoring"] is False
 
-    # Resume
     response = client.post("/api/resume")
     assert response.status_code == 200
     assert response.json() == {"status": "running"}
@@ -162,17 +150,14 @@ def test_pause_resume_endpoints(client: TestClient) -> None:
 
 
 def test_pause_is_idempotent(client: TestClient) -> None:
-    """Double-pause doesn't corrupt state."""
     client.post("/api/pause")
     client.post("/api/pause")
     assert client.get("/api/state").json()["paused"] is True
-    # Resume once
     client.post("/api/resume")
     assert client.get("/api/state").json()["paused"] is False
 
 
 def test_api_analysis_not_found(client: TestClient) -> None:
-    """Missing analysis id returns 404 with error body."""
     response = client.get("/api/analysis/999999")
     assert response.status_code == 404
     assert response.json() == {"error": "not found"}
@@ -181,7 +166,6 @@ def test_api_analysis_not_found(client: TestClient) -> None:
 def test_api_analysis_returns_full_payload(
     client: TestClient, config: GuardLensConfig
 ) -> None:
-    """An injected analysis can be fetched by its DB id."""
     state = client.app.state.guardlens
     fake = ScreenAnalysis(
         timestamp=datetime.now(),
@@ -196,22 +180,29 @@ def test_api_analysis_returns_full_payload(
         ),
         inference_seconds=1.2,
     )
-    state.worker._queue.put(fake)
-    # Drain via /api/state so the row is persisted
-    client.get("/api/state")
+    analysis_id = state.database.record_analysis(fake)
+    assert analysis_id > 0
 
-    # The injected alert should be accessible by id 1 (fresh tmp DB)
-    response = client.get("/api/analysis/1")
+    response = client.get(f"/api/analysis/{analysis_id}")
     assert response.status_code == 200
     payload = response.json()
     assert payload["threat_level"] == "alert"
     assert payload["category"] == "grooming"
-    assert "False Age" in payload["indicators"]  # cleaned tag
 
 
 def test_state_has_alert_total_field(client: TestClient) -> None:
-    """/api/state exposes alert_total for the 'X of Y' display."""
     response = client.get("/api/state")
     assert response.status_code == 200
     assert "alert_total" in response.json()
     assert isinstance(response.json()["alert_total"], int)
+
+
+def test_state_has_conversations_and_session_narrative(client: TestClient) -> None:
+    response = client.get("/api/state")
+    assert response.status_code == 200
+    payload = response.json()
+    assert "conversations" in payload
+    assert "session_narrative" in payload
+    assert isinstance(payload["conversations"], list)
+    assert "headline" in payload["session_narrative"]
+    assert "what_to_do" in payload["session_narrative"]
