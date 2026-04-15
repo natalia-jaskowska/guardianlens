@@ -70,29 +70,42 @@ html, body {
 /* ------------------------------ Header ------------------------------ */
 .gl-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 16px;
+  padding: 14px 22px;
   border-bottom: 0.5px solid var(--border);
 }
-.gl-brand { display: flex; align-items: center; gap: 9px; }
+.gl-brand { display: flex; align-items: center; gap: 12px; }
 .gl-logo {
-  width: 24px; height: 24px; border-radius: 6px;
-  background: #2563eb;
+  width: 32px; height: 32px; border-radius: 8px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.35), inset 0 0 0 1px rgba(255,255,255,0.1);
 }
-.gl-brand > span { font-weight: 500; font-size: 13px; }
+.gl-logo svg { width: 18px; height: 18px; }
+.gl-brand > span {
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.3px;
+  color: var(--text);
+}
 
-.gl-meta { display: flex; align-items: center; gap: 14px; }
-.gl-status-dot { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--dim); }
-.gl-status-dot .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--safe); }
+.gl-meta { display: flex; align-items: center; gap: 16px; }
+.gl-status-dot { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); font-weight: 500; }
+.gl-status-dot .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--safe);
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
+}
 .gl-status-dot .dot.paused { background: var(--caution); }
 .gl-status-dot .dot.off { background: var(--faint); }
 .gl-duration { font-family: monospace; font-size: 10px; color: var(--dim); }
 .gl-pill {
-  font-size: 11px; color: var(--muted); background: var(--card);
-  border: 0.5px solid var(--border2); padding: 3px 10px;
-  border-radius: 4px; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 4px;
-  font-family: inherit; min-width: 58px; justify-content: center;
+  font-size: 13px; color: var(--muted); background: var(--card);
+  border: 0.5px solid var(--border2); padding: 6px 14px;
+  border-radius: 999px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: inherit; min-width: 80px; justify-content: center;
+  font-weight: 500;
+  transition: all 120ms ease;
 }
 .gl-pill:hover { background: var(--card2); color: var(--text); }
 .gl-pill.paused { color: var(--caution); border-color: rgba(234,179,8,0.3); background: var(--yel-bg); }
@@ -199,9 +212,11 @@ html, body {
   display: flex; align-items: center; justify-content: center;
 }
 .gl-model {
-  font-size: 9px; color: var(--dim);
-  border: 0.5px solid var(--border2); padding: 2px 6px;
-  border-radius: 3px; font-family: monospace;
+  font-size: 11px; color: var(--dim);
+  border: 0.5px solid var(--border2); padding: 4px 10px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
 }
 
 /* ------------------------------ Body grid --------------------------- */
@@ -230,13 +245,24 @@ html, body {
 
 /* ------------------------------ Section labels ---------------------- */
 .gl-section-label {
-  font-size: 10px;
+  font-size: 15px;
   font-weight: 600;
-  color: var(--dim);
-  text-transform: uppercase;
-  letter-spacing: 1.4px;
-  margin-bottom: 4px;
-  padding-top: 4px;
+  color: var(--text);
+  letter-spacing: -0.2px;
+  margin-bottom: 10px;
+  padding-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.2;
+}
+.gl-section-label::before {
+  content: "";
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(96,165,250,0.85), rgba(96,165,250,0.3));
+  flex-shrink: 0;
 }
 .gl-section-head {
   display: flex; justify-content: space-between; align-items: center;
@@ -248,6 +274,10 @@ html, body {
 
 /* ------------------------------ Live capture ------------------------ */
 .gl-capture {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   border-radius: 12px;
   overflow: hidden;
   border: 0.5px solid rgba(34,197,94,0.22);
@@ -281,13 +311,22 @@ html, body {
 .gl-capture.alert { border-color: var(--alert); }
 .gl-capture.warn { border-color: var(--caution); }
 .gl-capture-frame {
-  background: #000; min-height: 140px;
-  padding: 10px;
-  display: flex; align-items: stretch;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background:
+    radial-gradient(600px 300px at 50% 50%, rgba(34,197,94,0.04), transparent 70%),
+    #050608;
+  overflow: hidden;
 }
 .gl-capture-frame img {
-  width: 100%; max-height: 220px; object-fit: contain;
-  border-radius: 4px;
+  position: absolute;
+  inset: 16px;
+  display: block;
+  width: calc(100% - 32px);
+  height: calc(100% - 32px);
+  object-fit: contain;
+  border-radius: 8px;
 }
 .gl-capture-img {
   cursor: zoom-in;
@@ -341,8 +380,8 @@ html, body {
 }
 .gl-capture-empty {
   color: var(--faint); font-size: 11px;
+  position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
-  width: 100%; min-height: 120px;
 }
 .gl-capture-chat {
   background: #1a1a2a; border-radius: 4px;
@@ -516,11 +555,36 @@ html, body {
 /* ------------------------------ Activity list ----------------------- */
 .gl-activity {
   display: flex; flex-direction: column; gap: 6px;
-  flex: 1; min-height: 0; overflow-y: auto;
+  flex: 1 1 0; min-height: 0; overflow-y: auto;
   padding: 3px 2px 3px 2px;
 }
-.gl-activity::-webkit-scrollbar { width: 4px; }
-.gl-activity::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+/* Unified scrollbar style — applied to every scroll container so the
+ * dashboard reads as one design language. */
+.gl-left, .gl-right, .gl-activity, .gl-reasoning, .gl-alerts-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border2) transparent;
+}
+.gl-left::-webkit-scrollbar,
+.gl-right::-webkit-scrollbar,
+.gl-activity::-webkit-scrollbar,
+.gl-alerts-list::-webkit-scrollbar { width: 4px; }
+.gl-left::-webkit-scrollbar-track,
+.gl-right::-webkit-scrollbar-track,
+.gl-activity::-webkit-scrollbar-track,
+.gl-alerts-list::-webkit-scrollbar-track { background: transparent; }
+.gl-left::-webkit-scrollbar-thumb,
+.gl-right::-webkit-scrollbar-thumb,
+.gl-activity::-webkit-scrollbar-thumb,
+.gl-alerts-list::-webkit-scrollbar-thumb {
+  background: var(--border2);
+  border-radius: 2px;
+}
+.gl-left::-webkit-scrollbar-thumb:hover,
+.gl-right::-webkit-scrollbar-thumb:hover,
+.gl-activity::-webkit-scrollbar-thumb:hover,
+.gl-alerts-list::-webkit-scrollbar-thumb:hover {
+  background: var(--faint);
+}
 .gl-empty { font-size: 11px; color: var(--faint); padding: 12px 10px; text-align: center; }
 
 /* ---- Modern activity card -------------------------------------------
@@ -1034,24 +1098,39 @@ html, body {
 
 /* STATE 2 & 3 — detail header (modern) */
 .gl-back {
-  background: rgba(255,255,255,0.03);
-  border: 0.5px solid rgba(255,255,255,0.06);
-  border-radius: 999px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.01));
+  border: 0.5px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
   cursor: pointer;
-  color: var(--dim); font-size: 11px;
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 5px 12px 5px 9px;
+  color: var(--muted); font-size: 13px;
+  font-weight: 500;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px 8px 10px;
   align-self: flex-start;
-  transition: all 120ms ease;
+  transition: all 150ms ease;
   font-family: inherit;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
 }
-.gl-back svg { transition: transform 120ms ease; }
+.gl-back svg {
+  width: 14px; height: 14px;
+  transition: transform 150ms ease;
+}
 .gl-back:hover {
   color: var(--text);
-  background: rgba(255,255,255,0.06);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
   border-color: rgba(255,255,255,0.12);
 }
-.gl-back:hover svg { transform: translateX(-2px); }
+.gl-back:hover {
+  border-color: rgba(255,255,255,0.16);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.gl-back:hover svg { transform: translateX(-3px); }
+.gl-back:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
 
 .gl-detail-header {
   display: flex; align-items: center; gap: 12px;
