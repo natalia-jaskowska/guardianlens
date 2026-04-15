@@ -10,6 +10,7 @@ import json
 import logging
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 from app.serializers import (
@@ -380,8 +381,10 @@ class AppState:
 
         latest_payload = None
         if latest_screenshot:
+            filename = Path(latest_screenshot).name
             latest_payload = {
                 "screenshot_path": latest_screenshot,
+                "screenshot_url": f"/screenshots/{filename}",
                 "platform": latest_platform or "Unknown",
                 "threat_level": worst,
                 "reasoning": "",

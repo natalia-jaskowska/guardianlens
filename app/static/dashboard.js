@@ -161,38 +161,24 @@ function sortByDanger(items, levelKey) {
   });
 }
 
-function renderActivity(conversations, environments) {
+function renderActivity(conversations) {
   const list = $("activityList");
-  const all = [
-    ...conversations.map((c) => ({ kind: "conversation", level: c.threat_level, data: c })),
-    ...environments.map((e) => ({ kind: "environment", level: e.overall_safety, data: e })),
-  ];
-  // Sort rule: (1) danger first, (2) within a danger tier, people
-  // before places. People are the actionable alert target; places are
-  // context about where those people are.
-  const ranked = [...all].sort((a, b) => {
+  const sorted = [...conversations].sort((a, b) => {
     const order = { alert: 0, critical: 0, warning: 1, caution: 2, safe: 3 };
-    const d = (order[a.level] ?? 9) - (order[b.level] ?? 9);
+    const d = (order[a.threat_level] ?? 9) - (order[b.threat_level] ?? 9);
     if (d !== 0) return d;
-    const k = (x) => (x.kind === "conversation" ? 0 : 1);
-    return k(a) - k(b);
+    return new Date(b.last_seen || 0) - new Date(a.last_seen || 0);
   });
 
-  const unsafe = ranked.filter((r) => r.level !== "safe");
-  const safe = ranked.filter((r) => r.level === "safe");
-
   list.innerHTML = "";
-  if (ranked.length === 0) {
+  if (sorted.length === 0) {
     list.innerHTML = `<div class="gl-empty">Monitoring — no activity yet</div>`;
     return;
   }
 
-  for (const item of unsafe) {
-    list.appendChild(
-      item.kind === "conversation" ? convCard(item.data) : envCard(item.data)
-    );
+  for (const c of sorted) {
+    list.appendChild(convCard(c));
   }
-  if (safe.length > 0) list.appendChild(safeGroup(safe));
 }
 
 function convCard(c) {
@@ -260,93 +246,6 @@ function convCard(c) {
       ${snippet ? `<div class="gl-card-note ${lvl}">${escapeHtml(snippet)}</div>` : ""}
     </div>`;
   return card;
-}
-
-function envCard(e) {
-  // Environment card. Same skeleton as convCard but the "status" pills
-  // read "Safe / Watching / Flagged" instead of threat levels — the
-  // parent is judging a space, not a person.
-  const rawLvl = e.overall_safety || "safe";
-  const lvl = levelClass(rawLvl);
-  const fam = platformFamily(e.platform);
-  const pCount = (e.promoted_users || []).length;
-  const badgeLabel = lvl === "safe" ? "Safe"
-    : lvl === "alert" ? "Flagged"
-    : "Watching";
-  const card = document.createElement("div");
-  card.className = `gl-card env ${lvl}`;
-  card.setAttribute("role", "button");
-  card.setAttribute("tabindex", "0");
-  card.setAttribute(
-    "aria-label",
-    `${badgeLabel} — ${platformLabel(e.platform)} environment. Click to open analysis.`,
-  );
-  const openDetail = () => {
-    markSeen(alertId("environment", e));
-    ui.selection = { kind: "environment", platform: e.platform, context: e.context };
-    render();
-  };
-  card.addEventListener("click", openDetail);
-  card.addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); openDetail(); }
-  });
-
-  const duration = (e.first_seen && e.last_seen)
-    ? prettyDuration((new Date(e.last_seen).getTime() - new Date(e.first_seen).getTime()) / 1000)
-    : "";
-  const metaParts = [];
-  if (e.content_type) metaParts.push(String(e.content_type).replace(/_/g, " "));
-  if (e.user_count) metaParts.push(`${e.user_count} user${e.user_count === 1 ? "" : "s"}`);
-  if (duration && duration !== "0s") metaParts.push(duration);
-  if (pCount > 0) metaParts.push(`${pCount} tracked`);
-  const meta = metaParts.join(" · ");
-
-  const summary = e.content_summary
-    ? e.content_summary.split(".")[0].slice(0, 96)
-    : "";
-
-  const badgeCls = lvl === "safe" ? "safe" : lvl === "alert" ? "alert" : "warning";
-
-  card.innerHTML = `
-    <div class="gl-tile env ${fam}" aria-hidden="true">${platformLogo(fam)}</div>
-    <div class="gl-card-body">
-      <div class="gl-card-head">
-        <span class="gl-card-name">${escapeHtml(platformLabel(e.platform))}</span>
-        <span class="gl-card-kind" title="Shared space">Place</span>
-        <span class="gl-status-badge ${badgeCls}">${badgeLabel}</span>
-      </div>
-      <div class="gl-card-meta">${escapeHtml(meta)}</div>
-      ${summary ? `<div class="gl-card-note ${lvl}">${escapeHtml(summary)}</div>` : ""}
-    </div>`;
-  return card;
-}
-
-function safeGroup(items) {
-  // Collapse every safe activity into a single reassuring row. Shows up
-  // to 4 tokens with a person/place marker so the legend stays legible.
-  const wrap = document.createElement("div");
-  wrap.className = "gl-card-safe-group";
-  const tokens = items.slice(0, 4).map((it) => {
-    const label = it.kind === "conversation"
-      ? it.data.participant
-      : platformLabel(it.data.platform);
-    const markCls = it.kind === "conversation" ? "circle" : "square";
-    return `<span class="gl-safe-tok"><span class="gl-safe-mark ${markCls}"></span>${escapeHtml(label)}</span>`;
-  });
-  const overflow = items.length > tokens.length
-    ? `<span class="gl-safe-tok more">+${items.length - tokens.length} more</span>` : "";
-  wrap.innerHTML = `
-    <div class="gl-tile ok" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5L10 17L19 8"/></svg>
-    </div>
-    <div class="gl-card-body">
-      <div class="gl-card-head">
-        <span class="gl-card-name">${items.length} safe activit${items.length === 1 ? "y" : "ies"}</span>
-        <span class="gl-status-badge safe">Safe</span>
-      </div>
-      <div class="gl-safe-list">${tokens.join("")}${overflow}</div>
-    </div>`;
-  return wrap;
 }
 
 function shortNarrative(c) {
@@ -827,7 +726,7 @@ function render() {
   ]).size;
   $("statAlerts").textContent = Number(snapshot.alert_total ?? 0);
 
-  renderActivity(convs, envs);
+  renderActivity(convs);
 
   // Right — session / conversation / environment
   if (ui.selection) {
