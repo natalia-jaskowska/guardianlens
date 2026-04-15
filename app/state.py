@@ -63,6 +63,7 @@ class MonitorWorker:
         self._latest_platform: str | None = None
         self._latest_conv_ids: list[int] = []
         self._scan_count: int = 0
+        self._session_peak: str = "safe"
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ lifecycle
@@ -140,6 +141,18 @@ class MonitorWorker:
     def latest_conv_ids(self) -> list[int]:
         with self._lock:
             return list(self._latest_conv_ids)
+
+    @property
+    def session_peak(self) -> str:
+        with self._lock:
+            return self._session_peak
+
+    def bump_peak(self, level: str) -> None:
+        """Raise the session high-water mark if ``level`` is worse."""
+        order = {"safe": 0, "caution": 1, "warning": 2, "alert": 3, "critical": 4}
+        with self._lock:
+            if order.get(level, 0) > order.get(self._session_peak, 0):
+                self._session_peak = level
 
     # ------------------------------------------------------------------ thread body
 
@@ -226,6 +239,7 @@ def _build_session_narrative(
     conversations: list[dict],
     duration_s: float,
     alerts_count: int,
+    peak: str = "safe",
 ) -> dict[str, Any]:
     """Build the right-panel session overview narrative."""
     non_safe = [
@@ -310,6 +324,8 @@ def _build_session_narrative(
         "tone": tone,
         "monitored": _pretty_duration(duration_s),
         "platforms_count": len(platforms_seen),
+        "conversations_count": len(conversations),
+        "peak": peak,
         "safe_rate": safe_rate,
         "concerns": concerns,
         "safe_summary": safe_summary,
@@ -405,6 +421,11 @@ class AppState:
         )
         totals["alerts"] = alerting_count
 
+        # Update session high-water mark.
+        for c in conv_list:
+            self.worker.bump_peak(c["threat_level"])
+        peak = self.worker.session_peak
+
         # Live capture card reflects the LATEST frame, not the overall worst.
         # Pick the worst-level conversation from the most recently processed
         # screenshot (the pipeline returned its IDs).
@@ -461,6 +482,7 @@ class AppState:
                 conv_list,
                 self.worker.session_seconds,
                 self.database.total_alert_count(),
+                peak=peak,
             ),
             "privacy": {
                 "network": self.network_report,

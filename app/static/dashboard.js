@@ -320,12 +320,10 @@ function renderCapture(snapshot) {
   text.textContent = cls === "alert"
     ? (catLabel ? `Alert · ${catLabel}` : "Alert")
     : cls === "warn" ? (catLabel ? `Concerning · ${catLabel}` : "Concerning") : "All clear";
-  const reasonSnippet = (latest.reasoning || "").slice(0, 72);
-  const inf = typeof latest.inference_seconds === "number"
-    ? ` · ${latest.inference_seconds.toFixed(1)}s` : "";
-  sub.textContent = latest.platform
-    ? `${String(latest.platform).slice(0, 36)}${inf}${reasonSnippet ? " — " + reasonSnippet : ""}`
-    : reasonSnippet;
+  // Sub-line: short summary only (or fallback to platform). The full
+  // narrative is on the conversation card; here we want one short hint.
+  sub.textContent = latest.reasoning || latest.platform || "";
+  sub.title = latest.reasoning || "";
   // Blink the status dot only when the screenshot actually changes,
   // not on every SSE tick.
   const frameKey = latest.screenshot_url || latest.timestamp || "";
@@ -344,32 +342,52 @@ function renderSessionOverview(snapshot) {
   const convs = snapshot.conversations || [];
   const envs = snapshot.environments || [];
 
-  // Hero
+  // Hero — tone class also applied to the hero block for background gradient.
+  const toneCls = narr.tone === "alert" ? "alert" : narr.tone === "warning" ? "warn" : "";
   const hero = $("overviewHero");
   const title = $("heroTitle");
   const sub = $("heroSub");
-  title.className = "gl-hero-title " + (narr.tone === "alert" ? "alert" : narr.tone === "warning" ? "warn" : "");
-  sub.className = "gl-hero-sub " + (narr.tone === "alert" ? "alert" : narr.tone === "warning" ? "warn" : "");
+  hero.className = "gl-overview-hero" + (toneCls ? " " + toneCls : "");
+  title.className = "gl-hero-title " + toneCls;
+  sub.className = "gl-hero-sub " + toneCls;
   title.textContent = narr.headline || "Monitoring";
   sub.textContent = narr.subhead || "";
-  $("heroIcon").innerHTML = narr.tone === "safe"
-    ? `<svg width="30" height="30" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="14" stroke="rgba(34,197,94,0.18)" stroke-width="2"/><path d="M11 18.5L15.5 23L25 13" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-    : `<svg width="30" height="30" viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="14" stroke="rgba(239,68,68,0.25)" stroke-width="2"/><path d="M18 11v8M18 23v0.5" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/></svg>`;
+  $("heroIcon").innerHTML = toneCls === "alert"
+    ? `<svg viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="14" stroke="rgba(239,68,68,0.28)" stroke-width="1.5"/><path d="M18 11v8M18 23v0.5" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round"/></svg>`
+    : toneCls === "warn"
+      ? `<svg viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="14" stroke="rgba(234,179,8,0.28)" stroke-width="1.5"/><path d="M18 11v8M18 23v0.5" stroke="#eab308" stroke-width="2.5" stroke-linecap="round"/></svg>`
+      : `<svg viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="14" stroke="rgba(34,197,94,0.28)" stroke-width="1.5"/><path d="M11 18.5L15.5 23L25 13" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
   // Stats
   $("ovMonitored").textContent = narr.monitored || "0s";
-  $("ovPlatforms").textContent = narr.platforms_count || 0;
+  $("ovConversations").textContent = narr.conversations_count ?? 0;
   $("ovSafeRate").textContent = `${narr.safe_rate ?? 100}%`;
   $("ovSafeRate").className = "gl-stat-val gl-green";
+  const peak = (narr.peak || "safe").toUpperCase();
+  const peakEl = $("ovPeak");
+  peakEl.textContent = peak;
+  peakEl.className = "gl-stat-val gl-peak " + (
+    narr.peak === "alert" || narr.peak === "critical" ? "alert"
+    : narr.peak === "warning" ? "warn"
+    : narr.peak === "caution" ? "caution"
+    : "safe"
+  );
 
   // Narrative
   const intro = $("narrativeIntro");
   const concernsEl = $("narrativeConcerns");
   const safeEl = $("narrativeSafe");
   const total = convs.length + envs.length;
-  intro.innerHTML = total === 0
-    ? "Session in progress — nothing flagged yet."
-    : `Your child spent <b>${narr.monitored}</b> across <b>${narr.platforms_count} platform${narr.platforms_count === 1 ? "" : "s"}</b>.${narr.concerns && narr.concerns.length ? " " + narr.concerns.length + " concern" + (narr.concerns.length === 1 ? "" : "s") + " detected:" : ""}`;
+  if (total === 0) {
+    intro.innerHTML = "Session in progress — nothing flagged yet.";
+  } else {
+    const convCount = convs.length;
+    const convText = `${convCount} conversation${convCount === 1 ? "" : "s"}`;
+    const concernText = narr.concerns && narr.concerns.length
+      ? ` · <b class="gl-intro-flag">${narr.concerns.length} concern${narr.concerns.length === 1 ? "" : "s"}</b>`
+      : "";
+    intro.innerHTML = `Monitored for <b>${narr.monitored}</b> · ${convText}${concernText}`;
+  }
 
   concernsEl.innerHTML = "";
   for (const c of narr.concerns || []) {
@@ -382,24 +400,31 @@ function renderSessionOverview(snapshot) {
     concernsEl.appendChild(row);
   }
 
-  // Safe activities — prefer structured data (with person/platform
-  // visual markers) over the raw comma string. A person gets a small
-  // circle dot, a platform gets a small square, matching the left-panel
-  // legend so the glyph is learnable.
+  // Safe activities — modern chip row. Header text adapts to whether
+  // there are also concerns (so we don't say "All clear" alongside
+  // a "Concerning patterns" hero).
   if (narr.safe_count > 0) {
-    safeEl.innerHTML = "Safe activities: ";
     const safeConvs = (snapshot.conversations || []).filter((c) => c.threat_level === "safe");
-    const safeEnvs = (snapshot.environments || []).filter((e) => e.overall_safety === "safe");
-    const tokens = [];
-    safeConvs.slice(0, 4).forEach((c) => {
-      tokens.push(`<span class="gl-safe-tag"><span class="gl-safe-mark circle"></span>${escapeHtml(c.participant)} <em>${escapeHtml(c.platform)}</em></span>`);
+    const hasConcerns = (narr.concerns || []).length > 0;
+    const headerLabel = hasConcerns
+      ? `${narr.safe_count} other${narr.safe_count === 1 ? "" : "s"} look safe`
+      : "All clear";
+    const tokens = safeConvs.slice(0, 6).map((c) => {
+      const fam = platformFamily(c.platform);
+      const names = (c.participants && c.participants.length > 0) ? c.participants : [c.participant];
+      const label = names.slice(0, 2).join(", ") + (names.length > 2 ? ` +${names.length - 2}` : "");
+      return `<span class="gl-safe-chip"><span class="gl-safe-chip-dot ${fam}"></span>${escapeHtml(label)}</span>`;
     });
-    safeEnvs.slice(0, 4).forEach((e) => {
-      tokens.push(`<span class="gl-safe-tag"><span class="gl-safe-mark square ${platformFamily(e.platform)}"></span>${escapeHtml(e.platform)}</span>`);
-    });
-    safeEl.innerHTML += tokens.join("");
+    const overflow = safeConvs.length > 6
+      ? `<span class="gl-safe-chip more">+${safeConvs.length - 6}</span>` : "";
+    safeEl.innerHTML = `
+      <div class="gl-safe-header">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4.5" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>${escapeHtml(headerLabel)}</span>
+      </div>
+      <div class="gl-safe-chips">${tokens.join("")}${overflow}</div>`;
   } else {
-    safeEl.textContent = total > 0 ? "No fully-safe activities so far." : "";
+    safeEl.innerHTML = "";
   }
 
   // Actions
@@ -436,8 +461,12 @@ function renderConversationDetail(snapshot, sel) {
   const title = shown ? shown + extra : "Unknown";
 
   const avatar = $("convAvatar");
-  avatar.className = `gl-avatar-circle ${lvl}`;
-  avatar.textContent = initials(names[0] || "?");
+  // Brand color comes from gl-tile; severity is shown via the outer ring
+  // styled by the data-tone attribute (see CSS).
+  avatar.className = `gl-avatar-circle gl-tile ${fam}`;
+  avatar.dataset.tone = lvl;
+  avatar.innerHTML = platformLogo(fam);
+  avatar.title = platformLabel(c.platform);
 
   const name = $("convName");
   name.className = "gl-detail-name " + (lvl === "safe" ? "safe" : lvl);
@@ -446,8 +475,7 @@ function renderConversationDetail(snapshot, sel) {
 
   const sub = $("convSub");
   const ago = c.last_seen ? timeAgo(c.last_seen) : "";
-  const platformTag = `<span class="gl-platform-chip ${fam}">${platformLetters[fam] || ""}</span>`;
-  sub.innerHTML = `${platformTag}${escapeHtml(c.platform)}${ago ? " · " + ago : ""}`;
+  sub.textContent = ago;
 
   const conf = $("convConfidence");
   conf.className = "gl-detail-confidence " + (lvl === "safe" ? "safe" : lvl);
@@ -737,12 +765,6 @@ function render() {
   renderCapture(snapshot);
   const convs = snapshot.conversations || [];
   const envs = snapshot.environments || [];
-  $("statScans").textContent = snapshot.metrics?.screenshots ?? 0;
-  $("statActivities").textContent = convs.length + envs.length;
-  $("statPlatforms").textContent = new Set([
-    ...convs.map((c) => c.platform), ...envs.map((e) => e.platform)
-  ]).size;
-  $("statAlerts").textContent = Number(snapshot.alert_total ?? 0);
 
   renderActivity(convs);
 
@@ -764,8 +786,8 @@ function render() {
   const priv = snapshot.privacy || {};
   const net = priv.network || {};
   $("privacySub").textContent = net.ollama_local
-    ? `· 0 bytes to cloud · ${net.ollama_host || ""}`
-    : `· NOT LOCAL — ${net.ollama_host || "?"}`;
+    ? `0 bytes to cloud`
+    : `NOT LOCAL — ${net.ollama_host || "?"}`;
 
   // Auto-show State 2 for the newest alerting conversation when no selection yet.
   // Key includes threat_level so an escalation (caution→alert on the same
@@ -848,7 +870,7 @@ function renderAlertsMenu(snapshot, items) {
         <div class="gl-alert-icon ${lvl}">${initials(names[0] || "?")}</div>
         <div class="gl-alert-main">
           <div class="gl-alert-top ${lvl}"><span class="gl-alert-name" title="${escapeHtml(names.join(", "))}">${escapeHtml(title)}</span><span class="gl-alert-time">${escapeHtml(firstAgo || c.platform)}</span></div>
-          <div class="gl-alert-sub">${escapeHtml(c.platform)} — ${escapeHtml(shortNarrative(c))}</div>
+          <div class="gl-alert-sub">${escapeHtml(shortNarrative(c))}</div>
         </div>`;
       row.addEventListener("click", () => {
         markSeen(key);

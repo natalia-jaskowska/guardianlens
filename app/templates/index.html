@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{{ title }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="/static/dashboard.css">
 </head>
 <body>
@@ -67,22 +70,15 @@
         </div>
       </div>
 
-      <div class="gl-stats-row">
-        <div class="gl-stat"><div class="gl-stat-val" id="statScans">0</div><div class="gl-stat-lbl">scans</div></div>
-        <div class="gl-stat"><div class="gl-stat-val" id="statActivities">0</div><div class="gl-stat-lbl">activities</div></div>
-        <div class="gl-stat"><div class="gl-stat-val" id="statPlatforms">0</div><div class="gl-stat-lbl">platforms</div></div>
-        <div class="gl-stat gl-stat-alert"><div class="gl-stat-val" id="statAlerts">0</div><div class="gl-stat-lbl">alerts</div></div>
-      </div>
-
       <div class="gl-section-label">Activity</div>
       <div class="gl-activity" id="activityList">
         <div class="gl-empty">Monitoring — no activity yet</div>
       </div>
 
       <div class="gl-privacy">
-        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-        <span class="gl-privacy-main">Fully local</span>
-        <span class="gl-privacy-sub" id="privacySub">· 0 bytes to cloud</span>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <span class="gl-privacy-main">On-device</span>
+        <span class="gl-privacy-sub" id="privacySub">0 bytes sent to cloud</span>
         <span class="gl-privacy-pill">Private</span>
       </div>
     </section>
@@ -97,10 +93,11 @@
           <div class="gl-hero-title" id="heroTitle">Monitoring</div>
           <div class="gl-hero-sub" id="heroSub">Starting up…</div>
         </div>
-        <div class="gl-stats-row gl-stats-3">
+        <div class="gl-stats-row gl-stats-4">
           <div class="gl-stat"><div class="gl-stat-val" id="ovMonitored">0s</div><div class="gl-stat-lbl">monitored</div></div>
-          <div class="gl-stat"><div class="gl-stat-val" id="ovPlatforms">0</div><div class="gl-stat-lbl">platforms</div></div>
+          <div class="gl-stat"><div class="gl-stat-val" id="ovConversations">0</div><div class="gl-stat-lbl">conversations</div></div>
           <div class="gl-stat"><div class="gl-stat-val gl-green" id="ovSafeRate">100%</div><div class="gl-stat-lbl">safe rate</div></div>
+          <div class="gl-stat"><div class="gl-stat-val" id="ovPeak">—</div><div class="gl-stat-lbl">peak</div></div>
         </div>
         <div class="gl-section-label">Session summary</div>
         <div class="gl-narrative-card">
@@ -108,25 +105,19 @@
           <div class="gl-narrative-concerns" id="narrativeConcerns"></div>
           <div class="gl-narrative-safe" id="narrativeSafe"></div>
         </div>
-        <div class="gl-section-label">What to do</div>
+        <div class="gl-section-label">Recommendations</div>
         <div class="gl-actions-card">
           <div class="gl-actions-list" id="actionsList"></div>
-          <div class="gl-actions-foot">AI analysis only. No chat content shared.</div>
+          <div class="gl-actions-foot">AI-generated. No chat content leaves this device.</div>
         </div>
-        <div class="gl-hint">Select any activity on the left to view full analysis</div>
-        <div class="gl-privacy">
-          <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-          <span class="gl-privacy-main">Fully local</span>
-          <span class="gl-privacy-sub">· 0 bytes to cloud</span>
-          <span class="gl-privacy-pill">Private</span>
-        </div>
+        <div class="gl-hint">Click any activity on the left for full analysis</div>
       </div>
 
       <!-- STATE 2 -->
       <div class="gl-state" id="stateConversation" hidden>
         <button class="gl-back" data-back>
-          <svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8L10 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Session overview
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8L10 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Back to overview
         </button>
         <div class="gl-detail-header">
           <div class="gl-avatar-circle" id="convAvatar">—</div>
@@ -147,17 +138,18 @@
         <div class="gl-arc" id="convArc"></div>
         <div class="gl-section-label">AI reasoning</div>
         <pre class="gl-reasoning" id="convReasoning">—</pre>
+        <div class="gl-section-label">Recommendations</div>
         <div class="gl-actions-card">
           <div class="gl-actions-list" id="convActions"></div>
-          <div class="gl-actions-foot">No chat content shared.</div>
+          <div class="gl-actions-foot">AI-generated. No chat content leaves this device.</div>
         </div>
       </div>
 
       <!-- STATE 3 -->
       <div class="gl-state" id="stateEnvironment" hidden>
         <button class="gl-back" data-back>
-          <svg width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8L10 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Session overview
+          <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8L10 12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Back to overview
         </button>
         <div class="gl-detail-header">
           <div class="gl-avatar-square" id="envAvatar">—</div>
