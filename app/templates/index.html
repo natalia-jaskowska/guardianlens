@@ -74,13 +74,7 @@
         <div class="gl-stat gl-stat-alert"><div class="gl-stat-val" id="statAlerts">0</div><div class="gl-stat-lbl">alerts</div></div>
       </div>
 
-      <div class="gl-section-head">
-        <div class="gl-section-label">Activity</div>
-        <div class="gl-legend">
-          <span class="gl-legend-item"><span class="gl-dot-circle"></span>person</span>
-          <span class="gl-legend-item"><span class="gl-dot-square"></span>platform</span>
-        </div>
-      </div>
+      <div class="gl-section-label">Activity</div>
       <div class="gl-activity" id="activityList">
         <div class="gl-empty">Monitoring — no activity yet</div>
       </div>
@@ -190,6 +184,13 @@
     </section>
   </div>
 </div>
+
+<!-- Lightbox overlay -->
+<div class="gl-lightbox" id="lightbox" hidden>
+  <button class="gl-lightbox-close" id="lightboxClose" type="button" aria-label="Close">×</button>
+  <img class="gl-lightbox-img" id="lightboxImg" alt="">
+</div>
+
 <script src="/static/dashboard.js"></script>
 </body>
 </html>

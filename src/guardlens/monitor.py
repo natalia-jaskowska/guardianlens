@@ -122,8 +122,22 @@ def _watch_folder_loop(config: MonitorConfig) -> Iterator[Path]:
             f"watch_folder {watch} has no .jpg/.jpeg/.png/.webp files"
         )
 
+    # Group by scenario prefix (everything before the trailing _NNNN suffix),
+    # then shuffle the group order — so different scenarios interleave
+    # instead of processing all 01_safe_* frames before 02_grooming_*.
+    # Within each group, frame order is preserved (they tell a progression).
+    import random
+    import re
+    groups: dict[str, list[Path]] = {}
+    for p in images:
+        key = re.sub(r"_\d+$", "", p.stem)
+        groups.setdefault(key, []).append(p)
+    group_order = list(groups.keys())
+    random.shuffle(group_order)
+    shuffled = [img for key in group_order for img in groups[key]]
+
     while True:
-        for source in images:
+        for source in shuffled:
             target = _link_into_screenshots_dir(source, config.screenshots_dir)
             yield target
             time.sleep(config.capture_interval_seconds)

@@ -383,6 +383,12 @@ class ConversationPipeline:
             logger.warning("Model did not call update_conversation_status — safe fallback.")
             return ConversationStatus()
 
+        # Some models return confidence as a fraction (0.99) instead of
+        # a percentage (99). Normalize: anything ≤ 1.0 is treated as 0-1.
+        conf = args.get("confidence")
+        if isinstance(conf, (int, float)) and 0 < conf <= 1.0:
+            args["confidence"] = conf * 100
+
         try:
             return ConversationStatus.model_validate(args)
         except Exception as exc:
@@ -499,3 +505,5 @@ def _naive_merge(
             seen.add(key)
             result.append(m)
     return result
+
+

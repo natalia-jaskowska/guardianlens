@@ -61,6 +61,7 @@ class MonitorWorker:
         self._paused_total: float = 0.0
         self._latest_screenshot: str | None = None
         self._latest_platform: str | None = None
+        self._latest_conv_ids: list[int] = []
         self._scan_count: int = 0
         self._lock = threading.Lock()
 
@@ -135,6 +136,11 @@ class MonitorWorker:
         with self._lock:
             return self._latest_platform
 
+    @property
+    def latest_conv_ids(self) -> list[int]:
+        with self._lock:
+            return list(self._latest_conv_ids)
+
     # ------------------------------------------------------------------ thread body
 
     def _run(self) -> None:
@@ -161,6 +167,7 @@ class MonitorWorker:
             with self._lock:
                 self._scan_count += 1
                 self._latest_screenshot = str(screenshot_path)
+                self._latest_conv_ids = list(conv_ids)
                 if conv_ids:
                     row = self._database.get_conversation(conv_ids[0])
                     if row:
@@ -178,6 +185,15 @@ class MonitorWorker:
 # ====================================================================== helpers
 
 
+def _participant_label(c: dict) -> str:
+    """Format the participant list like the activity card — up to 3, +N overflow."""
+    names = c.get("participants") or ([c["participant"]] if c.get("participant") else [])
+    if not names:
+        return "Unknown"
+    shown = ", ".join(names[:3])
+    return f"{shown} +{len(names) - 3}" if len(names) > 3 else shown
+
+
 def _serialize_db_conversation(row: Any) -> dict[str, Any]:
     """Flatten a conversations DB row into the dashboard JSON shape."""
     status = json.loads(row["status_json"]) if row["status_json"] else {}
@@ -186,6 +202,7 @@ def _serialize_db_conversation(row: Any) -> dict[str, Any]:
     return {
         "conversation_id": row["id"],
         "participant": participants[0] if participants else "Unknown",
+        "participants": participants,
         "platform": row["platform"],
         "source": "direct",
         "first_seen": row["first_seen"],
@@ -196,7 +213,9 @@ def _serialize_db_conversation(row: Any) -> dict[str, Any]:
         "grooming_stage": status.get("grooming_stage"),
         "indicators": status.get("indicators", []),
         "confidence": status.get("confidence", 0),
+        "short_summary": status.get("short_summary", ""),
         "narrative": status.get("narrative", ""),
+        "reasoning": status.get("reasoning", ""),
         "alert_sent": False,
         "telegram_delivered": False,
         "escalation": None,
@@ -219,7 +238,7 @@ def _build_session_narrative(
     for c in non_safe:
         concerns.append({
             "kind": "conversation",
-            "name": c["participant"],
+            "name": _participant_label(c),
             "platform": c["platform"],
             "level": c["threat_level"],
             "category": c["category"],
@@ -358,6 +377,9 @@ class AppState:
         """
         summary = self.database.session_summary() if self.worker.is_running else empty_summary()
         totals = session_totals(summary)
+        # Override scan count with the worker's real screenshot count —
+        # the analyses table only stores fired alerts now, not every frame.
+        totals["screenshots"] = self.worker.scan_count
 
         session_id = self.database.session_id if self.worker.is_running else None
         session_health = build_session_health(
@@ -377,7 +399,22 @@ class AppState:
 
         latest_screenshot = self.worker.latest_screenshot
         latest_platform = self.worker.latest_platform
-        worst = _worst_level(conv_list)
+        alerting_count = sum(
+            1 for c in conv_list
+            if c["threat_level"] in {"warning", "alert", "critical"}
+        )
+        totals["alerts"] = alerting_count
+
+        # Live capture card reflects the LATEST frame, not the overall worst.
+        # Pick the worst-level conversation from the most recently processed
+        # screenshot (the pipeline returned its IDs).
+        latest_conv_ids = set(self.worker.latest_conv_ids)
+        latest_convs = [c for c in conv_list if c.get("conversation_id") in latest_conv_ids]
+        latest_worst = _worst_level(latest_convs) if latest_convs else "safe"
+        latest_worst_conv = next(
+            (c for c in latest_convs if c["threat_level"] == latest_worst and latest_worst != "safe"),
+            None,
+        )
 
         latest_payload = None
         if latest_screenshot:
@@ -386,11 +423,11 @@ class AppState:
                 "screenshot_path": latest_screenshot,
                 "screenshot_url": f"/screenshots/{filename}",
                 "platform": latest_platform or "Unknown",
-                "threat_level": worst,
-                "reasoning": "",
-                "confidence": 0,
-                "indicators_found": [],
-                "category": "none",
+                "threat_level": latest_worst,
+                "reasoning": latest_worst_conv["short_summary"] if latest_worst_conv else "",
+                "confidence": latest_worst_conv["confidence"] if latest_worst_conv else 0,
+                "indicators_found": latest_worst_conv["indicators"] if latest_worst_conv else [],
+                "category": latest_worst_conv["category"] if latest_worst_conv else "none",
             }
 
         return {
@@ -408,12 +445,12 @@ class AppState:
             "safe_streak": 0,
             "session_health": session_health,
             "alert_history": alert_history,
-            "alert_total": self.database.total_alert_count(),
+            "alert_total": alerting_count,
             "summary": summary,
             "timeline": [],
             "latest": latest_payload,
             "latest_alert": None,
-            "is_alert": worst in {"alert", "critical"},
+            "is_alert": latest_worst in {"alert", "critical"},
             "session_verdict": None,
             "conversation_size": sum(c["message_count"] for c in conv_list),
             "conversation_pending": False,

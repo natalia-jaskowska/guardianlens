@@ -44,6 +44,7 @@ const ui = {
   snapshot: null,
   selection: null,
   lastAutoAlertKey: null,
+  lastFrameKey: null,
   seenAlerts: loadSeen(),
 };
 
@@ -164,9 +165,6 @@ function sortByDanger(items, levelKey) {
 function renderActivity(conversations) {
   const list = $("activityList");
   const sorted = [...conversations].sort((a, b) => {
-    const order = { alert: 0, critical: 0, warning: 1, caution: 2, safe: 3 };
-    const d = (order[a.threat_level] ?? 9) - (order[b.threat_level] ?? 9);
-    if (d !== 0) return d;
     return new Date(b.last_seen || 0) - new Date(a.last_seen || 0);
   });
 
@@ -195,9 +193,14 @@ function convCard(c) {
   const fam = platformFamily(c.platform);
   const badge = statusBadge(rawLvl);
   const card = document.createElement("div");
-  card.className = `gl-card conv ${lvl}`;
+  const isSelected = ui.selection
+    && ui.selection.kind === "conversation"
+    && ui.selection.platform === c.platform
+    && ui.selection.participant === c.participant;
+  card.className = `gl-card conv ${lvl}${isSelected ? " selected" : ""}`;
   card.setAttribute("role", "button");
   card.setAttribute("tabindex", "0");
+  if (isSelected) card.setAttribute("aria-current", "true");
   card.setAttribute(
     "aria-label",
     `${badge.label} — ${c.participant} on ${platformLabel(c.platform)}. Click to open analysis.`,
@@ -218,14 +221,10 @@ function convCard(c) {
   const promoted = c.source && c.source.startsWith("promoted_")
     ? `<span class="gl-chip-promoted" title="Promoted from a public space">promoted</span>` : "";
 
-  // Platform line reads as a proper sentence fragment: "Instagram DM",
-  // "Discord", "Minecraft chat". Duration uses first_seen→last_seen.
-  const duration = (c.first_seen && c.last_seen)
-    ? prettyDuration((new Date(c.last_seen).getTime() - new Date(c.first_seen).getTime()) / 1000)
-    : "";
+  // Platform + recency. "X ago" answers "is this still happening?".
+  const ago = c.last_seen ? timeAgo(c.last_seen) : "";
   const metaParts = [platformLabel(c.platform)];
-  if (c.message_count) metaParts.push(`${c.message_count} msg${c.message_count === 1 ? "" : "s"}`);
-  if (duration && duration !== "0s") metaParts.push(duration);
+  if (ago) metaParts.push(ago);
   if (pct && lvl !== "safe") metaParts.push(`${pct}% confidence`);
   const meta = metaParts.join(" · ");
 
@@ -234,13 +233,20 @@ function convCard(c) {
   const alertPulse = lvl === "alert"
     ? '<span class="gl-badge-dot" aria-hidden="true"></span>' : "";
 
+  const names = (c.participants && c.participants.length > 0)
+    ? c.participants
+    : (c.participant ? [c.participant] : []);
+  const shown = names.slice(0, 3).join(", ");
+  const extra = names.length > 3 ? ` +${names.length - 3}` : "";
+  const title = shown ? shown + extra : "Unknown";
+
   card.innerHTML = `
     <div class="gl-tile ${fam}" aria-hidden="true">${platformLogo(fam)}</div>
     <div class="gl-card-body">
       <div class="gl-card-head">
-        <span class="gl-card-name">${escapeHtml(c.participant)}</span>
+        <span class="gl-card-name" title="${escapeHtml(names.join(", "))}">${escapeHtml(title)}</span>
         ${promoted}
-        <span class="gl-status-badge ${badge.cls}">${alertPulse}${badge.label}</span>
+        <span class="gl-status-badge ${badge.cls}">${alertPulse}${badge.label}${c.category && c.category !== "none" ? ` · ${prettyIndicator(c.category)}` : ""}</span>
       </div>
       <div class="gl-card-meta">${escapeHtml(meta)}</div>
       ${snippet ? `<div class="gl-card-note ${lvl}">${escapeHtml(snippet)}</div>` : ""}
@@ -249,7 +255,8 @@ function convCard(c) {
 }
 
 function shortNarrative(c) {
-  if (c.narrative) return c.narrative.split(".")[0].slice(0, 80);
+  if (c.short_summary) return c.short_summary;
+  if (c.narrative) return c.narrative.split(".")[0].slice(0, 140);
   if (c.indicators && c.indicators.length > 0) {
     return `${c.category} — ${c.indicators.slice(0, 2).join(", ")}`;
   }
@@ -295,7 +302,7 @@ function renderCapture(snapshot) {
         ${rows}
       </div>`;
   } else if (latest.screenshot_url) {
-    frame.innerHTML = `<img src="${latest.screenshot_url}" alt="live capture">`;
+    frame.innerHTML = `<img src="${latest.screenshot_url}" alt="live capture" class="gl-capture-img" data-lightbox="1">`;
   } else {
     frame.innerHTML = `<div class="gl-capture-empty">No preview available</div>`;
   }
@@ -309,20 +316,25 @@ function renderCapture(snapshot) {
   text.className = `gl-status-text ${cls === "safe" ? "" : cls}`;
   sub.className = `gl-status-sub ${cls === "safe" ? "" : cls}`;
 
+  const catLabel = (latest.category && latest.category !== "none") ? latest.category : "";
   text.textContent = cls === "alert"
-    ? `Alert · ${latest.category || "threat"}`
-    : cls === "warn" ? `Concerning · ${latest.category || "threat"}` : "All clear";
+    ? (catLabel ? `Alert · ${catLabel}` : "Alert")
+    : cls === "warn" ? (catLabel ? `Concerning · ${catLabel}` : "Concerning") : "All clear";
   const reasonSnippet = (latest.reasoning || "").slice(0, 72);
   const inf = typeof latest.inference_seconds === "number"
     ? ` · ${latest.inference_seconds.toFixed(1)}s` : "";
   sub.textContent = latest.platform
     ? `${String(latest.platform).slice(0, 36)}${inf}${reasonSnippet ? " — " + reasonSnippet : ""}`
     : reasonSnippet;
-  // Blink the status dot on each new frame so the operator sees activity
-  // even during long safe stretches.
-  statusEl.classList.remove("tick");
-  void statusEl.offsetWidth; // reflow to restart the animation
-  statusEl.classList.add("tick");
+  // Blink the status dot only when the screenshot actually changes,
+  // not on every SSE tick.
+  const frameKey = latest.screenshot_url || latest.timestamp || "";
+  if (ui.lastFrameKey !== frameKey) {
+    ui.lastFrameKey = frameKey;
+    statusEl.classList.remove("tick");
+    void statusEl.offsetWidth;
+    statusEl.classList.add("tick");
+  }
   ago.textContent = timeAgo(latest.timestamp);
 }
 
@@ -416,20 +428,26 @@ function renderConversationDetail(snapshot, sel) {
   const lvl = levelClass(c.threat_level);
   const fam = platformFamily(c.platform);
 
+  const names = (c.participants && c.participants.length > 0)
+    ? c.participants
+    : (c.participant ? [c.participant] : []);
+  const shown = names.slice(0, 3).join(", ");
+  const extra = names.length > 3 ? ` +${names.length - 3}` : "";
+  const title = shown ? shown + extra : "Unknown";
+
   const avatar = $("convAvatar");
   avatar.className = `gl-avatar-circle ${lvl}`;
-  avatar.textContent = initials(c.participant);
+  avatar.textContent = initials(names[0] || "?");
 
   const name = $("convName");
   name.className = "gl-detail-name " + (lvl === "safe" ? "safe" : lvl);
-  name.textContent = c.participant;
+  name.textContent = title;
+  name.title = names.join(", ");
 
   const sub = $("convSub");
-  const duration = prettyDuration(
-    (new Date(c.last_seen).getTime() - new Date(c.first_seen).getTime()) / 1000
-  );
+  const ago = c.last_seen ? timeAgo(c.last_seen) : "";
   const platformTag = `<span class="gl-platform-chip ${fam}">${platformLetters[fam] || ""}</span>`;
-  sub.innerHTML = `${platformTag}${escapeHtml(c.platform)} · ${c.message_count || 0} msgs · ${duration}`;
+  sub.innerHTML = `${platformTag}${escapeHtml(c.platform)}${ago ? " · " + ago : ""}`;
 
   const conf = $("convConfidence");
   conf.className = "gl-detail-confidence " + (lvl === "safe" ? "safe" : lvl);
@@ -439,11 +457,16 @@ function renderConversationDetail(snapshot, sel) {
   threat.className = `gl-threat-summary ${lvl === "safe" ? "safe" : lvl === "warn" ? "warn" : ""}`;
   const stage = c.grooming_stage || "none";
   const stageIdx = ["none","targeting","trust_building","isolation","desensitization","maintaining_control"].indexOf(stage);
-  $("convThreatTitle").className = "gl-threat-title " + (lvl === "safe" ? "safe" : lvl === "warn" ? "warn" : "");
-  $("convThreatTitle").textContent = stage !== "none" && stageIdx > 0
-    ? `${c.category} — stage ${stageIdx}/5`
-    : `${c.category || "observed"}`;
-  $("convThreatBody").textContent = c.narrative || "No narrative yet.";
+  const titleEl = $("convThreatTitle");
+  titleEl.className = "gl-threat-title " + (lvl === "safe" ? "safe" : lvl === "warn" ? "warn" : "");
+  if (stage !== "none" && stageIdx > 0) {
+    titleEl.textContent = `${c.category} — stage ${stageIdx}/5`;
+  } else if (c.category && c.category !== "none") {
+    titleEl.textContent = c.category;
+  } else {
+    titleEl.textContent = lvl === "safe" ? "Safe" : "Observed";
+  }
+  $("convThreatBody").textContent = c.short_summary || c.narrative || "No narrative yet.";
   const bar = $("convStageBar");
   if (stageIdx > 0) {
     bar.hidden = false;
@@ -462,7 +485,7 @@ function renderConversationDetail(snapshot, sel) {
   if (indicators.length === 0) {
     const row = document.createElement("div");
     row.className = "gl-arc-item";
-    row.innerHTML = `<div class="gl-arc-dot"></div><div class="gl-arc-body"><div class="gl-arc-text">No flagged messages yet</div><div class="gl-arc-label">Safe</div></div>`;
+    row.innerHTML = `<div class="gl-arc-dot"></div><div class="gl-arc-body"><div class="gl-arc-text">No flagged messages yet</div></div>`;
     arc.appendChild(row);
   } else {
     indicators.forEach((ind, i) => {
@@ -473,26 +496,21 @@ function renderConversationDetail(snapshot, sel) {
       row.innerHTML = `
         <div class="gl-arc-dot ${dotCls}"></div>
         <div class="gl-arc-body">
-          <div class="gl-arc-text ${dotCls}">${escapeHtml(ind)}</div>
-          <div class="gl-arc-label ${dotCls}">${isAlert ? "Alert trigger" : "Indicator"}</div>
+          <div class="gl-arc-text ${dotCls}">${escapeHtml(prettyIndicator(ind))}</div>
+          ${isAlert ? '<div class="gl-arc-label alert">Alert trigger</div>' : ""}
         </div>`;
       arc.appendChild(row);
     });
   }
 
-  // Reasoning
-  const lines = [
-    `1: Platform: ${c.platform}`,
-    `2: Users: ${c.participant} → child`,
-    `3: Messages analyzed: ${c.message_count || 0}`,
-  ];
-  indicators.forEach((ind, i) => lines.push(`   → ${ind}`));
-  const esc = c.escalation;
-  if (esc && esc.escalating) {
-    lines.push(`4: Escalating — speed ${esc.speed.toFixed(2)} · highest ${esc.highest_level}`);
-  }
-  lines.push(`${lvl === "alert" ? "ALERT" : lvl.toUpperCase()} — ${c.category} — ${pct}%`);
-  $("convReasoning").textContent = lines.join("\n");
+  // AI reasoning — use the LLM's chain-of-thought directly.
+  // Fall back to narrative, then to a minimal template if neither is available.
+  const reasoningText = c.reasoning && c.reasoning.trim()
+    ? c.reasoning
+    : c.narrative && c.narrative.trim()
+      ? c.narrative
+      : `No reasoning available yet. Verdict: ${lvl.toUpperCase()} — ${c.category} — ${pct}%.`;
+  $("convReasoning").textContent = reasoningText;
 
   // Actions
   const actList = $("convActions");
@@ -818,12 +836,19 @@ function renderAlertsMenu(snapshot, items) {
     row.className = `gl-alert-item ${lvl === "safe" ? "" : lvl} ${isUnread ? "unread" : "read"}`;
     if (it.kind === "conversation") {
       const c = it.data;
+      const names = (c.participants && c.participants.length > 0)
+        ? c.participants
+        : (c.participant ? [c.participant] : []);
+      const shown = names.slice(0, 3).join(", ");
+      const extra = names.length > 3 ? ` +${names.length - 3}` : "";
+      const title = shown ? shown + extra : "Unknown";
+      const firstAgo = c.first_seen ? timeAgo(c.first_seen) : "";
       row.innerHTML = `
         ${isUnread ? '<span class="gl-alert-dot"></span>' : ""}
-        <div class="gl-alert-icon ${lvl}">${initials(c.participant)}</div>
+        <div class="gl-alert-icon ${lvl}">${initials(names[0] || "?")}</div>
         <div class="gl-alert-main">
-          <div class="gl-alert-top ${lvl}"><span class="gl-alert-name">${escapeHtml(c.participant)}</span><span class="gl-alert-time">${escapeHtml(c.platform)}</span></div>
-          <div class="gl-alert-sub">${escapeHtml(shortNarrative(c))}</div>
+          <div class="gl-alert-top ${lvl}"><span class="gl-alert-name" title="${escapeHtml(names.join(", "))}">${escapeHtml(title)}</span><span class="gl-alert-time">${escapeHtml(firstAgo || c.platform)}</span></div>
+          <div class="gl-alert-sub">${escapeHtml(c.platform)} — ${escapeHtml(shortNarrative(c))}</div>
         </div>`;
       row.addEventListener("click", () => {
         markSeen(key);
@@ -925,6 +950,12 @@ function connect() {
 }
 
 /* ---------------------------- util ---------------------------------- */
+function prettyIndicator(s) {
+  if (!s) return "";
+  const cleaned = String(s).replace(/[_\-]+/g, " ").trim();
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+}
+
 function escapeHtml(s) {
   if (s == null) return "";
   return String(s)
@@ -934,6 +965,33 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+/* ---------------------------- lightbox ------------------------------ */
+function openLightbox(src) {
+  const box = $("lightbox");
+  const img = $("lightboxImg");
+  img.src = src;
+  box.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+function closeLightbox() {
+  $("lightbox").hidden = true;
+  $("lightboxImg").src = "";
+  document.body.style.overflow = "";
+}
+document.addEventListener("click", (e) => {
+  const img = e.target.closest("[data-lightbox]");
+  if (img && img.tagName === "IMG") {
+    openLightbox(img.src);
+    return;
+  }
+  if (e.target.id === "lightbox" || e.target.id === "lightboxClose") {
+    closeLightbox();
+  }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("lightbox").hidden) closeLightbox();
+});
 
 /* ---------------------------- bootstrap ----------------------------- */
 fetch("/api/state").then((r) => r.json()).then((s) => {

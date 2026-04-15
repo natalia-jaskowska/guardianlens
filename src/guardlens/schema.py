@@ -203,6 +203,7 @@ class ConversationStatus(BaseModel):
     confidence: float = Field(0.0, ge=0.0, le=100.0)
     grooming_stage: GroomingStage = GroomingStage.NONE
     indicators: list[str] = Field(default_factory=list)
+    short_summary: str = ""
     narrative: str = ""
     reasoning: str = ""
     parent_alert_recommended: bool = False

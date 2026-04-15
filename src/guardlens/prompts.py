@@ -138,14 +138,34 @@ Call `match_conversation`.
 
 
 MERGE_MESSAGES_SYSTEM_PROMPT = """\
-You are GuardianLens merging chat message lists.
+You are GuardianLens merging chat message lists across consecutive screen
+captures. The same messages WILL appear in multiple screenshots because
+the user's chat window stays open — you MUST catch these duplicates
+even when OCR reads them slightly differently.
 
-Rules:
-1. Remove duplicates: same sender + same or nearly-same text → keep one
-2. Preserve chronological ordering: earlier messages first
-3. New messages that extend the conversation go at the end
-4. Do NOT paraphrase, summarize, or modify any message text
-5. Return the complete merged list via `merge_messages`
+AGGRESSIVE DEDUPLICATION — two messages are the SAME if ANY of:
+- Identical sender + text (trivial case)
+- Same sender + text matches after stripping punctuation and lowercasing
+- Same sender + one text is a truncation/prefix of the other
+  (e.g. "me and jake are..." vs "s and jake are..." — OCR dropped 2 chars)
+- Sender usernames differ only by a numeric/handle suffix and text matches
+  (e.g. "Em" and "Em_22" with the SAME message → same person, keep one)
+- Sender usernames differ only by trailing digits and text matches
+  (e.g. "Sammy" vs "Sammy7" with same/near-same text → same person)
+- Text differs only by OCR artifacts at start/end (leading garbage chars,
+  dropped letters, "i"→"1", "l"→"I", etc.) and senders are similar
+
+When in doubt whether two messages are duplicates: MERGE THEM.
+Better to collapse a real duplicate than to count it twice.
+
+When senders vary for the "same" message, prefer the LONGER/fuller
+username (e.g. keep "Em_22" over "Em") — it's usually the full handle.
+
+Preserve chronological ordering: earlier messages first, new messages
+that truly extend the conversation at the end. Do NOT paraphrase or
+modify any message text.
+
+Return the complete deduplicated list via `merge_messages`.
 """
 
 MERGE_MESSAGES_USER_TEMPLATE = """\
@@ -194,6 +214,21 @@ ALERT rule:
 
 You CAN revise downward if prior said ALERT but messages look like peer chat.
 You SHOULD revise upward if the concerning pattern has continued.
+
+CONFIDENCE format: the `confidence` field is a PERCENTAGE from 0 to 100
+(e.g. 85 means 85%). Never use a 0-1 fraction.
+
+SHORT_SUMMARY: must be a single line, max 20 words, plain English.
+Describe what's happening in this conversation. Examples:
+  - "Coordinating a school science project; friendly peer chat."
+  - "Adult-presenting user asking child's age, escalating to private DMs."
+  - "Group chat mocking one user repeatedly; exclusion language."
+
+REASONING: write a verbose 3-6 sentence walkthrough (up to ~150 words)
+of your thinking. Reference specific message content, dynamics, and
+patterns you observed. Explain what you considered (both for and against
+the verdict) and why you ruled things in or out. This is shown to the
+parent under "AI reasoning" — be thorough and transparent.
 """
 
 STATUS_UPDATE_USER_TEMPLATE = """\

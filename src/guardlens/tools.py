@@ -306,6 +306,10 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                     "type": "number",
                     "minimum": 0,
                     "maximum": 100,
+                    "description": (
+                        "Confidence as a PERCENTAGE from 0 to 100 "
+                        "(e.g. 85 for 85%). Do NOT use a 0-1 fraction."
+                    ),
                 },
                 "grooming_stage": {
                     "type": "string",
@@ -315,6 +319,15 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Specific indicator labels supporting this verdict.",
+                },
+                "short_summary": {
+                    "type": "string",
+                    "description": (
+                        "ONE-LINE summary of what's happening in this "
+                        "conversation — max 20 words. Parent-facing. "
+                        "Example: 'Coordinating a school science project; "
+                        "friendly peer chat about weekend plans.'"
+                    ),
                 },
                 "narrative": {
                     "type": "string",
@@ -326,8 +339,11 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                 "reasoning": {
                     "type": "string",
                     "description": (
-                        "Internal chain-of-thought: how the prior status + "
-                        "new messages led to this verdict. Audit trail only."
+                        "VERBOSE chain-of-thought walkthrough (3-6 sentences, "
+                        "up to ~150 words) explaining WHY you reached this "
+                        "verdict. Reference specific messages, dynamics, and "
+                        "patterns. Describe what you considered and ruled "
+                        "out. This is shown to the parent under 'AI reasoning'."
                     ),
                 },
                 "parent_alert_recommended": {
@@ -344,7 +360,7 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
             },
             "required": [
                 "threat_level", "category", "confidence",
-                "narrative", "reasoning",
+                "short_summary", "narrative", "reasoning",
                 "parent_alert_recommended", "certainty",
             ],
         },
