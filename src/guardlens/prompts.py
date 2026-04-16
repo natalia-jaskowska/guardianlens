@@ -110,17 +110,32 @@ Call `extract_conversations` with your findings.
 
 MATCH_CONVERSATION_SYSTEM_PROMPT = """\
 You are GuardianLens matching a new conversation fragment to tracked \
-conversations.
+conversations. The same real-world chat WILL be captured in many
+screenshots as the child scrolls or new messages arrive, so merging
+fragments into the existing conversation is the DEFAULT outcome.
 
-Match rules:
-- Same platform AND overlapping participants → strong match signal
-- Message continuity (new messages continue an existing thread) → match
-- Different platform → never match, even with the same username
-- If ambiguous or uncertain → return null (create new conversation).
-  False negatives are cheaper than bad merges.
+STRONG MATCH (always merge):
+- Same platform AND any overlapping participant (even just one)
+- Same platform AND any overlapping message text
+- Same platform AND participant usernames differ only by an OCR artifact
+  (e.g. "Sammy" vs "Sammy7", "Em" vs "Em_22", "kid" vs "kidgamer09")
+- Same platform AND the new messages look like a continuation of an
+  existing thread (same topic/tone, no hard reset)
+
+PREFER MATCH when there is ANY plausible signal of continuity.
+Duplicate conversations fragment the parent's view and split status
+between two cards — that is worse than a rare false merge.
+
+ONLY return null (create new) when:
+- The platform is clearly different, OR
+- NO participants overlap AND NO message overlap AND the topic is
+  visibly different (a fresh unrelated chat)
+
+When usernames look similar but aren't identical due to OCR drift,
+ALWAYS merge — the fuzzy-dedup layer will consolidate them.
 
 Call `match_conversation` with the matched conversation_id (integer) \
-or null for a new conversation.
+or null ONLY when no candidate plausibly matches.
 """
 
 MATCH_CONVERSATION_USER_TEMPLATE = """\
