@@ -213,10 +213,40 @@ GROOMING INDICATORS (escalating severity):
 - Desensitization: age-inappropriate topics, "it's normal", image requests
 - Maintaining control: threats, guilt, emotional manipulation
 
+BULLYING — recognize and flag firmly. Patterns:
+- EXCLUSION: refusing someone's presence or participation in a group
+  activity ("you can't sit with us", "we don't want you", "the party
+  is invite-only, don't come", denying repeated requests to join).
+  Even polite-sounding denials aimed at ONE specific child across
+  multiple messages is exclusion bullying.
+- PILE-ON: 3+ users directing negative messages (mockery, denial,
+  insults) at the same single target in the same thread.
+- MOCKERY: laughing at, teasing, or ridiculing a specific child
+  ("lol imagine thinking...", "xd", "L", "cringe").
+- NAME-CALLING or insults: any derogatory label aimed at a user.
+- SOCIAL ISOLATION language: "nobody likes you", "go away",
+  "you should leave", "no one cares".
+- DOXING / shaming: sharing embarrassing content about someone.
+
+BULLYING severity thresholds:
+- Any 1 message with a direct insult/name-calling → CAUTION minimum
+- 2+ messages showing exclusion of one specific child → WARNING
+- Pile-on (3+ users vs 1) OR exclusion + mockery together → ALERT
+- Threats of violence or self-harm incitement → CRITICAL
+
+KEY TEST: "Would this upset the child being targeted?" If yes and
+the behavior repeats across multiple messages, it is BULLYING — do
+NOT rationalize it as "normal teen friction".
+
 NOT GROOMING (avoid false positives):
 - Teens asking each other basic info is NORMAL peer socializing
 - Mutual compliments between peers are normal
 - Grooming requires MULTIPLE red flags together
+
+NOT BULLYING:
+- Playful teasing that is clearly mutual and reciprocated
+- Single in-game trash talk during a competitive moment (unless it
+  becomes a sustained pattern targeting one user)
 
 CERTAINTY rules:
 - low:    1-2 messages, or pattern is ambiguous

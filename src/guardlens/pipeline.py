@@ -132,8 +132,8 @@ class ConversationPipeline:
         screenshot_entry = {"path": str(image_path), "timestamp": now}
         screenshots = prior_screenshots + [screenshot_entry]
 
-        all_participants = list(
-            dict.fromkeys(prior_participants + fragment.participants)
+        all_participants = _dedup_participants(
+            prior_participants + fragment.participants
         )
 
         if conv_id is None:
@@ -505,5 +505,46 @@ def _naive_merge(
             seen.add(key)
             result.append(m)
     return result
+
+
+def _normalize_name(s: str) -> str:
+    """Collapse OCR variants of the same username to a single key.
+
+    Strips trailing digits, punctuation, and short letter suffixes.
+    ``Kidgamer09``, ``KidGamer09``, ``kidgamer`` all map to ``kidgamer``.
+    ``Em``, ``Em_22`` map to ``em``. ``Lyla``, ``Lyla.x`` map to ``lyla``.
+    """
+    import re
+    s = s.strip().lower()
+    # strip trailing digit suffixes with optional punctuation (Em_22, 09)
+    s = re.sub(r"[_\-\.\s]*\d+$", "", s)
+    # strip trailing ".x" / ".y" style single-letter handles (Lyla.x)
+    s = re.sub(r"[\.\-_][a-z]{1,2}$", "", s)
+    # strip trailing punctuation
+    s = re.sub(r"[\.\-_\s]+$", "", s)
+    # collapse 3+ runs of same trailing letter (Maxxx → Max)
+    s = re.sub(r"(.)\1{2,}$", r"\1", s)
+    return s
+
+
+def _dedup_participants(names: list[str]) -> list[str]:
+    """Deduplicate a participant list, keeping the longest raw variant.
+
+    Different OCR reads of the same username collapse to one entry so the
+    dashboard doesn't render "Kidgamer09, KidGamer09, kidgamer" for what
+    is really one person.
+    """
+    canonical: dict[str, str] = {}  # key → best display form
+    for raw in names:
+        name = (raw or "").strip()
+        if not name:
+            continue
+        key = _normalize_name(name)
+        if not key:
+            continue
+        existing = canonical.get(key)
+        if existing is None or len(name) > len(existing):
+            canonical[key] = name
+    return list(canonical.values())
 
 
