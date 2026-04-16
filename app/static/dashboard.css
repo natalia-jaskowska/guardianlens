@@ -1281,6 +1281,31 @@ html, body {
   border: 0.5px solid rgba(239,68,68,0.25);
 }
 
+/* Screenshot — latest capture shown as visual evidence */
+.gl-screenshots { display: flex; }
+.gl-screenshot {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0a0c12;
+  border: 0.5px solid rgba(255,255,255,0.08);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+  cursor: zoom-in;
+  transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+.gl-screenshot:hover {
+  transform: translateY(-2px);
+  border-color: rgba(96,165,250,0.4);
+  box-shadow: 0 8px 22px rgba(0,0,0,0.4), 0 0 0 1px rgba(96,165,250,0.25);
+}
+.gl-screenshot img {
+  width: 100%; height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 /* Reasoning block — LLM prose, not console output */
 .gl-reasoning {
   position: relative;

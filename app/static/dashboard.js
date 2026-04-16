@@ -505,6 +505,24 @@ function renderConversationDetail(snapshot, sel) {
     bar.hidden = true;
   }
 
+  // Screenshot — latest captured frame for this conversation only.
+  const shotsEl = $("convScreenshots");
+  const shotsLabel = $("convScreenshotsLabel");
+  const allShots = c.screenshots || [];
+  const latestShot = allShots.length > 0 ? allShots[allShots.length - 1] : null;
+  if (latestShot) {
+    shotsLabel.hidden = false;
+    shotsEl.hidden = false;
+    shotsEl.innerHTML = `
+      <div class="gl-screenshot single" title="${escapeHtml(latestShot.timestamp || "")}">
+        <img src="${escapeHtml(latestShot.url)}" alt="latest capture" data-lightbox="1">
+      </div>`;
+  } else {
+    shotsLabel.hidden = true;
+    shotsEl.hidden = true;
+    shotsEl.innerHTML = "";
+  }
+
   // Arc — reconstruct from indicators (we don't have per-message stream here
   // yet, so render indicators as escalating dots).
   const arc = $("convArc");

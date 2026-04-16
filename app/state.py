@@ -212,6 +212,11 @@ def _serialize_db_conversation(row: Any) -> dict[str, Any]:
     status = json.loads(row["status_json"]) if row["status_json"] else {}
     messages = json.loads(row["messages_json"])
     participants = json.loads(row["participants_json"])
+    screenshots_raw = json.loads(row["screenshots_json"]) if row["screenshots_json"] else []
+    screenshots = [
+        {"url": f"/screenshots/{Path(s['path']).name}", "timestamp": s.get("timestamp", "")}
+        for s in screenshots_raw if s.get("path")
+    ]
     return {
         "conversation_id": row["id"],
         "participant": participants[0] if participants else "Unknown",
@@ -232,6 +237,7 @@ def _serialize_db_conversation(row: Any) -> dict[str, Any]:
         "alert_sent": False,
         "telegram_delivered": False,
         "escalation": None,
+        "screenshots": screenshots,
     }
 
 
