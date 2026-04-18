@@ -51,29 +51,9 @@
     <section class="gl-left" id="leftPanel">
 
       <div class="gl-section-label gl-section-label-live">
-        <span>Live Capture</span>
+        <span>Conversation Activity</span>
         <span class="gl-live-dot" id="liveDot" aria-hidden="true"></span>
       </div>
-      <div class="gl-capture" id="captureCard">
-        <div class="gl-capture-overlay hidden" id="captureOverlay">
-          <svg viewBox="0 0 24 24" fill="none"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>
-          <span class="lbl">Paused</span>
-          <span class="sub" id="captureOverlaySub">Monitoring suspended</span>
-        </div>
-        <div class="gl-capture-frame" id="captureFrame">
-          <div class="gl-capture-empty">Waiting for first frame…</div>
-        </div>
-        <div class="gl-capture-status" id="captureStatus">
-          <div class="gl-status-left">
-            <span class="gl-status-icon" id="captureIcon"></span>
-            <span class="gl-status-text" id="captureText">All clear</span>
-            <span class="gl-status-sub" id="captureSub"></span>
-          </div>
-          <span class="gl-status-ago" id="captureAgo"></span>
-        </div>
-      </div>
-
-      <div class="gl-section-label">Activity</div>
       <div class="gl-activity" id="activityList">
         <div class="gl-empty">Monitoring — no activity yet</div>
       </div>
@@ -96,11 +76,10 @@
           <div class="gl-hero-title" id="heroTitle">Monitoring</div>
           <div class="gl-hero-sub" id="heroSub">Starting up…</div>
         </div>
-        <div class="gl-stats-row gl-stats-4">
+        <div class="gl-stats-row gl-stats-3">
           <div class="gl-stat"><div class="gl-stat-val" id="ovMonitored">0s</div><div class="gl-stat-lbl">monitored</div></div>
           <div class="gl-stat"><div class="gl-stat-val" id="ovConversations">0</div><div class="gl-stat-lbl">conversations</div></div>
           <div class="gl-stat"><div class="gl-stat-val gl-green" id="ovSafeRate">100%</div><div class="gl-stat-lbl">safe rate</div></div>
-          <div class="gl-stat"><div class="gl-stat-val" id="ovPeak">—</div><div class="gl-stat-lbl">peak</div></div>
         </div>
         <div class="gl-section-label">Session Summary</div>
         <div class="gl-narrative-card">

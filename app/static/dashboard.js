@@ -263,77 +263,6 @@ function shortNarrative(c) {
   return c.category || "observed";
 }
 
-/* ---------------------------- capture block ------------------------- */
-function renderCapture(snapshot) {
-  const latest = snapshot.latest;
-  const frame = $("captureFrame");
-  const statusEl = $("captureStatus");
-  const card = $("captureCard");
-  const icon = $("captureIcon");
-  const text = $("captureText");
-  const sub = $("captureSub");
-  const ago = $("captureAgo");
-
-  if (!latest) {
-    frame.innerHTML = `<div class="gl-capture-empty">Waiting for first frame…</div>`;
-    card.classList.remove("alert", "warn");
-    statusEl.classList.remove("alert", "warn");
-    text.className = "gl-status-text";
-    text.textContent = "All clear";
-    sub.textContent = "";
-    ago.textContent = "";
-    return;
-  }
-
-  // `serialize_analysis` flattens ScreenAnalysis into a single dict —
-  // fields live directly on `latest`, not nested under `classification`.
-  // Prefer chat_messages for a richer rendering; fall back to the
-  // screenshot image when the frame has no structured messages.
-  const msgs = latest.chat_messages || [];
-  if (msgs.length > 0) {
-    const platformName = latest.platform || "—";
-    const rows = msgs.slice(0, 4).map((m) => {
-      const cls = m.flag ? "red" : "grn";
-      return `<div class="cc-msg"><span class="cc-sender ${cls}">${escapeHtml(m.sender || "")}:</span> <span>${escapeHtml(m.text || "")}</span></div>`;
-    }).join("");
-    frame.innerHTML = `
-      <div class="gl-capture-chat">
-        <div class="cc-platform">${escapeHtml(platformName)}</div>
-        ${rows}
-      </div>`;
-  } else if (latest.screenshot_url) {
-    frame.innerHTML = `<img src="${latest.screenshot_url}" alt="live capture" class="gl-capture-img" data-lightbox="1">`;
-  } else {
-    frame.innerHTML = `<div class="gl-capture-empty">No preview available</div>`;
-  }
-
-  const lvl = latest.threat_level || "safe";
-  const cls = levelClass(lvl);
-  card.classList.toggle("alert", cls === "alert");
-  card.classList.toggle("warn", cls === "warn");
-  statusEl.classList.toggle("alert", cls === "alert");
-  statusEl.classList.toggle("warn", cls === "warn");
-  text.className = `gl-status-text ${cls === "safe" ? "" : cls}`;
-  sub.className = `gl-status-sub ${cls === "safe" ? "" : cls}`;
-
-  const catLabel = (latest.category && latest.category !== "none") ? latest.category : "";
-  text.textContent = cls === "alert"
-    ? (catLabel ? `Alert · ${catLabel}` : "Alert")
-    : cls === "warn" ? (catLabel ? `Concerning · ${catLabel}` : "Concerning") : "All clear";
-  sub.textContent = "";
-  sub.removeAttribute("title");
-  // Blink the status dot only when the screenshot actually changes,
-  // not on every SSE tick.
-  const frameKey = latest.screenshot_url || latest.timestamp || "";
-  if (ui.lastFrameKey !== frameKey) {
-    ui.lastFrameKey = frameKey;
-    statusEl.classList.remove("tick");
-    void statusEl.offsetWidth;
-    statusEl.classList.add("tick");
-  }
-  ago.textContent = timeAgo(latest.timestamp);
-}
-
 /* ---------------------------- session overview ---------------------- */
 function renderSessionOverview(snapshot) {
   const narr = snapshot.session_narrative || {};
@@ -361,44 +290,6 @@ function renderSessionOverview(snapshot) {
   $("ovConversations").textContent = narr.conversations_count ?? 0;
   $("ovSafeRate").textContent = `${narr.safe_rate ?? 100}%`;
   $("ovSafeRate").className = "gl-stat-val gl-green";
-  const peak = (narr.peak || "safe").toUpperCase();
-  const peakEl = $("ovPeak");
-  peakEl.textContent = peak;
-  peakEl.className = "gl-stat-val gl-peak " + (
-    narr.peak === "alert" || narr.peak === "critical" ? "alert"
-    : narr.peak === "warning" ? "warn"
-    : narr.peak === "caution" ? "caution"
-    : "safe"
-  );
-
-  const peakStat = peakEl.closest(".gl-stat");
-  const peakConv = narr.peak_conv;
-  if (peakStat) {
-    peakStat.onclick = null;
-    peakStat.classList.remove("gl-stat-clickable");
-    peakStat.removeAttribute("title");
-    peakStat.removeAttribute("role");
-    peakStat.removeAttribute("tabindex");
-    if (peakConv && peakConv.platform && peakConv.participant) {
-      peakStat.classList.add("gl-stat-clickable");
-      peakStat.setAttribute("role", "button");
-      peakStat.setAttribute("tabindex", "0");
-      peakStat.title = peakConv.short_summary || "Open peak conversation";
-      const open = () => {
-        markSeen(alertId("conversation", peakConv));
-        ui.selection = {
-          kind: "conversation",
-          platform: peakConv.platform,
-          participant: peakConv.participant,
-        };
-        render();
-      };
-      peakStat.onclick = open;
-      peakStat.onkeydown = (e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
-      };
-    }
-  }
 
   // Narrative intro — platform chips + severity breakdown (no stat duplication).
   const intro = $("narrativeIntro");
@@ -432,16 +323,10 @@ function renderSessionOverview(snapshot) {
       </div>`;
   }
 
-  concernsEl.innerHTML = "";
-  for (const c of narr.concerns || []) {
-    const cls = levelClass(c.level);
-    const row = document.createElement("div");
-    row.className = "gl-concern-row";
-    row.innerHTML = `
-      <div class="gl-concern-dot ${cls === "alert" ? "" : "warn"}"></div>
-      <div class="gl-concern-text ${cls === "alert" ? "" : "warn"}"><b>${escapeHtml(c.name)}</b> — ${escapeHtml(c.summary || c.category)}</div>`;
-    concernsEl.appendChild(row);
-  }
+  // Concerns list intentionally removed from Session Summary — the
+  // Activity panel on the left already shows each flagged conversation
+  // with participants + summary, so this row was duplicate content.
+  if (concernsEl) concernsEl.innerHTML = "";
 
   // Safe activities — modern chip row. Header text adapts to whether
   // there are also concerns (so we don't say "All clear" alongside
@@ -794,18 +679,7 @@ function render() {
     pauseLabel.textContent = "Pause";
   }
 
-  // Capture pause overlay
-  const overlay = $("captureOverlay");
-  if (snapshot.paused) {
-    overlay.classList.remove("hidden");
-    $("captureOverlaySub").textContent = `Paused at ${snapshot.session_duration || "0s"}`;
-    $("captureCard").classList.add("paused");
-  } else {
-    overlay.classList.add("hidden");
-    $("captureCard").classList.remove("paused");
-  }
-
-  // Live-capture section label: green ping when running, static dot when paused/stopped
+  // Activity section label: green ping when running, static dot when paused/stopped
   const liveDot = $("liveDot");
   if (liveDot) {
     const liveActive = Boolean(snapshot.monitoring) && !snapshot.paused;
@@ -832,8 +706,7 @@ function render() {
 
   renderAlertsMenu(snapshot, flaggedItems);
 
-  // Left — capture + stats + activity
-  renderCapture(snapshot);
+  // Left — activity list
   const convs = snapshot.conversations || [];
   const envs = snapshot.environments || [];
 
@@ -860,20 +733,10 @@ function render() {
     ? `0 bytes to cloud`
     : `NOT LOCAL — ${net.ollama_host || "?"}`;
 
-  // Auto-show State 2 only for CRITICAL conversations — that's the "this
-  // is actively dangerous right now" signal where interrupting the parent
-  // is justified. Alert/warning/caution stay on the overview; the pulsing
-  // hero icon, pulsing bell badge, and flashing card are the call to action.
-  const topCritical = (convs || []).find((c) => c.threat_level === "critical");
-  if (topCritical && !ui.selection) {
-    const key = `c:${topCritical.platform}:${topCritical.participant}:${topCritical.threat_level}`;
-    if (ui.lastAutoAlertKey !== key) {
-      ui.lastAutoAlertKey = key;
-      ui.selection = { kind: "conversation", platform: topCritical.platform, participant: topCritical.participant };
-      showState("stateConversation");
-      renderConversationDetail(snapshot, ui.selection);
-    }
-  }
+  // No auto-opening of conversation detail. The right panel stays on the
+  // session overview by default; the parent must click a conversation card
+  // in the Conversation Activity list to drill in. Passive cues (bell
+  // badge, hero icon pulse, card flash) still signal new alerts.
 }
 
 /* ---------------------------- alerts menu --------------------------- */
