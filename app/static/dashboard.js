@@ -548,12 +548,15 @@ function renderConversationDetail(snapshot, sel) {
     bar.hidden = true;
   }
 
-  // Screenshot — latest captured frame for this conversation only.
+  // Screenshot — only shown when the conversation is flagged. Safe chats
+  // don't need evidence imagery on the overview (reduces clutter + is less
+  // intrusive when everything is fine).
   const shotsEl = $("convScreenshots");
   const shotsLabel = $("convScreenshotsLabel");
   const allShots = c.screenshots || [];
   const latestShot = allShots.length > 0 ? allShots[allShots.length - 1] : null;
-  if (latestShot) {
+  const showShot = latestShot && lvl !== "safe";
+  if (showShot) {
     shotsLabel.hidden = false;
     shotsEl.hidden = false;
     shotsEl.innerHTML = `
