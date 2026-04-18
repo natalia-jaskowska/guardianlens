@@ -284,6 +284,32 @@ html, body {
 .gl-section-head {
   display: flex; justify-content: space-between; align-items: center;
 }
+
+.gl-section-label-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.gl-live-dot {
+  display: inline-block;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--safe);
+  box-shadow: 0 0 0 0 rgba(34,197,94,0.6);
+  animation: gl-live-ping 1.6s ease-out infinite;
+}
+.gl-live-dot.paused {
+  background: rgba(148,163,184,0.45);
+  box-shadow: none;
+  animation: none;
+}
+@keyframes gl-live-ping {
+  0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.55); }
+  70%  { box-shadow: 0 0 0 9px rgba(34,197,94,0); }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gl-live-dot { animation: none; }
+}
 .gl-legend { display: flex; gap: 8px; font-size: 9px; color: var(--faint); }
 .gl-legend-item { display: flex; align-items: center; gap: 3px; }
 .gl-dot-circle { width: 8px; height: 8px; border-radius: 50%; background: var(--card); }
@@ -510,6 +536,16 @@ html, body {
 .gl-stat:hover {
   border-color: rgba(255,255,255,0.12);
   transform: translateY(-1px);
+}
+.gl-stat-clickable { cursor: pointer; }
+.gl-stat-clickable:hover {
+  border-color: rgba(255,255,255,0.22);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
+}
+.gl-stat-clickable:focus-visible {
+  outline: 2px solid rgba(96,165,250,0.55);
+  outline-offset: 2px;
 }
 .gl-stat-val {
   font-size: 20px; font-weight: 600;
@@ -740,9 +776,10 @@ html, body {
 }
 .gl-card-note {
   font-size: 11px; color: var(--muted); font-style: italic;
-  overflow: hidden; text-overflow: ellipsis;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  line-clamp: 2;
+  line-height: 1.45;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   margin-top: 1px;
 }
 .gl-card-note.alert { color: var(--red-txt); }
@@ -936,6 +973,7 @@ html, body {
   border-radius: 50%;
   background: rgba(34,197,94,0.08);
   box-shadow: inset 0 0 0 1px rgba(34,197,94,0.2);
+  animation: gl-hero-pulse-safe 2.6s ease-in-out infinite;
 }
 .gl-overview-hero.warn .gl-hero-icon {
   background: rgba(234,179,8,0.08);
@@ -949,6 +987,20 @@ html, body {
 }
 .gl-hero-icon svg { width: 30px; height: 30px; }
 
+@keyframes gl-hero-pulse-safe {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow:
+      inset 0 0 0 1px rgba(34,197,94,0.20),
+      0 0 0 0 rgba(34,197,94,0.35);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow:
+      inset 0 0 0 1px rgba(34,197,94,0.30),
+      0 0 0 8px rgba(34,197,94,0);
+  }
+}
 @keyframes gl-hero-pulse-warn {
   0%, 100% {
     transform: scale(1);
@@ -978,8 +1030,7 @@ html, body {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .gl-overview-hero.warn .gl-hero-icon,
-  .gl-overview-hero.alert .gl-hero-icon { animation: none; }
+  .gl-hero-icon { animation: none; }
 }
 .gl-hero-title {
   font-size: 18px; font-weight: 600;
@@ -1089,6 +1140,70 @@ html, body {
   color: var(--yel-txt);
   font-weight: 600;
 }
+
+/* Session summary intro — platform chips + severity pills */
+.gl-intro-muted {
+  color: var(--dim);
+  font-size: 12px;
+}
+.gl-intro-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.gl-intro-platforms {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.gl-intro-platform {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 3px 8px 3px 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.04);
+  border: 0.5px solid rgba(255,255,255,0.08);
+}
+.gl-intro-platform-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--dim);
+}
+.gl-intro-platform-dot.discord   { background: #5865F2; }
+.gl-intro-platform-dot.minecraft { background: #44bd32; }
+.gl-intro-platform-dot.instagram { background: #E1306C; }
+.gl-intro-platform-dot.roblox    { background: #ef4444; }
+.gl-intro-platform-dot.tiktok    { background: #00F2EA; }
+.gl-intro-platform-dot.youtube   { background: #FF4040; }
+.gl-intro-platform-dot.snapchat  { background: #E6E100; }
+.gl-intro-platform-dot.whatsapp  { background: #25d366; }
+
+.gl-intro-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.gl-intro-pill {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 0.5px solid transparent;
+  line-height: 1.2;
+}
+.gl-intro-pill.safe    { color: #86efac; background: rgba(34,197,94,0.10);  border-color: rgba(34,197,94,0.28); }
+.gl-intro-pill.caution { color: #fde68a; background: rgba(234,179,8,0.12);  border-color: rgba(234,179,8,0.30); }
+.gl-intro-pill.warn    { color: #fbbf24; background: rgba(245,158,11,0.14); border-color: rgba(245,158,11,0.34); }
+.gl-intro-pill.alert   { color: #fecaca; background: rgba(239,68,68,0.16);  border-color: rgba(239,68,68,0.44); }
 .gl-safe-tag {
   display: inline-flex; align-items: center; gap: 3px;
   color: var(--muted); font-size: 10px;

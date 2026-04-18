@@ -1,7 +1,11 @@
 """Prompt templates for GuardianLens LLM calls.
 
 Production pipeline prompts (used by :mod:`guardlens.pipeline`):
-  FRAME_EXTRACT_*, MATCH_CONVERSATION_*, MERGE_MESSAGES_*, STATUS_UPDATE_*
+  FRAME_EXTRACT_*, STATUS_UPDATE_*
+
+Conversation matching and message deduplication are handled
+deterministically in ``pipeline._score_match`` and
+``pipeline._fuzzy_merge`` — no LLM calls.
 
 Legacy per-frame prompts (used by :mod:`guardlens.analyzer` for eval scripts):
   SYSTEM_PROMPT, ANALYSIS_PROMPT
@@ -105,98 +109,6 @@ return an empty list.
 FRAME_EXTRACT_USER_PROMPT = """\
 Analyze this screenshot. Extract all visible chat conversations.
 Call `extract_conversations` with your findings.
-"""
-
-
-MATCH_CONVERSATION_SYSTEM_PROMPT = """\
-You are GuardianLens matching a new conversation fragment to tracked \
-conversations. A real chat viewed over time produces many near-duplicate
-fragments, but DIFFERENT chats on the same platform must remain separate.
-
-Merging is only correct when there is POSITIVE EVIDENCE of continuity.
-Do NOT merge merely because the platform is the same.
-
-MERGE only when at least ONE of the following holds:
-- A non-child participant username overlaps (exact match, or differs
-  only by trailing digits / minor OCR drift on the same token).
-- A message text overlaps (exact, prefix/suffix, or clear OCR variant
-  of the same wording).
-- The new fragment is clearly a direct continuation of the candidate:
-  same participants AND same topic AND no hard scene change.
-
-CREATE NEW (return null) when ANY of these are true:
-- The platform is different.
-- No participant overlaps AND no message overlaps.
-- The set of participants is entirely disjoint from every candidate,
-  even if the topic feels loosely similar.
-- The scene clearly changed (different chat window, different channel,
-  different group of people talking about unrelated things).
-
-Topic or tone similarity alone is NOT enough to merge. Two different
-gaming chats, two different DMs, or two different group channels on
-the same platform are SEPARATE conversations.
-
-When in doubt and evidence of overlap is weak or absent: CREATE NEW.
-A rare duplicate card is better than collapsing unrelated chats and
-mixing their safety signals.
-
-Call `match_conversation` with the matched conversation_id (integer) \
-or null when no candidate has positive overlap evidence.
-"""
-
-MATCH_CONVERSATION_USER_TEMPLATE = """\
-NEW FRAGMENT:
-  Platform: {platform}
-  Participants: {participants}
-  Messages (first {msg_count}):
-{messages_sample}
-
-CANDIDATE CONVERSATIONS (active in last {stale_minutes} minutes):
-{candidates}
-
-Call `match_conversation`.
-"""
-
-
-MERGE_MESSAGES_SYSTEM_PROMPT = """\
-You are GuardianLens merging chat message lists across consecutive screen
-captures. The same messages WILL appear in multiple screenshots because
-the user's chat window stays open — you MUST catch these duplicates
-even when OCR reads them slightly differently.
-
-AGGRESSIVE DEDUPLICATION — two messages are the SAME if ANY of:
-- Identical sender + text (trivial case)
-- Same sender + text matches after stripping punctuation and lowercasing
-- Same sender + one text is a truncation/prefix of the other
-  (e.g. "me and jake are..." vs "s and jake are..." — OCR dropped 2 chars)
-- Sender usernames differ only by a numeric/handle suffix and text matches
-  (e.g. "Em" and "Em_22" with the SAME message → same person, keep one)
-- Sender usernames differ only by trailing digits and text matches
-  (e.g. "Sammy" vs "Sammy7" with same/near-same text → same person)
-- Text differs only by OCR artifacts at start/end (leading garbage chars,
-  dropped letters, "i"→"1", "l"→"I", etc.) and senders are similar
-
-When in doubt whether two messages are duplicates: MERGE THEM.
-Better to collapse a real duplicate than to count it twice.
-
-When senders vary for the "same" message, prefer the LONGER/fuller
-username (e.g. keep "Em_22" over "Em") — it's usually the full handle.
-
-Preserve chronological ordering: earlier messages first, new messages
-that truly extend the conversation at the end. Do NOT paraphrase or
-modify any message text.
-
-Return the complete deduplicated list via `merge_messages`.
-"""
-
-MERGE_MESSAGES_USER_TEMPLATE = """\
-PRIOR ACCUMULATED MESSAGES ({prior_count} total):
-{prior_transcript}
-
-NEW MESSAGES FROM CURRENT FRAME ({new_count} messages):
-{new_transcript}
-
-Merge into one deduplicated ordered list. Call `merge_messages`.
 """
 
 

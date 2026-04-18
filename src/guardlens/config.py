@@ -154,7 +154,7 @@ class ConversationConfig(BaseModel):
     """Settings for the conversation-first pipeline."""
 
     stale_minutes: int = Field(
-        30,
+        1,
         ge=1,
         description=(
             "Conversations not updated for this many minutes are not "

@@ -14,7 +14,7 @@ from unittest.mock import patch
 from guardlens.analyzer import GuardLensAnalyzer
 from guardlens.config import GuardLensConfig, OllamaConfig
 from guardlens.database import GuardLensDatabase
-from guardlens.pipeline import ConversationPipeline, _naive_merge
+from guardlens.pipeline import ConversationPipeline, _fuzzy_merge
 from guardlens.schema import (
     FrameAnalysis,
     ScreenAnalysis,
@@ -96,20 +96,44 @@ def test_analyzer_parses_full_tool_chain(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_naive_merge_deduplicates() -> None:
+def test_fuzzy_merge_deduplicates() -> None:
     prior = [{"sender": "Alice", "text": "hello"}, {"sender": "Bob", "text": "hi"}]
     new = [{"sender": "Bob", "text": "hi"}, {"sender": "Carol", "text": "hey"}]
-    result = _naive_merge(prior, new)
+    result = _fuzzy_merge(prior, new)
     assert len(result) == 3
     assert result[0]["sender"] == "Alice"
     assert result[2]["sender"] == "Carol"
 
 
-def test_naive_merge_case_insensitive() -> None:
+def test_fuzzy_merge_case_insensitive() -> None:
     prior = [{"sender": "Alice", "text": "Hello"}]
     new = [{"sender": "alice", "text": "hello"}]
-    result = _naive_merge(prior, new)
+    result = _fuzzy_merge(prior, new)
     assert len(result) == 1
+
+
+def test_fuzzy_merge_ocr_variants() -> None:
+    prior = [{"sender": "Kidgamer09", "text": "hey can i come to the movie night?"}]
+    new = [
+        {"sender": "KidGamer09", "text": "hey can i come to the movie night?"},
+        {"sender": "Lyla", "text": "uhh this is invite only"},
+    ]
+    result = _fuzzy_merge(prior, new)
+    assert len(result) == 2
+
+
+def test_fuzzy_merge_prefix_truncation() -> None:
+    prior = [{"sender": "Sammy", "text": "me and jake are doing a science project"}]
+    new = [{"sender": "Sammy", "text": "s and jake are doing a science project"}]
+    result = _fuzzy_merge(prior, new)
+    assert len(result) == 1
+
+
+def test_fuzzy_merge_keeps_distinct_messages_from_same_sender() -> None:
+    prior = [{"sender": "Maxx", "text": "hey"}]
+    new = [{"sender": "Maxx", "text": "bye"}]
+    result = _fuzzy_merge(prior, new)
+    assert len(result) == 2
 
 
 def test_db_conversation_crud(tmp_path: Path) -> None:

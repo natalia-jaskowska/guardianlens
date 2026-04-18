@@ -256,7 +256,7 @@ function convCard(c) {
 
 function shortNarrative(c) {
   if (c.short_summary) return c.short_summary;
-  if (c.narrative) return c.narrative.split(".")[0].slice(0, 140);
+  if (c.narrative) return c.narrative;
   if (c.indicators && c.indicators.length > 0) {
     return `${c.category} — ${c.indicators.slice(0, 2).join(", ")}`;
   }
@@ -320,10 +320,8 @@ function renderCapture(snapshot) {
   text.textContent = cls === "alert"
     ? (catLabel ? `Alert · ${catLabel}` : "Alert")
     : cls === "warn" ? (catLabel ? `Concerning · ${catLabel}` : "Concerning") : "All clear";
-  // Sub-line: short summary only (or fallback to platform). The full
-  // narrative is on the conversation card; here we want one short hint.
-  sub.textContent = latest.reasoning || latest.platform || "";
-  sub.title = latest.reasoning || "";
+  sub.textContent = "";
+  sub.removeAttribute("title");
   // Blink the status dot only when the screenshot actually changes,
   // not on every SSE tick.
   const frameKey = latest.screenshot_url || latest.timestamp || "";
@@ -373,20 +371,65 @@ function renderSessionOverview(snapshot) {
     : "safe"
   );
 
-  // Narrative
+  const peakStat = peakEl.closest(".gl-stat");
+  const peakConv = narr.peak_conv;
+  if (peakStat) {
+    peakStat.onclick = null;
+    peakStat.classList.remove("gl-stat-clickable");
+    peakStat.removeAttribute("title");
+    peakStat.removeAttribute("role");
+    peakStat.removeAttribute("tabindex");
+    if (peakConv && peakConv.platform && peakConv.participant) {
+      peakStat.classList.add("gl-stat-clickable");
+      peakStat.setAttribute("role", "button");
+      peakStat.setAttribute("tabindex", "0");
+      peakStat.title = peakConv.short_summary || "Open peak conversation";
+      const open = () => {
+        markSeen(alertId("conversation", peakConv));
+        ui.selection = {
+          kind: "conversation",
+          platform: peakConv.platform,
+          participant: peakConv.participant,
+        };
+        render();
+      };
+      peakStat.onclick = open;
+      peakStat.onkeydown = (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); }
+      };
+    }
+  }
+
+  // Narrative intro — platform chips + severity breakdown (no stat duplication).
   const intro = $("narrativeIntro");
   const concernsEl = $("narrativeConcerns");
   const safeEl = $("narrativeSafe");
   const total = convs.length + envs.length;
   if (total === 0) {
-    intro.innerHTML = "Session in progress — nothing flagged yet.";
+    intro.innerHTML = `<span class="gl-intro-muted">Monitoring — nothing flagged yet.</span>`;
   } else {
-    const convCount = convs.length;
-    const convText = `${convCount} conversation${convCount === 1 ? "" : "s"}`;
-    const concernText = narr.concerns && narr.concerns.length
-      ? ` · <b class="gl-intro-flag">${narr.concerns.length} concern${narr.concerns.length === 1 ? "" : "s"}</b>`
-      : "";
-    intro.innerHTML = `Monitored for <b>${narr.monitored}</b> · ${convText}${concernText}`;
+    const platformSet = new Set(convs.map((c) => c.platform).filter(Boolean));
+    const platformChips = Array.from(platformSet).slice(0, 4).map((p) => {
+      const fam = platformFamily(p);
+      return `<span class="gl-intro-platform"><span class="gl-intro-platform-dot ${fam}"></span>${escapeHtml(platformLabel(p))}</span>`;
+    }).join("");
+
+    const counts = { alert: 0, warning: 0, caution: 0 };
+    for (const c of narr.concerns || []) {
+      const k = c.level === "critical" ? "alert" : (counts.hasOwnProperty(c.level) ? c.level : null);
+      if (k) counts[k] += 1;
+    }
+    const pills = [];
+    if (counts.alert)   pills.push(`<span class="gl-intro-pill alert">${counts.alert} alert${counts.alert === 1 ? "" : "s"}</span>`);
+    if (counts.warning) pills.push(`<span class="gl-intro-pill warn">${counts.warning} concerning</span>`);
+    if (counts.caution) pills.push(`<span class="gl-intro-pill caution">${counts.caution} caution</span>`);
+    if (pills.length === 0) pills.push(`<span class="gl-intro-pill safe">All clear</span>`);
+
+    intro.innerHTML = `
+      <div class="gl-intro-row">
+        <div class="gl-intro-platforms">${platformChips}</div>
+        <div class="gl-intro-pills">${pills.join("")}</div>
+      </div>`;
   }
 
   concernsEl.innerHTML = "";
@@ -759,6 +802,13 @@ function render() {
     $("captureCard").classList.remove("paused");
   }
 
+  // Live-capture section label: green ping when running, static dot when paused/stopped
+  const liveDot = $("liveDot");
+  if (liveDot) {
+    const liveActive = Boolean(snapshot.monitoring) && !snapshot.paused;
+    liveDot.classList.toggle("paused", !liveActive);
+  }
+
   // Unread counter = flagged items the parent hasn't clicked yet.
   // `alert_total` is kept for the left-panel stats row (lifetime count),
   // but the bell is inbox-style and counts UNREAD only.
@@ -807,16 +857,16 @@ function render() {
     ? `0 bytes to cloud`
     : `NOT LOCAL — ${net.ollama_host || "?"}`;
 
-  // Auto-show State 2 for the newest alerting conversation when no selection yet.
-  // Key includes threat_level so an escalation (caution→alert on the same
-  // person) produces a new key and re-pops the detail view — otherwise the
-  // parent would miss the new severity if they were on the session overview.
-  const topAlert = (convs || []).find((c) => c.threat_level === "alert" || c.threat_level === "critical");
-  if (topAlert && !ui.selection) {
-    const key = `c:${topAlert.platform}:${topAlert.participant}:${topAlert.threat_level}`;
+  // Auto-show State 2 only for CRITICAL conversations — that's the "this
+  // is actively dangerous right now" signal where interrupting the parent
+  // is justified. Alert/warning/caution stay on the overview; the pulsing
+  // hero icon, pulsing bell badge, and flashing card are the call to action.
+  const topCritical = (convs || []).find((c) => c.threat_level === "critical");
+  if (topCritical && !ui.selection) {
+    const key = `c:${topCritical.platform}:${topCritical.participant}:${topCritical.threat_level}`;
     if (ui.lastAutoAlertKey !== key) {
       ui.lastAutoAlertKey = key;
-      ui.selection = { kind: "conversation", platform: topAlert.platform, participant: topAlert.participant };
+      ui.selection = { kind: "conversation", platform: topCritical.platform, participant: topCritical.participant };
       showState("stateConversation");
       renderConversationDetail(snapshot, ui.selection);
     }

@@ -1,8 +1,10 @@
 """Ollama function-calling tool definitions for GuardianLens.
 
 Production pipeline tools (used by :mod:`guardlens.pipeline`):
-  PIPELINE_FRAME_TOOLS, PIPELINE_MATCH_TOOLS, PIPELINE_MERGE_TOOLS,
-  PIPELINE_STATUS_TOOLS
+  PIPELINE_FRAME_TOOLS, PIPELINE_STATUS_TOOLS
+
+Matching and message merge are deterministic — see
+``pipeline._score_match`` and ``pipeline._fuzzy_merge``.
 
 Legacy per-frame tools (used by :mod:`guardlens.analyzer` for eval scripts):
   GUARDLENS_TOOLS (CLASSIFY_THREAT_TOOL, IDENTIFY_GROOMING_STAGE_TOOL,
@@ -220,68 +222,6 @@ EXTRACT_CONVERSATIONS_TOOL: dict[str, Any] = {
 }
 
 
-MATCH_CONVERSATION_TOOL: dict[str, Any] = {
-    "type": "function",
-    "function": {
-        "name": "match_conversation",
-        "description": (
-            "Decide whether a conversation fragment matches an existing "
-            "tracked conversation, or is new. Return the matching "
-            "conversation_id (integer) or null to create a new one."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "conversation_id": {
-                    "type": ["integer", "null"],
-                    "description": (
-                        "ID of the matching existing conversation, or null "
-                        "if this is a new conversation."
-                    ),
-                },
-                "reasoning": {
-                    "type": "string",
-                    "description": "One sentence explaining the match/no-match decision.",
-                },
-            },
-            "required": ["conversation_id", "reasoning"],
-        },
-    },
-}
-
-
-MERGE_MESSAGES_TOOL: dict[str, Any] = {
-    "type": "function",
-    "function": {
-        "name": "merge_messages",
-        "description": (
-            "Produce a single deduplicated, chronologically ordered list of "
-            "chat messages by merging the prior accumulated list with the new "
-            "messages from the current frame. Remove exact or near-exact "
-            "duplicates. Preserve all unique messages. Do not paraphrase."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "merged_messages": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "sender": {"type": "string"},
-                            "text": {"type": "string"},
-                        },
-                        "required": ["sender", "text"],
-                    },
-                    "description": "The full deduplicated ordered message list.",
-                },
-            },
-            "required": ["merged_messages"],
-        },
-    },
-}
-
-
 UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
     "type": "function",
     "function": {
@@ -369,6 +309,4 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
 
 
 PIPELINE_FRAME_TOOLS: list[dict[str, Any]] = [EXTRACT_CONVERSATIONS_TOOL]
-PIPELINE_MATCH_TOOLS: list[dict[str, Any]] = [MATCH_CONVERSATION_TOOL]
-PIPELINE_MERGE_TOOLS: list[dict[str, Any]] = [MERGE_MESSAGES_TOOL]
 PIPELINE_STATUS_TOOLS: list[dict[str, Any]] = [UPDATE_CONVERSATION_STATUS_TOOL]

@@ -14,6 +14,7 @@ All state lives in SQLite. No in-memory copies.
 from __future__ import annotations
 
 import base64
+import difflib
 import json
 import logging
 import time
@@ -30,10 +31,6 @@ from guardlens.ollama_utils import extract_thinking, find_call, get_message, get
 from guardlens.prompts import (
     FRAME_EXTRACT_SYSTEM_PROMPT,
     FRAME_EXTRACT_USER_PROMPT,
-    MATCH_CONVERSATION_SYSTEM_PROMPT,
-    MATCH_CONVERSATION_USER_TEMPLATE,
-    MERGE_MESSAGES_SYSTEM_PROMPT,
-    MERGE_MESSAGES_USER_TEMPLATE,
     STATUS_UPDATE_SYSTEM_PROMPT,
     STATUS_UPDATE_USER_TEMPLATE,
 )
@@ -46,10 +43,15 @@ from guardlens.schema import (
 )
 from guardlens.tools import (
     PIPELINE_FRAME_TOOLS,
-    PIPELINE_MATCH_TOOLS,
-    PIPELINE_MERGE_TOOLS,
     PIPELINE_STATUS_TOOLS,
 )
+
+MATCH_LONG_MSG_MIN = 15
+"""Normalized length at which a single message is considered distinctive enough
+to serve as a standalone merge signal."""
+
+MATCH_MIN_RUN = 2
+"""Minimum number of contiguous in-order message matches to count as a run."""
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +72,7 @@ class ConversationPipeline:
         database: GuardLensDatabase,
         alerts: AlertSender | None = None,
         *,
-        stale_minutes: int = 30,
+        stale_minutes: int = 1,
     ) -> list[int]:
         """Run the full pipeline for one screenshot.
 
@@ -232,7 +234,7 @@ class ConversationPipeline:
         )
 
     # ------------------------------------------------------------------
-    # Step 3: Match conversation (text LLM call)
+    # Step 3: Match conversation (deterministic, no LLM)
     # ------------------------------------------------------------------
 
     def _match_conversation(
@@ -240,61 +242,7 @@ class ConversationPipeline:
         fragment: ConversationFragment,
         candidates: list[Any],
     ) -> int | None:
-        if not candidates:
-            return None
-
-        messages_sample = _format_messages(fragment.messages[:5])
-        candidates_text = _format_candidates(candidates)
-
-        prompt = MATCH_CONVERSATION_USER_TEMPLATE.format(
-            platform=fragment.platform,
-            participants=", ".join(fragment.participants) or "(none visible)",
-            msg_count=min(5, len(fragment.messages)),
-            messages_sample=messages_sample,
-            stale_minutes=30,
-            candidates=candidates_text,
-        )
-
-        try:
-            response = self._client.chat(
-                model=self._config.inference_model,
-                messages=[
-                    {"role": "system", "content": MATCH_CONVERSATION_SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                tools=PIPELINE_MATCH_TOOLS,
-                options={"temperature": 0.1, "num_ctx": self._config.num_ctx},
-            )
-        except (ollama.RequestError, ollama.ResponseError, TimeoutError, ConnectionError) as exc:
-            logger.error("Match call failed: %s — creating new conversation", exc)
-            return None
-
-        message = get_message(response)
-        tool_calls = get_tool_calls(message)
-        args = find_call(tool_calls, "match_conversation")
-
-        if args is None:
-            return None
-
-        conv_id = args.get("conversation_id")
-        if conv_id is None:
-            return None
-
-        try:
-            conv_id_int = int(conv_id)
-        except (ValueError, TypeError):
-            return None
-
-        chosen = next((c for c in candidates if c["id"] == conv_id_int), None)
-        if chosen is None:
-            return None
-        if not _has_overlap(fragment, chosen):
-            logger.info(
-                "Rejecting LLM match conv=%d — no participant/message overlap",
-                conv_id_int,
-            )
-            return None
-        return conv_id_int
+        return _score_match(fragment, candidates)
 
     # ------------------------------------------------------------------
     # Step 4: Merge messages (text LLM call)
@@ -306,50 +254,7 @@ class ConversationPipeline:
         new_messages: list[ChatMessage],
     ) -> list[dict[str, str]]:
         new_dicts = [{"sender": m.sender, "text": m.text} for m in new_messages]
-
-        if not prior:
-            return new_dicts
-        if not new_dicts:
-            return prior
-
-        prior_transcript = _format_message_dicts(prior)
-        new_transcript = _format_message_dicts(new_dicts)
-
-        prompt = MERGE_MESSAGES_USER_TEMPLATE.format(
-            prior_count=len(prior),
-            prior_transcript=prior_transcript,
-            new_count=len(new_dicts),
-            new_transcript=new_transcript,
-        )
-
-        try:
-            response = self._client.chat(
-                model=self._config.inference_model,
-                messages=[
-                    {"role": "system", "content": MERGE_MESSAGES_SYSTEM_PROMPT},
-                    {"role": "user", "content": prompt},
-                ],
-                tools=PIPELINE_MERGE_TOOLS,
-                options={"temperature": 0.0, "num_ctx": self._config.num_ctx},
-            )
-        except (ollama.RequestError, ollama.ResponseError, TimeoutError, ConnectionError) as exc:
-            logger.error("Merge call failed: %s — naive fallback", exc)
-            return _naive_merge(prior, new_dicts)
-
-        message = get_message(response)
-        tool_calls = get_tool_calls(message)
-        args = find_call(tool_calls, "merge_messages")
-
-        if args is None:
-            logger.warning("Model did not call merge_messages — naive fallback.")
-            return _naive_merge(prior, new_dicts)
-
-        merged_raw = args.get("merged_messages", [])
-        result = []
-        for m in merged_raw:
-            if isinstance(m, dict) and "sender" in m and "text" in m:
-                result.append({"sender": m["sender"], "text": m["text"]})
-        return result if result else _naive_merge(prior, new_dicts)
+        return _fuzzy_merge(prior, new_dicts)
 
     # ------------------------------------------------------------------
     # Step 5: Update conversation status (text LLM call)
@@ -469,13 +374,6 @@ def _encode_image(image_path: Path) -> str:
         return base64.b64encode(f.read()).decode("utf-8")
 
 
-def _format_messages(messages: list[ChatMessage]) -> str:
-    lines = []
-    for m in messages:
-        lines.append(f"  {m.sender}: {m.text}")
-    return "\n".join(lines) if lines else "  (no messages)"
-
-
 def _format_message_dicts(messages: list[dict[str, str]]) -> str:
     lines = []
     for m in messages:
@@ -483,86 +381,300 @@ def _format_message_dicts(messages: list[dict[str, str]]) -> str:
     return "\n".join(lines) if lines else "  (no messages)"
 
 
-def _format_candidates(candidates: list[Any]) -> str:
-    if not candidates:
-        return "  (none)"
-    lines = []
-    for c in candidates:
-        cid = c["id"]
-        platform = c["platform"]
-        participants = json.loads(c["participants_json"])
-        last_seen = c["last_seen"]
-        messages = json.loads(c["messages_json"])
-        tail = messages[-3:] if messages else []
-        tail_text = "; ".join(f'{m.get("sender","?")}: {m.get("text","")}' for m in tail)
-        lines.append(
-            f"  ID {cid}: platform={platform}, "
-            f"participants={', '.join(participants)}, "
-            f"last_seen={last_seen}, "
-            f"last messages: [{tail_text}]"
-        )
-    return "\n".join(lines)
-
-
-def _normalize_name(name: str) -> str:
-    s = name.strip().lower()
-    s = "".join(ch for ch in s if ch.isalnum())
-    return s.rstrip("0123456789")
-
-
 def _normalize_text(text: str) -> str:
     s = text.strip().lower()
     return "".join(ch for ch in s if ch.isalnum())
 
 
-def _has_overlap(fragment: ConversationFragment, candidate: Any) -> bool:
-    """Check positive overlap evidence between a fragment and a candidate.
-
-    Requires a non-child participant match OR a normalized message-text
-    match. Platform identity alone is not sufficient.
-    """
-    if fragment.platform != candidate["platform"]:
+def _fuzzy_name_match(a: str, b: str) -> bool:
+    """True if two normalized names are the same person modulo OCR noise."""
+    if not a or not b:
         return False
+    if a == b:
+        return True
+    # One is a prefix of the other (Max / Maxx / Maxxx after collapse).
+    shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+    if len(shorter) >= 3 and longer.startswith(shorter):
+        return True
+    # Close OCR drift (one char added/changed on short names).
+    if abs(len(a) - len(b)) <= 2 and difflib.SequenceMatcher(None, a, b).ratio() >= 0.85:
+        return True
+    return False
 
-    cand_participants = {
-        _normalize_name(p)
-        for p in json.loads(candidate["participants_json"])
-        if p and p.lower() != "child"
-    }
-    frag_participants = {
+
+def _score_match(
+    fragment: ConversationFragment,
+    candidates: list[Any],
+) -> int | None:
+    """Deterministic fragment→conversation matcher.
+
+    A merge requires at least one of these "strong" signals with the
+    candidate, computed on normalized message text:
+
+    * ≥1 "long" exact match (normalized length ≥ :data:`MATCH_LONG_MSG_MIN`)
+    * ≥2 total message hits (exact + fuzzy)
+    * a contiguous in-order run of ≥ :data:`MATCH_MIN_RUN` matching messages
+
+    Short single-message fragments only merge when the single message
+    is long and distinctive — an isolated "lol" or "yes" never merges
+    a new frame into an existing conversation.
+
+    Score (used only for tie-breaking among eligible candidates):
+
+    * +6 per exact hit, +5 extra for each "long" exact hit
+    * +3 per fuzzy hit (SequenceMatcher ratio ≥ 0.85, both ≥ 10 chars)
+    * +4 per non-child participant overlap
+    * +8 per additional matched step in the longest contiguous run
+    """
+    if not candidates:
+        return None
+
+    frag_parts = [
         _normalize_name(p)
         for p in fragment.participants
         if p and p.lower() != "child"
-    }
-    cand_participants.discard("")
-    frag_participants.discard("")
-    if cand_participants & frag_participants:
+    ]
+    frag_parts = [p for p in frag_parts if p]
+
+    frag_texts_raw = [
+        _normalize_text(m.text if hasattr(m, "text") else m.get("text", ""))
+        for m in fragment.messages
+    ]
+    frag_texts = [t for t in frag_texts_raw if len(t) >= 4]
+    frag_size = len(fragment.messages)
+
+    best_id: int | None = None
+    best_score = 0
+    breakdowns: list[str] = []
+
+    for c in candidates:
+        if c["platform"] != fragment.platform:
+            continue
+
+        cand_parts = [
+            _normalize_name(p)
+            for p in json.loads(c["participants_json"])
+            if p and p.lower() != "child"
+        ]
+        cand_parts = [p for p in cand_parts if p]
+
+        cand_messages = json.loads(c["messages_json"])
+        cand_texts_raw = [_normalize_text(m.get("text", "")) for m in cand_messages]
+        cand_texts_set = {t for t in cand_texts_raw if t}
+
+        part_hits = 0
+        seen_cand: set[str] = set()
+        for fp in frag_parts:
+            for cp in cand_parts:
+                if cp in seen_cand:
+                    continue
+                if _fuzzy_name_match(fp, cp):
+                    part_hits += 1
+                    seen_cand.add(cp)
+                    break
+
+        exact_hits = 0
+        long_hits = 0
+        for t in frag_texts:
+            if t in cand_texts_set:
+                exact_hits += 1
+                if len(t) >= MATCH_LONG_MSG_MIN:
+                    long_hits += 1
+
+        fuzzy_hits = 0
+        remaining = [t for t in frag_texts if t not in cand_texts_set and len(t) >= 10]
+        if remaining:
+            cand_long = [t for t in cand_texts_set if len(t) >= 10]
+            for t in remaining:
+                for ct in cand_long:
+                    if difflib.SequenceMatcher(None, t, ct).ratio() >= 0.85:
+                        fuzzy_hits += 1
+                        break
+
+        run_len = _longest_contiguous_run(frag_texts_raw, cand_texts_raw)
+
+        total_hits = exact_hits + fuzzy_hits
+        strong = (
+            long_hits >= 1
+            or total_hits >= 2
+            or run_len >= MATCH_MIN_RUN
+        )
+
+        if frag_size == 1:
+            # Only accept a single-message fragment when the one message
+            # is itself distinctive (long exact / fuzzy / inside a run).
+            single_ok = long_hits >= 1 or run_len >= 1 and total_hits >= 1
+            strong = strong and single_ok
+
+        score = (
+            4 * part_hits
+            + 6 * exact_hits
+            + 5 * long_hits
+            + 3 * fuzzy_hits
+            + 8 * max(0, run_len - 1)
+        )
+
+        breakdowns.append(
+            f"  conv={c['id']} parts={part_hits} exact={exact_hits} "
+            f"long={long_hits} fuzzy={fuzzy_hits} run={run_len} "
+            f"score={score} strong={strong}"
+        )
+
+        if not strong:
+            continue
+        if score > best_score:
+            best_score = score
+            best_id = int(c["id"])
+
+    if logger.isEnabledFor(logging.DEBUG) and breakdowns:
+        logger.debug("Match scoring:\n%s", "\n".join(breakdowns))
+
+    if best_id is not None:
+        logger.info(
+            "Matched fragment (size=%d) to conv=%d (score=%d)",
+            frag_size, best_id, best_score,
+        )
+        return best_id
+
+    logger.info(
+        "Creating new conversation (no candidate passed strong-match gate, fragment size=%d)",
+        frag_size,
+    )
+    return None
+
+
+def _longest_contiguous_run(frag_texts: list[str], cand_texts: list[str]) -> int:
+    """Length of the longest contiguous in-order matching subsequence.
+
+    Two positions match when their normalized texts are non-empty and
+    equal. Used as a "prefix / sequence" signal: if the fragment's
+    messages appear consecutively somewhere in the candidate (or vice
+    versa), it is strong evidence of continuity even when individual
+    messages on their own would be weak.
+    """
+    if not frag_texts or not cand_texts:
+        return 0
+    n, m = len(frag_texts), len(cand_texts)
+    # Rolling DP on the previous row to keep memory small.
+    prev = [0] * (m + 1)
+    best = 0
+    for i in range(1, n + 1):
+        cur = [0] * (m + 1)
+        fi = frag_texts[i - 1]
+        if len(fi) < 4:
+            # Short/empty fragment entries never contribute to a run.
+            prev = cur
+            continue
+        for j in range(1, m + 1):
+            if cand_texts[j - 1] and cand_texts[j - 1] == fi:
+                cur[j] = prev[j - 1] + 1
+                if cur[j] > best:
+                    best = cur[j]
+        prev = cur
+    return best
+
+
+def _messages_are_same(a_sender: str, a_text: str, b_sender: str, b_text: str) -> bool:
+    """Are two messages the same real message modulo OCR noise?
+
+    Senders must fuzzy-match (normalized + trailing digits/handles
+    stripped). Then the texts must match by one of:
+    - Identical normalized text
+    - One normalized text is a prefix/suffix of the other (length >= 6)
+    - Long messages (>= 10 chars) with SequenceMatcher ratio >= 0.85
+    """
+    sa = _normalize_name(a_sender)
+    sb = _normalize_name(b_sender)
+    if not _fuzzy_name_match(sa, sb):
+        return False
+
+    ta = _normalize_text(a_text)
+    tb = _normalize_text(b_text)
+    if not ta or not tb:
+        return ta == tb
+    if ta == tb:
         return True
 
-    cand_texts = {
-        _normalize_text(m.get("text", ""))
-        for m in json.loads(candidate["messages_json"])
-    }
-    cand_texts.discard("")
-    for m in fragment.messages:
-        t = _normalize_text(m.get("text", ""))
-        if len(t) >= 6 and t in cand_texts:
+    shorter, longer = (ta, tb) if len(ta) <= len(tb) else (tb, ta)
+    if len(shorter) >= 6 and (longer.startswith(shorter) or longer.endswith(shorter)):
+        return True
+
+    if min(len(ta), len(tb)) >= 10:
+        if difflib.SequenceMatcher(None, ta, tb).ratio() >= 0.85:
             return True
 
     return False
 
 
-def _naive_merge(
+def _better_sender(a: str, b: str) -> str:
+    """Pick the fuller sender variant when OCR produced two readings."""
+    if len(b) > len(a):
+        return b
+    return a
+
+
+def _better_text(a: str, b: str) -> str:
+    """Pick the fuller text variant when OCR truncated one reading."""
+    na = _normalize_text(a)
+    nb = _normalize_text(b)
+    if len(nb) > len(na):
+        return b
+    if len(nb) < len(na):
+        return a
+    return b if len(b) > len(a) else a
+
+
+def _fuzzy_merge(
     prior: list[dict[str, str]],
     new: list[dict[str, str]],
 ) -> list[dict[str, str]]:
-    seen: set[tuple[str, str]] = set()
+    """Deterministic OCR-tolerant message deduplication.
+
+    Preserves prior chronological order; appends truly new messages at
+    the end. When the same real-world message appears in both lists
+    with OCR variation, the fuller sender and fuller text win.
+    """
+    if not prior:
+        return _dedup_within(new)
+    if not new:
+        return _dedup_within(prior)
+
+    result: list[dict[str, str]] = [dict(m) for m in prior]
+    for nm in new:
+        ns = nm.get("sender", "")
+        nt = nm.get("text", "")
+        match_idx = None
+        for i, em in enumerate(result):
+            if _messages_are_same(em.get("sender", ""), em.get("text", ""), ns, nt):
+                match_idx = i
+                break
+        if match_idx is None:
+            result.append({"sender": ns, "text": nt})
+        else:
+            em = result[match_idx]
+            em["sender"] = _better_sender(em.get("sender", ""), ns)
+            em["text"] = _better_text(em.get("text", ""), nt)
+
+    return result
+
+
+def _dedup_within(messages: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Collapse near-duplicate messages inside a single list (same OCR rules)."""
     result: list[dict[str, str]] = []
-    for m in prior + new:
-        key = (m.get("sender", "").strip().lower(), m.get("text", "").strip().lower())
-        if key not in seen:
-            seen.add(key)
-            result.append(m)
+    for m in messages:
+        s = m.get("sender", "")
+        t = m.get("text", "")
+        match_idx = None
+        for i, em in enumerate(result):
+            if _messages_are_same(em.get("sender", ""), em.get("text", ""), s, t):
+                match_idx = i
+                break
+        if match_idx is None:
+            result.append({"sender": s, "text": t})
+        else:
+            em = result[match_idx]
+            em["sender"] = _better_sender(em.get("sender", ""), s)
+            em["text"] = _better_text(em.get("text", ""), t)
     return result
 
 

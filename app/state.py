@@ -246,8 +246,16 @@ def _build_session_narrative(
     duration_s: float,
     alerts_count: int,
     peak: str = "safe",
+    latest_level: str = "safe",
+    latest_conv: dict | None = None,
 ) -> dict[str, Any]:
-    """Build the right-panel session overview narrative."""
+    """Build the right-panel session overview narrative.
+
+    The hero (big headline + tone) reflects the LATEST frame so the
+    right panel stays in sync with the live-capture tile on the left.
+    The concerns list below still shows every conversation flagged
+    during the session — that's the historical log, not the "now".
+    """
     non_safe = [
         c for c in conversations
         if c["threat_level"] in {"caution", "warning", "alert", "critical"}
@@ -262,30 +270,46 @@ def _build_session_narrative(
             "platform": c["platform"],
             "level": c["threat_level"],
             "category": c["category"],
+            "conversation_id": c.get("conversation_id"),
+            "participant": c.get("participant"),
             "summary": (
-                c["narrative"][:140]
-                if c.get("narrative")
-                else f"{c['category']} pattern on {c['platform']}"
+                c.get("short_summary")
+                or c.get("narrative")
+                or f"{c['category']} pattern on {c['platform']}"
             ),
         })
 
-    if any(c["level"] in {"alert", "critical"} for c in concerns):
+    if latest_level in {"alert", "critical"}:
         tone = "alert"
-        headline = "Alerts active"
-        subhead = f"{len(concerns)} concern{'s' if len(concerns) != 1 else ''} — review now"
-    elif concerns:
+        headline = "Alert active"
+        subhead = (
+            latest_conv.get("short_summary") if latest_conv and latest_conv.get("short_summary")
+            else "Latest capture shows a high-severity pattern"
+        )
+    elif latest_level in {"warning", "caution"}:
         tone = "warning"
-        headline = "Concerning patterns"
-        subhead = f"{len(concerns)} concern{'s' if len(concerns) != 1 else ''} flagged"
+        headline = "Concerning pattern"
+        subhead = (
+            latest_conv.get("short_summary") if latest_conv and latest_conv.get("short_summary")
+            else "Latest capture flagged for review"
+        )
     else:
         tone = "safe"
-        headline = "Currently safe"
-        subhead = (
-            f"Normal activity across {len(conversations)} "
-            f"place{'s' if len(conversations) != 1 else ''}"
-            if conversations
-            else "Monitoring — nothing flagged yet"
-        )
+        if concerns:
+            headline = "Currently safe"
+            subhead = (
+                f"Latest capture is clear — {len(concerns)} earlier "
+                f"concern{'s' if len(concerns) != 1 else ''} still in view"
+            )
+        elif conversations:
+            headline = "Currently safe"
+            subhead = (
+                f"Normal activity across {len(conversations)} "
+                f"place{'s' if len(conversations) != 1 else ''}"
+            )
+        else:
+            headline = "Currently safe"
+            subhead = "Monitoring — nothing flagged yet"
 
     platforms_seen = {c["platform"] for c in conversations}
     total = len(conversations)
@@ -324,6 +348,29 @@ def _build_session_narrative(
     if not what_to_do:
         what_to_do = ["Keep monitoring — nothing actionable yet"]
 
+    # Pick the conversation whose threat_level matches the session peak.
+    # That's the one Peak links to so clicking it jumps to that detail.
+    peak_rank = {"safe": 0, "caution": 1, "warning": 2, "alert": 3, "critical": 4}
+    peak_conv_summary = None
+    if peak != "safe":
+        peak_conv = next(
+            (c for c in conversations if c["threat_level"] == peak),
+            None,
+        )
+        if peak_conv:
+            peak_conv_summary = {
+                "conversation_id": peak_conv.get("conversation_id"),
+                "platform": peak_conv["platform"],
+                "participant": peak_conv.get("participant"),
+                "name": _participant_label(peak_conv),
+                "short_summary": (
+                    peak_conv.get("short_summary")
+                    or peak_conv.get("narrative")
+                    or f"{peak_conv.get('category', '')} pattern"
+                ),
+                "category": peak_conv.get("category"),
+            }
+
     return {
         "headline": headline,
         "subhead": subhead,
@@ -332,6 +379,7 @@ def _build_session_narrative(
         "platforms_count": len(platforms_seen),
         "conversations_count": len(conversations),
         "peak": peak,
+        "peak_conv": peak_conv_summary,
         "safe_rate": safe_rate,
         "concerns": concerns,
         "safe_summary": safe_summary,
@@ -489,6 +537,8 @@ class AppState:
                 self.worker.session_seconds,
                 self.database.total_alert_count(),
                 peak=peak,
+                latest_level=latest_worst,
+                latest_conv=latest_worst_conv,
             ),
             "privacy": {
                 "network": self.network_report,
