@@ -318,35 +318,11 @@ def _build_session_narrative(
     safe_tokens = [c["participant"] for c in safe[:5]]
     safe_summary = ", ".join(safe_tokens) if safe_tokens else "—"
 
-    what_to_do: list[str] = []
-    grooming_names = [c["name"] for c in concerns if "grooming" in c.get("category", "")]
-    bullying_names = [c["name"] for c in concerns if "bullying" in c.get("category", "")]
-    if grooming_names:
-        what_to_do.append(
-            f"Have a calm conversation with your child about the {grooming_names[0]} interaction"
-        )
-    elif bullying_names:
-        what_to_do.append(
-            f"Offer emotional support around the {bullying_names[0]} exchanges"
-        )
-    elif concerns:
-        what_to_do.append("Review the concerning activity with your child")
-
-    if len(concerns) >= 2:
-        what_to_do.append(
-            "Ask who " + " and ".join(f'"{c["name"]}"' for c in concerns[:2]) + " are"
-        )
-    elif concerns:
-        what_to_do.append(f"Ask who \"{concerns[0]['name']}\" is")
-
-    if concerns:
-        what_to_do.append(
-            "Block and report "
-            + ("them together" if len(concerns) >= 2 else f"{concerns[0]['name']}")
-        )
-
-    if not what_to_do:
-        what_to_do = ["Keep monitoring — nothing actionable yet"]
+    what_to_do = _build_recommendations(
+        latest_level=latest_level,
+        latest_conv=latest_conv,
+        concerns=concerns,
+    )
 
     # Pick the conversation whose threat_level matches the session peak.
     # That's the one Peak links to so clicking it jumps to that detail.
@@ -387,6 +363,107 @@ def _build_session_narrative(
         "what_to_do": what_to_do,
         "alerts_count": alerts_count,
     }
+
+
+def _build_recommendations(
+    latest_level: str,
+    latest_conv: dict | None,
+    concerns: list[dict],
+) -> list[str]:
+    """Parent-facing action list for the right-panel Recommendations card.
+
+    Priorities, in order:
+
+    1. Ground the first line in the LATEST frame's verdict — not in any
+       non-safe conversation ever seen in the session. Stale concerns
+       should not keep telling the parent to "block" someone.
+    2. Pull the conversation's own model-written ``short_summary`` into
+       that first line so it's specific ("asked the child's age and
+       offered exclusive coaching") instead of a generic "have a
+       conversation".
+    3. Branch by category — grooming, bullying, scam, other — with
+       actionable, platform-aware follow-ups.
+    4. Soft follow-up when the latest is safe but earlier concerns
+       exist. No "block and report" calls when nothing is happening now.
+    """
+    level = latest_level or "safe"
+    if level == "safe":
+        if concerns:
+            top = concerns[0]
+            cat = (top.get("category") or "").lower()
+            cat_label = (
+                "grooming conversation" if "grooming" in cat
+                else "bullying episode" if "bullying" in cat
+                else "scam / phishing attempt" if "scam" in cat or "phish" in cat
+                else "concerning activity"
+            )
+            return [
+                f'Things look calm right now. Earlier "{top["name"]}" was flagged for a {cat_label} — review when you can.',
+                "Stay available — your child may bring it up on their own.",
+            ]
+        return ["All clear. Keep monitoring — nothing actionable yet."]
+
+    if not latest_conv:
+        return ["Review the concerning activity with your child."]
+
+    name = latest_conv.get("participant") or latest_conv.get("name") or "the user"
+    platform = latest_conv.get("platform") or "the platform"
+    summary = (
+        latest_conv.get("short_summary")
+        or latest_conv.get("narrative")
+        or ""
+    ).strip()
+    category = (latest_conv.get("category") or "").lower()
+
+    summary_tail = f" ({summary})" if summary and len(summary) <= 220 else ""
+
+    recs: list[str] = []
+    if "grooming" in category:
+        recs.append(
+            f"Talk to your child calmly about their chat with {name}{summary_tail}"
+        )
+        recs.append(
+            f'Ask how they met {name} and whether {name} has asked personal questions or offered gifts.'
+        )
+        recs.append(
+            f"Consider blocking and reporting {name} on {platform}."
+        )
+    elif "bullying" in category:
+        recs.append(
+            f"Check in emotionally about the exchange with {name}{summary_tail}"
+        )
+        recs.append(
+            "Save screenshots before anything is deleted — they may be needed for the school or platform."
+        )
+        recs.append(
+            f"Consider muting or blocking {name} and reporting the messages to {platform}."
+        )
+    elif "scam" in category or "phish" in category:
+        recs.append(
+            f"Make sure your child hasn't clicked any links from {name}{summary_tail}"
+        )
+        recs.append(
+            "Remind them: real giveaways never require password or account verification."
+        )
+        recs.append(
+            f"Report {name} as a scam on {platform} and block the account."
+        )
+    else:
+        recs.append(
+            f"Review the chat with {name} together{summary_tail}"
+        )
+        recs.append(
+            f"Ask your child to walk you through what happened before and after the flagged moment."
+        )
+
+    if len(concerns) >= 2:
+        others = [c["name"] for c in concerns if c.get("participant") != latest_conv.get("participant")][:2]
+        if others:
+            recs.append(
+                f'Also check earlier concerns: {", ".join(others)}.'
+            )
+
+    return recs
 
 
 def _pretty_duration(seconds: float) -> str:

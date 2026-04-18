@@ -81,16 +81,26 @@
           <div class="gl-stat"><div class="gl-stat-val" id="ovConversations">0</div><div class="gl-stat-lbl">conversations</div></div>
           <div class="gl-stat"><div class="gl-stat-val gl-green" id="ovSafeRate">100%</div><div class="gl-stat-lbl">safe rate</div></div>
         </div>
-        <div class="gl-section-label">Session Summary</div>
-        <div class="gl-narrative-card">
-          <div class="gl-narrative-intro" id="narrativeIntro">Session in progress.</div>
-          <div class="gl-narrative-concerns" id="narrativeConcerns"></div>
-          <div class="gl-narrative-safe" id="narrativeSafe"></div>
+        <div class="gl-panel gl-panel-narrative" id="narrativePanel">
+          <div class="gl-panel-head">
+            <svg class="gl-panel-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.5M8 11v0.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <span class="gl-panel-title">Session Summary</span>
+          </div>
+          <div class="gl-panel-body">
+            <div class="gl-narrative-intro" id="narrativeIntro">Session in progress.</div>
+            <div class="gl-narrative-concerns" id="narrativeConcerns"></div>
+            <div class="gl-narrative-safe" id="narrativeSafe"></div>
+          </div>
         </div>
-        <div class="gl-section-label">Recommendations</div>
-        <div class="gl-actions-card">
-          <div class="gl-actions-list" id="actionsList"></div>
-          <div class="gl-actions-foot">AI-generated. No chat content leaves this device.</div>
+        <div class="gl-panel gl-panel-actions" id="actionsPanel">
+          <div class="gl-panel-head">
+            <svg class="gl-panel-icon" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="gl-panel-title">Recommendations</span>
+            <span class="gl-panel-tag">AI · On-device</span>
+          </div>
+          <div class="gl-panel-body">
+            <div class="gl-actions-list" id="actionsList"></div>
+          </div>
         </div>
         <div class="gl-hint">Click any activity on the left for full analysis</div>
       </div>

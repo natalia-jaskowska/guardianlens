@@ -277,6 +277,15 @@ function renderSessionOverview(snapshot) {
   hero.className = "gl-overview-hero" + (toneCls ? " " + toneCls : "");
   title.className = "gl-hero-title " + toneCls;
   sub.className = "gl-hero-sub " + toneCls;
+  const narrativePanel = $("narrativePanel");
+  if (narrativePanel) {
+    narrativePanel.classList.remove("tone-safe", "tone-warn", "tone-alert");
+    narrativePanel.classList.add(
+      toneCls === "alert" ? "tone-alert"
+      : toneCls === "warn" ? "tone-warn"
+      : "tone-safe"
+    );
+  }
   title.textContent = narr.headline || "Monitoring";
   sub.textContent = narr.subhead || "";
   $("heroIcon").innerHTML = toneCls === "alert"
@@ -328,32 +337,10 @@ function renderSessionOverview(snapshot) {
   // with participants + summary, so this row was duplicate content.
   if (concernsEl) concernsEl.innerHTML = "";
 
-  // Safe activities — modern chip row. Header text adapts to whether
-  // there are also concerns (so we don't say "All clear" alongside
-  // a "Concerning patterns" hero).
-  if (narr.safe_count > 0) {
-    const safeConvs = (snapshot.conversations || []).filter((c) => c.threat_level === "safe");
-    const hasConcerns = (narr.concerns || []).length > 0;
-    const headerLabel = hasConcerns
-      ? `${narr.safe_count} other${narr.safe_count === 1 ? "" : "s"} look safe`
-      : "All clear";
-    const tokens = safeConvs.slice(0, 6).map((c) => {
-      const fam = platformFamily(c.platform);
-      const names = (c.participants && c.participants.length > 0) ? c.participants : [c.participant];
-      const label = names.slice(0, 2).join(", ") + (names.length > 2 ? ` +${names.length - 2}` : "");
-      return `<span class="gl-safe-chip"><span class="gl-safe-chip-dot ${fam}"></span>${escapeHtml(label)}</span>`;
-    });
-    const overflow = safeConvs.length > 6
-      ? `<span class="gl-safe-chip more">+${safeConvs.length - 6}</span>` : "";
-    safeEl.innerHTML = `
-      <div class="gl-safe-header">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8.5L6.5 12L13 4.5" stroke="#22c55e" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>${escapeHtml(headerLabel)}</span>
-      </div>
-      <div class="gl-safe-chips">${tokens.join("")}${overflow}</div>`;
-  } else {
-    safeEl.innerHTML = "";
-  }
+  // Safe-participants chip row intentionally removed — the platform +
+  // severity pill summary above already conveys "N look safe" without
+  // listing every OCR'd username.
+  if (safeEl) safeEl.innerHTML = "";
 
   // Actions
   const actionsList = $("actionsList");
@@ -772,19 +759,34 @@ function renderAlertsMenu(snapshot, items) {
   const empty = $("alertsEmpty");
   const head = $("alertsHeadText");
 
-  const unread = items.filter((it) => !ui.seenAlerts.has(alertId(it.kind, it.data)));
+  // Sort: unread first, then newest by last_seen. Severity no longer
+  // rearranges the list — the level is already shown per row, but the
+  // parent primarily wants "what's new" at the top.
+  const itemTime = (it) => {
+    const t = it.data && it.data.last_seen;
+    const ms = t ? Date.parse(t) : NaN;
+    return Number.isFinite(ms) ? ms : 0;
+  };
+  const sorted = items.slice().sort((a, b) => {
+    const ua = !ui.seenAlerts.has(alertId(a.kind, a.data)) ? 0 : 1;
+    const ub = !ui.seenAlerts.has(alertId(b.kind, b.data)) ? 0 : 1;
+    if (ua !== ub) return ua - ub;
+    return itemTime(b) - itemTime(a);
+  });
+
+  const unread = sorted.filter((it) => !ui.seenAlerts.has(alertId(it.kind, it.data)));
   head.textContent = unread.length > 0
     ? `Alerts (${unread.length} new)`
-    : items.length > 0 ? `Alerts (${items.length} read)` : "Alerts";
+    : sorted.length > 0 ? `Alerts (${sorted.length} read)` : "Alerts";
 
   list.innerHTML = "";
-  if (items.length === 0) {
+  if (sorted.length === 0) {
     empty.hidden = false;
     return;
   }
   empty.hidden = true;
 
-  for (const it of items) {
+  for (const it of sorted) {
     const row = document.createElement("div");
     const lvl = levelClass(it.level);
     const key = alertId(it.kind, it.data);
