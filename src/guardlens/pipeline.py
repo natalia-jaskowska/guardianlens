@@ -281,9 +281,20 @@ class ConversationPipeline:
             return None
 
         try:
-            return int(conv_id)
+            conv_id_int = int(conv_id)
         except (ValueError, TypeError):
             return None
+
+        chosen = next((c for c in candidates if c["id"] == conv_id_int), None)
+        if chosen is None:
+            return None
+        if not _has_overlap(fragment, chosen):
+            logger.info(
+                "Rejecting LLM match conv=%d — no participant/message overlap",
+                conv_id_int,
+            )
+            return None
+        return conv_id_int
 
     # ------------------------------------------------------------------
     # Step 4: Merge messages (text LLM call)
@@ -491,6 +502,54 @@ def _format_candidates(candidates: list[Any]) -> str:
             f"last messages: [{tail_text}]"
         )
     return "\n".join(lines)
+
+
+def _normalize_name(name: str) -> str:
+    s = name.strip().lower()
+    s = "".join(ch for ch in s if ch.isalnum())
+    return s.rstrip("0123456789")
+
+
+def _normalize_text(text: str) -> str:
+    s = text.strip().lower()
+    return "".join(ch for ch in s if ch.isalnum())
+
+
+def _has_overlap(fragment: ConversationFragment, candidate: Any) -> bool:
+    """Check positive overlap evidence between a fragment and a candidate.
+
+    Requires a non-child participant match OR a normalized message-text
+    match. Platform identity alone is not sufficient.
+    """
+    if fragment.platform != candidate["platform"]:
+        return False
+
+    cand_participants = {
+        _normalize_name(p)
+        for p in json.loads(candidate["participants_json"])
+        if p and p.lower() != "child"
+    }
+    frag_participants = {
+        _normalize_name(p)
+        for p in fragment.participants
+        if p and p.lower() != "child"
+    }
+    cand_participants.discard("")
+    frag_participants.discard("")
+    if cand_participants & frag_participants:
+        return True
+
+    cand_texts = {
+        _normalize_text(m.get("text", ""))
+        for m in json.loads(candidate["messages_json"])
+    }
+    cand_texts.discard("")
+    for m in fragment.messages:
+        t = _normalize_text(m.get("text", ""))
+        if len(t) >= 6 and t in cand_texts:
+            return True
+
+    return False
 
 
 def _naive_merge(

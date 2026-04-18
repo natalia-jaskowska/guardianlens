@@ -210,6 +210,23 @@ html, body {
   background: var(--alert); color: white;
   font-size: 7px; font-weight: 500;
   display: flex; align-items: center; justify-content: center;
+  transform-origin: center;
+  animation: gl-badge-pulse 1.6s ease-in-out infinite;
+  box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
+}
+.gl-bell-badge[hidden] { animation: none; }
+@keyframes gl-badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.55);
+  }
+  50% {
+    transform: scale(1.25);
+    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gl-bell-badge { animation: none; }
 }
 .gl-model {
   font-size: 11px; color: var(--dim);
@@ -923,12 +940,47 @@ html, body {
 .gl-overview-hero.warn .gl-hero-icon {
   background: rgba(234,179,8,0.08);
   box-shadow: inset 0 0 0 1px rgba(234,179,8,0.28);
+  animation: gl-hero-pulse-warn 1.8s ease-in-out infinite;
 }
 .gl-overview-hero.alert .gl-hero-icon {
   background: rgba(239,68,68,0.10);
   box-shadow: inset 0 0 0 1px rgba(239,68,68,0.32);
+  animation: gl-hero-pulse-alert 1.4s ease-in-out infinite;
 }
 .gl-hero-icon svg { width: 30px; height: 30px; }
+
+@keyframes gl-hero-pulse-warn {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow:
+      inset 0 0 0 1px rgba(234,179,8,0.28),
+      0 0 0 0 rgba(234,179,8,0.55);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow:
+      inset 0 0 0 1px rgba(234,179,8,0.40),
+      0 0 0 10px rgba(234,179,8,0);
+  }
+}
+@keyframes gl-hero-pulse-alert {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow:
+      inset 0 0 0 1px rgba(239,68,68,0.32),
+      0 0 0 0 rgba(239,68,68,0.60);
+  }
+  50% {
+    transform: scale(1.12);
+    box-shadow:
+      inset 0 0 0 1px rgba(239,68,68,0.50),
+      0 0 0 12px rgba(239,68,68,0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gl-overview-hero.warn .gl-hero-icon,
+  .gl-overview-hero.alert .gl-hero-icon { animation: none; }
+}
 .gl-hero-title {
   font-size: 18px; font-weight: 600;
   color: var(--safe);

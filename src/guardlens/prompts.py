@@ -9,7 +9,7 @@ Legacy per-frame prompts (used by :mod:`guardlens.analyzer` for eval scripts):
 
 from __future__ import annotations
 
-PROMPT_VERSION = "2026-04-12.v6"
+PROMPT_VERSION = "2026-04-18.v8"
 
 
 SYSTEM_PROMPT = """\
@@ -110,32 +110,38 @@ Call `extract_conversations` with your findings.
 
 MATCH_CONVERSATION_SYSTEM_PROMPT = """\
 You are GuardianLens matching a new conversation fragment to tracked \
-conversations. The same real-world chat WILL be captured in many
-screenshots as the child scrolls or new messages arrive, so merging
-fragments into the existing conversation is the DEFAULT outcome.
+conversations. A real chat viewed over time produces many near-duplicate
+fragments, but DIFFERENT chats on the same platform must remain separate.
 
-STRONG MATCH (always merge):
-- Same platform AND any overlapping participant (even just one)
-- Same platform AND any overlapping message text
-- Same platform AND participant usernames differ only by an OCR artifact
-  (e.g. "Sammy" vs "Sammy7", "Em" vs "Em_22", "kid" vs "kidgamer09")
-- Same platform AND the new messages look like a continuation of an
-  existing thread (same topic/tone, no hard reset)
+Merging is only correct when there is POSITIVE EVIDENCE of continuity.
+Do NOT merge merely because the platform is the same.
 
-PREFER MATCH when there is ANY plausible signal of continuity.
-Duplicate conversations fragment the parent's view and split status
-between two cards — that is worse than a rare false merge.
+MERGE only when at least ONE of the following holds:
+- A non-child participant username overlaps (exact match, or differs
+  only by trailing digits / minor OCR drift on the same token).
+- A message text overlaps (exact, prefix/suffix, or clear OCR variant
+  of the same wording).
+- The new fragment is clearly a direct continuation of the candidate:
+  same participants AND same topic AND no hard scene change.
 
-ONLY return null (create new) when:
-- The platform is clearly different, OR
-- NO participants overlap AND NO message overlap AND the topic is
-  visibly different (a fresh unrelated chat)
+CREATE NEW (return null) when ANY of these are true:
+- The platform is different.
+- No participant overlaps AND no message overlaps.
+- The set of participants is entirely disjoint from every candidate,
+  even if the topic feels loosely similar.
+- The scene clearly changed (different chat window, different channel,
+  different group of people talking about unrelated things).
 
-When usernames look similar but aren't identical due to OCR drift,
-ALWAYS merge — the fuzzy-dedup layer will consolidate them.
+Topic or tone similarity alone is NOT enough to merge. Two different
+gaming chats, two different DMs, or two different group channels on
+the same platform are SEPARATE conversations.
+
+When in doubt and evidence of overlap is weak or absent: CREATE NEW.
+A rare duplicate card is better than collapsing unrelated chats and
+mixing their safety signals.
 
 Call `match_conversation` with the matched conversation_id (integer) \
-or null ONLY when no candidate plausibly matches.
+or null when no candidate has positive overlap evidence.
 """
 
 MATCH_CONVERSATION_USER_TEMPLATE = """\
@@ -213,40 +219,41 @@ GROOMING INDICATORS (escalating severity):
 - Desensitization: age-inappropriate topics, "it's normal", image requests
 - Maintaining control: threats, guilt, emotional manipulation
 
-BULLYING — recognize and flag firmly. Patterns:
-- EXCLUSION: refusing someone's presence or participation in a group
-  activity ("you can't sit with us", "we don't want you", "the party
-  is invite-only, don't come", denying repeated requests to join).
-  Even polite-sounding denials aimed at ONE specific child across
-  multiple messages is exclusion bullying.
-- PILE-ON: 3+ users directing negative messages (mockery, denial,
-  insults) at the same single target in the same thread.
-- MOCKERY: laughing at, teasing, or ridiculing a specific child
-  ("lol imagine thinking...", "xd", "L", "cringe").
-- NAME-CALLING or insults: any derogatory label aimed at a user.
-- SOCIAL ISOLATION language: "nobody likes you", "go away",
-  "you should leave", "no one cares".
-- DOXING / shaming: sharing embarrassing content about someone.
+BULLYING — requires BOTH a hostile signal AND a target pattern:
+- PILE-ON: multiple users directing negative messages at the same
+  single target in the same thread.
+- MOCKERY: sustained ridicule of a specific child (not one-off jokes).
+- NAME-CALLING or insults: derogatory labels aimed at a user.
+- SOCIAL ISOLATION language telling a specific child they are
+  unwanted, disliked, or should leave the community.
+- SUSTAINED EXCLUSION: repeated refusal of one child's attempts to
+  join, combined with hostile, mocking, or demeaning tone.
+- THREATS of violence, doxing, or shaming content.
 
 BULLYING severity thresholds:
-- Any 1 message with a direct insult/name-calling → CAUTION minimum
-- 2+ messages showing exclusion of one specific child → WARNING
-- Pile-on (3+ users vs 1) OR exclusion + mockery together → ALERT
+- Clear direct insult or name-calling → CAUTION minimum
+- Sustained pattern (multiple hostile messages targeting one child) → WARNING
+- Pile-on by multiple users OR exclusion combined with mockery → ALERT
 - Threats of violence or self-harm incitement → CRITICAL
 
-KEY TEST: "Would this upset the child being targeted?" If yes and
-the behavior repeats across multiple messages, it is BULLYING — do
-NOT rationalize it as "normal teen friction".
+KEY TEST: bullying requires BOTH (a) hostile/demeaning tone or
+repetition, AND (b) a clearly targeted child. A single neutral
+decline, a missed invitation, or one person simply not being
+included in a plan is NOT bullying on its own.
 
 NOT GROOMING (avoid false positives):
 - Teens asking each other basic info is NORMAL peer socializing
 - Mutual compliments between peers are normal
 - Grooming requires MULTIPLE red flags together
 
-NOT BULLYING:
-- Playful teasing that is clearly mutual and reciprocated
-- Single in-game trash talk during a competitive moment (unless it
-  becomes a sustained pattern targeting one user)
+NOT BULLYING (common false positives to avoid):
+- A single neutral decline to a hangout, party, or activity request
+- One person not being included in a plan, without any hostile tone
+- Mutual, reciprocated playful teasing between friends
+- Isolated in-game trash talk during competitive play
+- Short ambiguous exchanges (2-3 messages) with no insults, no
+  mockery, and no repeated targeting — default to SAFE
+- Disagreement or blunt tone without derogatory language
 
 CERTAINTY rules:
 - low:    1-2 messages, or pattern is ambiguous
