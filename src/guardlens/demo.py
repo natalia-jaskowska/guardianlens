@@ -741,28 +741,91 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
             fill=leaf_col,
         )
 
-    # ---- Semi-transparent chat overlay (bottom-left) ----
+    # ---- Village house (middle-ground, adds depth) ----
+    house_x = width // 2 + 80
+    house_base = ground_y - 6
+    house_w, house_h = 140, 78
+    # Log walls
+    draw.rectangle(
+        (house_x, house_base - house_h, house_x + house_w, house_base),
+        fill=(138, 95, 52),
+    )
+    # Horizontal log grain
+    for i in range(1, 5):
+        y = house_base - i * (house_h // 5)
+        draw.line((house_x, y, house_x + house_w, y), fill=(98, 66, 35), width=1)
+    # Roof (triangle of darker wood)
+    for dy in range(0, 44):
+        indent = dy
+        draw.rectangle(
+            (house_x - 6 + indent, house_base - house_h - 44 + dy,
+             house_x + house_w + 6 - indent, house_base - house_h - 44 + dy + 1),
+            fill=(102, 52, 28),
+        )
+    # Window with glow
+    win_x = house_x + 30
+    win_y = house_base - house_h + 24
+    draw.rectangle((win_x, win_y, win_x + 26, win_y + 22), fill=(253, 215, 110))
+    draw.line((win_x + 13, win_y, win_x + 13, win_y + 22), fill=(138, 95, 52), width=2)
+    draw.line((win_x, win_y + 11, win_x + 26, win_y + 11), fill=(138, 95, 52), width=2)
+    # Door
+    door_x = house_x + house_w - 42
+    draw.rectangle(
+        (door_x, house_base - 50, door_x + 24, house_base),
+        fill=(92, 58, 28),
+    )
+    draw.line(
+        (door_x + 12, house_base - 48, door_x + 12, house_base - 2),
+        fill=(60, 40, 20), width=1,
+    )
+
+    # ---- Chat overlay (bottom-left, Minecraft-style with text shadow) ----
     lines = _SCENARIO_LINES["minecraft"][scenario]
     chat_font = _font("DejaVuSansMono.ttf", 16)
-    line_h = 24
-    chat_pad = 8
+    line_h = 22
+    chat_pad = 6
     chat_h = line_h * len(lines) + chat_pad * 2
-    chat_w = int(width * 0.60)
+    chat_w = int(width * 0.62)
     chat_x = 4
-    # Position chat just above the HUD elements
-    chat_y = height - 96 - chat_h
+    chat_y = height - 100 - chat_h
 
-    overlay = Image.new("RGBA", (chat_w, chat_h), (0, 0, 0, 120))
+    overlay = Image.new("RGBA", (chat_w, chat_h), (0, 0, 0, 140))
     image.paste(overlay, (chat_x, chat_y), overlay)
     draw = ImageDraw.Draw(image)
+
+    def _mc_text(xy, text, fill):
+        """Minecraft-style text with a 2px drop-shadow (signature look)."""
+        x, y = xy
+        # Darker shadow offset down-right, just like in-game
+        shadow = tuple(int(c * 0.25) for c in fill[:3]) + ((fill[3],) if len(fill) == 4 else ())
+        draw.text((x + 2, y + 2), text, fill=shadow, font=chat_font)
+        draw.text((x, y), text, fill=fill, font=chat_font)
 
     ty = chat_y + chat_pad
     for user, msg in lines:
         tag = f"<{user}> "
-        draw.text((chat_x + 6, ty), tag, fill=(120, 200, 255), font=chat_font)
+        _mc_text((chat_x + 6, ty), tag, (255, 255, 255))
         tag_w = int(draw.textlength(tag, font=chat_font))
-        draw.text((chat_x + 6 + tag_w, ty), msg, fill=(240, 240, 240), font=chat_font)
+        _mc_text((chat_x + 6 + tag_w, ty), msg, (233, 233, 233))
         ty += line_h
+
+    # ---- Armor bar (mirror of hearts, above health) ----
+    armor_y = height - 102
+    for i in range(10):
+        ax = width // 2 - 182 + i * 16
+        # Empty armor slot (outlined triangle)
+        draw.polygon(
+            [(ax + 6, armor_y), (ax + 12, armor_y + 6),
+             (ax + 6, armor_y + 10), (ax, armor_y + 6)],
+            fill=(40, 40, 40),
+        )
+        # Filled armor for first 7 (typical iron set partial)
+        if i < 7:
+            draw.polygon(
+                [(ax + 6, armor_y + 1), (ax + 11, armor_y + 6),
+                 (ax + 6, armor_y + 9), (ax + 1, armor_y + 6)],
+                fill=(210, 210, 220),
+            )
 
     # ---- Health hearts (left) + Hunger (right) ----
     hud_y = height - 88
@@ -781,7 +844,7 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
         if i < 9:
             draw.rectangle((fx + 1, hud_y + 1, fx + 11, hud_y + 9), fill=(190, 140, 50))
 
-    # ---- XP bar ----
+    # ---- XP bar with level number ----
     xp_y = hud_y + 16
     bar_w = 362
     bar_x = (width - bar_w) // 2
@@ -790,6 +853,14 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
     draw = ImageDraw.Draw(image)
     xp_fill = int(bar_w * 0.62)
     draw.rectangle((bar_x, xp_y, bar_x + xp_fill, xp_y + 4), fill=(128, 255, 32))
+    # Level number — green with black shadow, centered above the bar
+    level_font = _font("DejaVuSans-Bold.ttf", 16)
+    level_text = "27"
+    level_w = int(draw.textlength(level_text, font=level_font))
+    level_x = (width - level_w) // 2
+    level_y = xp_y - 20
+    draw.text((level_x + 1, level_y + 1), level_text, fill=(0, 0, 0), font=level_font)
+    draw.text((level_x, level_y), level_text, fill=(128, 255, 32), font=level_font)
 
     # ---- Hotbar ----
     slot_s = 40

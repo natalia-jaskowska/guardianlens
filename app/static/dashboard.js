@@ -74,12 +74,24 @@ function initials(name) {
 function timeAgo(isoOrSeconds) {
   if (!isoOrSeconds) return "";
   const d = typeof isoOrSeconds === "string" ? new Date(isoOrSeconds) : new Date(isoOrSeconds * 1000);
-  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  const now = Date.now();
+  const s = Math.max(0, Math.floor((now - d.getTime()) / 1000));
   if (s < 10) return "just now";
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  return `${Math.floor(m / 60)}h ago`;
+  if (s < 600) {
+    // Recent — keep the "X ago" relative feel for the current session.
+    if (s < 60) return `${s}s ago`;
+    const m = Math.floor(s / 60);
+    return `${m}m ago`;
+  }
+  // Older than 10 minutes — show an absolute clock time like a normal
+  // messaging app (Discord / iMessage / Slack). If the event is from a
+  // previous day, include the date.
+  const sameDay =
+    new Date(now).toDateString() === d.toDateString();
+  const timeStr = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  if (sameDay) return timeStr;
+  const dateStr = d.toLocaleDateString([], { month: "short", day: "numeric" });
+  return `${dateStr} · ${timeStr}`;
 }
 
 function platformFamily(p) {
@@ -119,7 +131,16 @@ const PLATFORM_SVG = {
   instagram:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none"/></svg>',
   minecraft:
-    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 7l8-4 8 4-8 4-8-4zm0 2v8l8 4v-8L4 9zm16 0l-8 4v8l8-4V9z"/></svg>',
+    // Classic creeper face — the most recognizable Minecraft motif.
+    // Pixel-crisp, rendered in the signature green, no trademark on
+    // the face itself (it's a simple blocky emoji-style shape).
+    '<svg viewBox="0 0 24 24" fill="#8BC34A" aria-hidden="true" shape-rendering="crispEdges">'
+    + '<rect x="6" y="7" width="4" height="4"/>'
+    + '<rect x="14" y="7" width="4" height="4"/>'
+    + '<rect x="9" y="13" width="6" height="3"/>'
+    + '<rect x="9" y="16" width="3" height="3"/>'
+    + '<rect x="13" y="16" width="3" height="3"/>'
+    + '</svg>',
   tiktok:
     '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17 3v3.1a5 5 0 0 0 4 2v3a8 8 0 0 1-4-1.2V16a6 6 0 1 1-6-6v3a3 3 0 1 0 3 3V3h3z"/></svg>',
   youtube:
@@ -300,36 +321,60 @@ function renderSessionOverview(snapshot) {
   $("ovSafeRate").textContent = `${narr.safe_rate ?? 100}%`;
   $("ovSafeRate").className = "gl-stat-val gl-green";
 
-  // Narrative intro — platform chips + severity breakdown (no stat duplication).
+  // Per-platform breakdown — one row per platform with its chat count
+  // and severity pills. Tells the parent WHERE the concern is, not just
+  // that one exists somewhere.
   const intro = $("narrativeIntro");
   const concernsEl = $("narrativeConcerns");
   const safeEl = $("narrativeSafe");
   const total = convs.length + envs.length;
   if (total === 0) {
-    intro.innerHTML = `<span class="gl-intro-muted">Monitoring — nothing flagged yet.</span>`;
+    intro.innerHTML = `<div class="gl-platsum-empty">Monitoring — nothing flagged yet.</div>`;
   } else {
-    const platformSet = new Set(convs.map((c) => c.platform).filter(Boolean));
-    const platformChips = Array.from(platformSet).slice(0, 4).map((p) => {
-      const fam = platformFamily(p);
-      return `<span class="gl-intro-platform"><span class="gl-intro-platform-dot ${fam}"></span>${escapeHtml(platformLabel(p))}</span>`;
+    // Group conversations by platform family.
+    const byPlatform = new Map();  // fam -> { label, conversations: [] }
+    for (const c of convs) {
+      const fam = platformFamily(c.platform);
+      const label = platformLabel(c.platform);
+      if (!byPlatform.has(fam)) byPlatform.set(fam, { fam, label, conversations: [] });
+      byPlatform.get(fam).conversations.push(c);
+    }
+    // Order: platforms with the worst severity first.
+    const sevRank = (lvl) => (
+      lvl === "alert" || lvl === "critical" ? 3
+      : lvl === "warning" ? 2
+      : lvl === "caution" ? 1
+      : 0
+    );
+    const rows = Array.from(byPlatform.values()).map((p) => {
+      const worst = p.conversations.reduce((m, c) => Math.max(m, sevRank(c.threat_level)), 0);
+      const counts = { alert: 0, warning: 0, caution: 0 };
+      for (const c of p.conversations) {
+        const k = (c.threat_level === "critical") ? "alert"
+          : (counts.hasOwnProperty(c.threat_level) ? c.threat_level : null);
+        if (k) counts[k] += 1;
+      }
+      return { ...p, worst, counts, total: p.conversations.length };
+    }).sort((a, b) => b.worst - a.worst || b.total - a.total);
+
+    const rowHtml = rows.map((p) => {
+      const pills = [];
+      if (p.counts.alert)   pills.push(`<span class="gl-platsum-pill alert">${p.counts.alert} alert${p.counts.alert === 1 ? "" : "s"}</span>`);
+      if (p.counts.warning) pills.push(`<span class="gl-platsum-pill warn">${p.counts.warning} concerning</span>`);
+      if (p.counts.caution) pills.push(`<span class="gl-platsum-pill caution">${p.counts.caution} caution</span>`);
+      if (pills.length === 0) pills.push(`<span class="gl-platsum-pill safe">All clear</span>`);
+      return `
+        <div class="gl-platsum-row" data-worst="${p.worst}">
+          <span class="gl-platsum-tile gl-tile ${p.fam}" aria-hidden="true">${platformLogo(p.fam)}</span>
+          <div class="gl-platsum-meta">
+            <span class="gl-platsum-name">${escapeHtml(p.label)}</span>
+            <span class="gl-platsum-count">${p.total} chat${p.total === 1 ? "" : "s"}</span>
+          </div>
+          <span class="gl-platsum-pills">${pills.join("")}</span>
+        </div>`;
     }).join("");
 
-    const counts = { alert: 0, warning: 0, caution: 0 };
-    for (const c of narr.concerns || []) {
-      const k = c.level === "critical" ? "alert" : (counts.hasOwnProperty(c.level) ? c.level : null);
-      if (k) counts[k] += 1;
-    }
-    const pills = [];
-    if (counts.alert)   pills.push(`<span class="gl-intro-pill alert">${counts.alert} alert${counts.alert === 1 ? "" : "s"}</span>`);
-    if (counts.warning) pills.push(`<span class="gl-intro-pill warn">${counts.warning} concerning</span>`);
-    if (counts.caution) pills.push(`<span class="gl-intro-pill caution">${counts.caution} caution</span>`);
-    if (pills.length === 0) pills.push(`<span class="gl-intro-pill safe">All clear</span>`);
-
-    intro.innerHTML = `
-      <div class="gl-intro-row">
-        <div class="gl-intro-platforms">${platformChips}</div>
-        <div class="gl-intro-pills">${pills.join("")}</div>
-      </div>`;
+    intro.innerHTML = `<div class="gl-platsum">${rowHtml}</div>`;
   }
 
   // Concerns list intentionally removed from Session Summary — the
