@@ -275,6 +275,21 @@ function convCard(c) {
   return card;
 }
 
+function safeArcItems(c) {
+  const text = ((c.narrative || '') + ' ' + (c.short_summary || '')).toLowerCase();
+  const items = [];
+  if (text.match(/friend|peer|classmate|buddy/)) items.push('Friend check-in');
+  if (text.match(/support|comfort|feel|emotion/)) items.push('Emotional support');
+  if (text.match(/game|gaming|play|minecraft|roblox/)) items.push('Gaming chat');
+  if (text.match(/school|homework|class|study/)) items.push('School discussion');
+  if (text.match(/family|parent|mom|dad|sibling/)) items.push('Family conversation');
+  if (text.match(/sport|team|practice|match/)) items.push('Sports talk');
+  if (items.length === 0) items.push('Normal conversation');
+  items.push('No risk indicators');
+  items.push('Safe outcome \u2713');
+  return items.slice(0, 4);
+}
+
 function shortNarrative(c) {
   if (c.short_summary) return c.short_summary;
   if (c.narrative) return c.narrative;
@@ -491,7 +506,14 @@ function renderConversationDetail(snapshot, sel) {
   const arc = $("convArc");
   arc.innerHTML = "";
   const indicators = c.indicators || [];
-  if (indicators.length === 0) {
+  if (indicators.length === 0 && lvl === "safe") {
+    safeArcItems(c).forEach(label => {
+      const row = document.createElement("div");
+      row.className = "gl-arc-item";
+      row.innerHTML = `<div class="gl-arc-dot"></div><div class="gl-arc-body"><div class="gl-arc-text">${escapeHtml(label)}</div></div>`;
+      arc.appendChild(row);
+    });
+  } else if (indicators.length === 0) {
     const row = document.createElement("div");
     row.className = "gl-arc-item";
     row.innerHTML = `<div class="gl-arc-dot"></div><div class="gl-arc-body"><div class="gl-arc-text">No flagged messages yet</div></div>`;
