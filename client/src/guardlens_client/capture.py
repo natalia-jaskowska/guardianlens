@@ -21,7 +21,7 @@ _backend: str | None = None
 
 
 def _detect_backend() -> str:
-    """Return 'mss' or 'grim' depending on what works."""
+    """Return backend name depending on what works: mss, grim, gnome-screenshot, or spectacle."""
     import tempfile
     try:
         import mss
@@ -36,12 +36,29 @@ def _detect_backend() -> str:
         pass
 
     if shutil.which("grim"):
-        logger.info("Capture backend: grim (Wayland)")
-        return "grim"
+        # Verify grim actually works with this compositor before committing to it.
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as f:
+            result = subprocess.run(["grim", f.name], capture_output=True)
+        if result.returncode == 0:
+            logger.info("Capture backend: grim (Wayland/wlroots)")
+            return "grim"
+        logger.info("grim found but compositor unsupported, trying other backends")
+
+    if shutil.which("gnome-screenshot"):
+        logger.info("Capture backend: gnome-screenshot (GNOME Wayland)")
+        return "gnome-screenshot"
+
+    if shutil.which("spectacle"):
+        logger.info("Capture backend: spectacle (KDE Wayland)")
+        return "spectacle"
 
     raise RuntimeError(
-        "No capture backend available. "
-        "On X11 mss should work; on Wayland install grim: sudo pacman -S grim"
+        "No capture backend available.\n"
+        "  X11:             pip install mss\n"
+        "  Wayland/wlroots: sudo pacman -S grim\n"
+        "  GNOME Wayland:   sudo pacman -S gnome-screenshot\n"
+        "  KDE Wayland:     sudo pacman -S spectacle"
     )
 
 
@@ -56,7 +73,7 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if _backend == "mss":
+    if _backend == "mss":  # noqa: SIM102
         import mss
         import mss.tools
         with mss.mss() as sct:
@@ -65,10 +82,9 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
             shot = sct.grab(monitors[idx])
             mss.tools.to_png(shot.rgb, shot.size, output=str(output_path))
 
-    else:  # grim
+    elif _backend == "grim":
         import os
         env = os.environ.copy()
-        # Ensure WAYLAND_DISPLAY is set; default to wayland-1 if missing.
         if "WAYLAND_DISPLAY" not in env:
             env["WAYLAND_DISPLAY"] = "wayland-1"
 
@@ -83,6 +99,24 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
         if result.returncode != 0:
             err = result.stderr.decode(errors="replace").strip()
             raise RuntimeError(f"grim failed (exit {result.returncode}): {err}")
+
+    elif _backend == "gnome-screenshot":
+        result = subprocess.run(
+            ["gnome-screenshot", "-f", str(output_path)],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            err = result.stderr.decode(errors="replace").strip()
+            raise RuntimeError(f"gnome-screenshot failed (exit {result.returncode}): {err}")
+
+    elif _backend == "spectacle":
+        result = subprocess.run(
+            ["spectacle", "-b", "-n", "-o", str(output_path)],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            err = result.stderr.decode(errors="replace").strip()
+            raise RuntimeError(f"spectacle failed (exit {result.returncode}): {err}")
 
     return output_path
 
