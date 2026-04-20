@@ -197,7 +197,7 @@ class ConversationPipeline:
                 },
             )
         except (ollama.RequestError, ollama.ResponseError, TimeoutError, ConnectionError) as exc:
-            logger.error("Frame analysis failed: %s", exc)
+            logger.exception("Frame analysis failed (%s): %s", type(exc).__name__, exc)
             return FrameAnalysis()
         elapsed = time.perf_counter() - start
 

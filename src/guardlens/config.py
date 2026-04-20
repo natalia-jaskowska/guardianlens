@@ -21,7 +21,7 @@ from typing import Any
 
 import yaml
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[2]
 
@@ -194,6 +194,18 @@ class GuardLensConfig(BaseSettings):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
     conversation: ConversationConfig = Field(default_factory=ConversationConfig)
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # env vars must beat YAML (init_settings), so env comes first
+        return (env_settings, dotenv_settings, init_settings, file_secret_settings)
 
 
 def load_config(config_path: Path | None = None) -> GuardLensConfig:
