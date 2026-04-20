@@ -1,33 +1,99 @@
 """Screenshot capture loop for the GuardianLens client.
 
 Supports two modes:
-- Real mode: uses mss to grab the primary monitor.
+- Real mode: tries mss (X11) then grim (Wayland) automatically.
 - Demo mode: cycles through synthetic PNG files in a provided folder.
 """
 
 from __future__ import annotations
 
 import logging
+import shutil
+import subprocess
 import time
 from collections.abc import Iterator
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Resolved once at first capture call.
+_backend: str | None = None
+
+
+def _detect_backend() -> str:
+    """Return 'mss' or 'grim' depending on what works."""
+    import tempfile
+    try:
+        import mss
+        import mss.tools
+        with mss.mss() as sct:
+            shot = sct.grab(sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0])
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as f:
+                mss.tools.to_png(shot.rgb, shot.size, output=f.name)
+        logger.info("Capture backend: mss (X11)")
+        return "mss"
+    except Exception:
+        pass
+
+    if shutil.which("grim"):
+        logger.info("Capture backend: grim (Wayland)")
+        return "grim"
+
+    raise RuntimeError(
+        "No capture backend available. "
+        "On X11 mss should work; on Wayland install grim: sudo pacman -S grim"
+    )
+
 
 def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
-    """Grab a single screenshot with mss and save it as PNG."""
-    import mss
-    import mss.tools
+    """Grab a single screenshot and save it as PNG.
+
+    Tries mss (X11) first, falls back to grim (Wayland) automatically.
+    """
+    global _backend
+    if _backend is None:
+        _backend = _detect_backend()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with mss.mss() as sct:
-        monitors = sct.monitors
-        if monitor_index >= len(monitors):
-            monitor_index = 1
-        shot = sct.grab(monitors[monitor_index])
-        mss.tools.to_png(shot.rgb, shot.size, output=str(output_path))
+
+    if _backend == "mss":
+        import mss
+        import mss.tools
+        with mss.mss() as sct:
+            monitors = sct.monitors
+            idx = monitor_index if monitor_index < len(monitors) else 1
+            shot = sct.grab(monitors[idx])
+            mss.tools.to_png(shot.rgb, shot.size, output=str(output_path))
+
+    else:  # grim
+        # monitor_index 1 → output index 0 (grim uses 0-based output list)
+        cmd = ["grim"]
+        outputs = _grim_outputs()
+        out_idx = monitor_index - 1
+        if outputs and out_idx < len(outputs):
+            cmd += ["-o", outputs[out_idx]]
+        cmd.append(str(output_path))
+        subprocess.run(cmd, check=True, capture_output=True)
+
     return output_path
+
+
+def _grim_outputs() -> list[str]:
+    """Return list of Wayland output names via swaymsg/wlr-randr if available."""
+    for tool, args in [
+        ("swaymsg", ["-t", "get_outputs"]),
+        ("wlr-randr", ["--json"]),
+    ]:
+        if not shutil.which(tool):
+            continue
+        try:
+            import json
+            result = subprocess.run([tool, *args], capture_output=True, text=True, timeout=3)
+            data = json.loads(result.stdout)
+            return [o["name"] for o in data if o.get("active", True)]
+        except Exception:
+            pass
+    return []
 
 
 def capture_loop(
