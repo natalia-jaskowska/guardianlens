@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import queue
 import threading
 import time
 from pathlib import Path
@@ -55,6 +56,7 @@ class MonitorWorker:
         self._privacy = privacy_guard or PrivacyGuard(config.privacy)
         self._stop_event = threading.Event()
         self._pause_event = threading.Event()
+        self._frame_queue: queue.Queue[Path | None] = queue.Queue()
         self._thread: threading.Thread | None = None
         self._started_at: float | None = None
         self._paused_at: float | None = None
@@ -156,7 +158,28 @@ class MonitorWorker:
 
     # ------------------------------------------------------------------ thread body
 
+    def push_frame(self, path: Path) -> None:
+        """Enqueue an externally supplied frame for processing (receive mode)."""
+        self._frame_queue.put(path)
+
     def _run(self) -> None:
+        if self._config.monitor.receive_mode:
+            self._run_receive_mode()
+        else:
+            self._run_capture_mode()
+
+    def _run_receive_mode(self) -> None:
+        logger.info("Monitor running in receive mode — waiting for frames via API.")
+        while not self._stop_event.is_set():
+            try:
+                path = self._frame_queue.get(timeout=1.0)
+            except queue.Empty:
+                continue
+            if path is None:
+                break
+            self._process_frame(path)
+
+    def _run_capture_mode(self) -> None:
         for screenshot_path in capture_loop(self._config.monitor):
             if self._stop_event.is_set():
                 break
@@ -164,35 +187,37 @@ class MonitorWorker:
                 time.sleep(1)
             if self._stop_event.is_set():
                 break
+            self._process_frame(screenshot_path)
 
-            logger.info("Processing screenshot: %s", screenshot_path.name)
-            try:
-                conv_ids = self._pipeline.push_screenshot(
-                    screenshot_path,
-                    self._database,
-                    self._alerts,
-                    stale_minutes=self._config.conversation.stale_minutes,
-                )
-            except Exception:
-                logger.exception("Pipeline failed for %s", screenshot_path)
-                continue
-
-            with self._lock:
-                self._scan_count += 1
-                self._latest_screenshot = str(screenshot_path)
-                self._latest_conv_ids = list(conv_ids)
-                if conv_ids:
-                    row = self._database.get_conversation(conv_ids[0])
-                    if row:
-                        self._latest_platform = row["platform"]
-
-            self._privacy.delete_screenshot(screenshot_path)
-
-            logger.info(
-                "Pipeline done: %d conversation(s) updated — %s",
-                len(conv_ids),
-                screenshot_path.name,
+    def _process_frame(self, screenshot_path: Path) -> None:
+        logger.info("Processing screenshot: %s", screenshot_path.name)
+        try:
+            conv_ids = self._pipeline.push_screenshot(
+                screenshot_path,
+                self._database,
+                self._alerts,
+                stale_minutes=self._config.conversation.stale_minutes,
             )
+        except Exception:
+            logger.exception("Pipeline failed for %s", screenshot_path)
+            return
+
+        with self._lock:
+            self._scan_count += 1
+            self._latest_screenshot = str(screenshot_path)
+            self._latest_conv_ids = list(conv_ids)
+            if conv_ids:
+                row = self._database.get_conversation(conv_ids[0])
+                if row:
+                    self._latest_platform = row["platform"]
+
+        self._privacy.delete_screenshot(screenshot_path)
+
+        logger.info(
+            "Pipeline done: %d conversation(s) updated — %s",
+            len(conv_ids),
+            screenshot_path.name,
+        )
 
 
 # ====================================================================== helpers

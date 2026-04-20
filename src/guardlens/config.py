@@ -60,6 +60,14 @@ class MonitorConfig(BaseModel):
             "running the analyzer against scraped/staged screenshots."
         ),
     )
+    receive_mode: bool = Field(
+        False,
+        description=(
+            "If True, disable local screen capture entirely. "
+            "The server expects frames to be pushed via POST /api/frames "
+            "from a remote guardlens-client instance."
+        ),
+    )
 
 
 class SessionConfig(BaseModel):

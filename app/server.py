@@ -27,7 +27,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+import shutil
+import time
+import uuid
+
+from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -202,6 +206,19 @@ def create_app(config: GuardLensConfig) -> FastAPI:
         config.monitor.capture_interval_seconds = seconds
         logger.info("Capture interval changed to %.0fs", seconds)
         return JSONResponse({"status": "ok", "seconds": seconds})
+
+    @app.post("/api/frames")
+    async def api_receive_frame(file: UploadFile = File(...)) -> JSONResponse:
+        """Accept a PNG frame from a remote guardlens-client and queue it for analysis."""
+        shots_dir = config.monitor.screenshots_dir
+        shots_dir.mkdir(parents=True, exist_ok=True)
+        fname = f"client_{int(time.time())}_{uuid.uuid4().hex[:8]}.png"
+        dest = shots_dir / fname
+        with dest.open("wb") as fh:
+            shutil.copyfileobj(file.file, fh)
+        state.worker.push_frame(dest)
+        logger.info("Received frame from client: %s", fname)
+        return JSONResponse({"status": "queued", "file": fname}, status_code=202)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

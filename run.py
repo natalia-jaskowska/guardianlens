@@ -103,6 +103,14 @@ def _parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--no-capture",
+        action="store_true",
+        help=(
+            "Disable local screen capture. The server receives frames via "
+            "POST /api/frames from a remote guardlens-client instance."
+        ),
+    )
+    parser.add_argument(
         "--log-level",
         type=str,
         default=None,
@@ -145,6 +153,9 @@ def main() -> int:
         config.dashboard.server_port = args.dashboard_port
     if args.bind:
         config.dashboard.server_name = args.bind
+    if args.no_capture:
+        config.monitor.receive_mode = True
+        config.monitor.demo_mode = False
     if args.use_finetuned:
         # Swap the inference model for the fine-tuned variant.
         config.ollama.inference_model = config.ollama.finetuned_model
