@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<!--
+  usage ─────────────────────────────────────────────────────────
+  Minecraft alert screenshot — real gameplay photo background with
+  the chat conversation overlaid in classic in-game style (white
+  Mojangles-like text with a 2px drop-shadow, at bottom-left above
+  the hotbar).
+
+  Viewport: 1280×720. The background image covers the whole frame
+  so the composition matches a real screenshot from the game.
+
+  Drive content via `location.hash`:
+
+    {
+      "messages": [
+        {"sender": "knifecore_", "text": "lol u built that?? embarrassing"},
+        {"sender": "child",      "text": "why are u guys like this"}
+      ]
+    }
+
+  Sender "child" is rendered as the local player username ("ava_l"
+  by default, override with `child`).
+  ────────────────────────────────────────────────────────────────
+-->
+<head>
+<meta charset="utf-8">
+<title>Minecraft · alert</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: #000;
+    font-family: "Minecraft", "VT323", ui-monospace, SFMono-Regular,
+                  "DejaVu Sans Mono", Consolas, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    width: 1280px; height: 720px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .bg {
+    position: absolute; inset: 0;
+    background-image: url("_minecraft_bg.jpg");
+    background-size: cover;
+    background-position: center;
+    image-rendering: pixelated;
+    filter: saturate(1.05) contrast(1.04);
+  }
+
+  /* Classic Minecraft chat box sits above the hotbar, bottom-left.
+     Semi-transparent black, white pixel text, drop-shadow. */
+  .chat {
+    position: absolute;
+    left: 8px;
+    bottom: 80px;          /* sits above the real hotbar in the bg */
+    width: 58%;
+    max-width: 760px;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 8px 10px 10px;
+    color: #fff;
+    font-size: 22px;       /* crisp at 2x screenshot */
+    line-height: 1.25;
+    font-weight: 400;
+    letter-spacing: 0.4px;
+    text-shadow:
+      2px 2px 0 rgba(0, 0, 0, 0.65),
+      3px 3px 0 rgba(0, 0, 0, 0.35);
+  }
+  .chat-line { white-space: pre-wrap; word-wrap: break-word; }
+  .chat-line + .chat-line { margin-top: 2px; }
+  .chat-line .tag { color: #fff; }
+  .chat-line .text { color: #fff; }
+
+  /* Specific colour hints so the bullies read as hostile accounts
+     when you scan the scene quickly. Minecraft actually renders all
+     chat white by default — this is a tasteful nudge. */
+  .chat-line.child .tag { color: #ffd75f; }        /* yellow local */
+  .chat-line.mod   .tag { color: #55ff55; }        /* op/mod */
+  .chat-line.bully .tag { color: #ff7b7b; }        /* hostile */
+
+  /* subtle blinking caret matching an open chat prompt */
+  .chat-prompt {
+    margin-top: 6px;
+    color: #ddd;
+    font-size: 22px;
+    text-shadow:
+      2px 2px 0 rgba(0, 0, 0, 0.65);
+    opacity: 0.9;
+  }
+  .chat-prompt::after {
+    content: "";
+    display: inline-block;
+    width: 10px; height: 20px;
+    background: #fff;
+    margin-left: 6px;
+    animation: caret 1s steps(2, end) infinite;
+    vertical-align: -2px;
+  }
+  @keyframes caret { 50% { opacity: 0; } }
+
+  /* Optional corner pill: "GuardianLens captured this frame" — small,
+     not obtrusive, helps judges connect the screenshot to the app. */
+  .capture-badge {
+    position: absolute;
+    top: 14px; right: 14px;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px 6px 9px;
+    background: rgba(15, 17, 22, 0.82);
+    border: 0.5px solid rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+    color: #dcddde;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    backdrop-filter: blur(8px);
+  }
+  .capture-badge .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #ef4444;
+    box-shadow: 0 0 0 0 rgba(239,68,68,0.6);
+    animation: pulse 1.6s ease-out infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.55); }
+    70%  { box-shadow: 0 0 0 7px rgba(239,68,68,0); }
+    100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+  }
+</style>
+</head>
+<body>
+
+<div class="bg"></div>
+
+<div class="capture-badge">
+  <span class="dot"></span>
+  <span id="captureLabel">Guardian<b style="font-weight:800;color:#fff">Lens</b> · captured</span>
+</div>
+
+<div class="chat" id="chat"></div>
+
+<script>
+function escapeHtml(s){
+  return String(s||'')
+    .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+    .replaceAll('"','&quot;').replaceAll("'",'&#39;');
+}
+
+const DEFAULT_SCENE = {
+  child: "ava_l",
+  messages: [
+    { sender: "knifecore_", text: "lol u built that?? embarrassing" },
+    { sender: "_shardrat_", text: "literal 5yo build" },
+    { sender: "mooncrypt",  text: "get off MY server" },
+    { sender: "knifecore_", text: "yeah pack it up ava" },
+    { sender: "_shardrat_", text: "we just destroyed your base lmao" },
+    { sender: "child",      text: "why are u guys like this" },
+    { sender: "knifecore_", text: "bc nobody wants u here" },
+    { sender: "mooncrypt",  text: "try a baby server next time" },
+  ],
+};
+
+function readScene(){
+  const raw = location.hash.slice(1);
+  if (!raw) return DEFAULT_SCENE;
+  try { return JSON.parse(decodeURIComponent(raw)); }
+  catch(_){ try { return JSON.parse(raw); } catch(_){ return DEFAULT_SCENE; } }
+}
+
+function render(){
+  const s = readScene();
+  const child = (s.child || "ava_l").toLowerCase();
+  const box = document.getElementById("chat");
+  const lines = [];
+
+  for (const m of s.messages || []) {
+    const senderRaw = String(m.sender || "");
+    const isChild = senderRaw.toLowerCase() === "child";
+    const displayName = isChild ? (s.child || "ava_l") : senderRaw;
+    const cls = isChild ? "child" : "bully";
+    lines.push(
+      `<div class="chat-line ${cls}">` +
+        `<span class="tag">&lt;${escapeHtml(displayName)}&gt;</span> ` +
+        `<span class="text">${escapeHtml(m.text || "")}</span>` +
+      `</div>`
+    );
+  }
+
+  box.innerHTML = lines.join("");
+
+  // Player-side prompt line under the chat so it reads like a typed-in session
+  const prompt = document.createElement("div");
+  prompt.className = "chat-prompt";
+  prompt.textContent = `> `;
+  box.appendChild(prompt);
+}
+
+window.addEventListener("hashchange", render);
+render();
+</script>
+</body>
+</html>

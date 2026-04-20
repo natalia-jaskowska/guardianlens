@@ -166,6 +166,22 @@ SCENES: list[tuple[str, demo.Platform, demo.Scenario, list[tuple[str, str]]]] = 
             ("tara.k_",    "go private loser"),
         ],
     ),
+    # ---- 9b · Minecraft ALERT — targeted pile-on bullying
+    (
+        "09b_minecraft_alert_bullying",
+        "minecraft",
+        "bullying",
+        [
+            ("knifecore_",  "lol u built that?? embarrassing"),
+            ("_shardrat_",  "literal 5yo build"),
+            ("mooncrypt",   "get off MY server"),
+            ("knifecore_",  "yeah pack it up ava"),
+            ("_shardrat_",  "we just destroyed your base lmao"),
+            ("ava_l",       "why are u guys like this"),
+            ("knifecore_",  "bc nobody wants u here"),
+            ("mooncrypt",   "try a baby server next time"),
+        ],
+    ),
     # ---- 10 · Minecraft SAFE — trade (cooldown scene after alerts)
     (
         "10_minecraft_safe_trade",
