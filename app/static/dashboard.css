@@ -74,11 +74,17 @@ html, body {
   border-bottom: 0.5px solid var(--border);
 }
 .gl-brand { display: flex; align-items: center; gap: 12px; }
+.gl-brand-logo { height: 32px; width: auto; display: block; }
+.gl-logo-spin { transform-origin: 512px 512px; animation: gl-spin 12s linear infinite; }
+.gl-logo-pulse { animation: gl-pulse 2.4s ease-in-out infinite; }
+@keyframes gl-spin { to { transform: rotate(360deg); } }
+@keyframes gl-pulse {
+  0%,100% { opacity: 1; filter: drop-shadow(0 0 3px #E63946); }
+  50%      { opacity: 0.75; filter: drop-shadow(0 0 8px #E63946); }
+}
 .gl-logo {
-  width: 32px; height: 32px; border-radius: 8px;
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 2px 8px rgba(37,99,235,0.35), inset 0 0 0 1px rgba(255,255,255,0.1);
 }
 .gl-logo svg { width: 18px; height: 18px; }
 .gl-brand > span {
