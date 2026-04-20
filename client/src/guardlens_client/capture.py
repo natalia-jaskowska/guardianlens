@@ -66,14 +66,23 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
             mss.tools.to_png(shot.rgb, shot.size, output=str(output_path))
 
     else:  # grim
-        # monitor_index 1 → output index 0 (grim uses 0-based output list)
+        import os
+        env = os.environ.copy()
+        # Ensure WAYLAND_DISPLAY is set; default to wayland-1 if missing.
+        if "WAYLAND_DISPLAY" not in env:
+            env["WAYLAND_DISPLAY"] = "wayland-1"
+
         cmd = ["grim"]
         outputs = _grim_outputs()
         out_idx = monitor_index - 1
         if outputs and out_idx < len(outputs):
             cmd += ["-o", outputs[out_idx]]
         cmd.append(str(output_path))
-        subprocess.run(cmd, check=True, capture_output=True)
+
+        result = subprocess.run(cmd, capture_output=True, env=env)
+        if result.returncode != 0:
+            err = result.stderr.decode(errors="replace").strip()
+            raise RuntimeError(f"grim failed (exit {result.returncode}): {err}")
 
     return output_path
 
