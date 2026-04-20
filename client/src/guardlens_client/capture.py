@@ -8,6 +8,7 @@ Supports two modes:
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import subprocess
 import time
@@ -20,9 +21,24 @@ logger = logging.getLogger(__name__)
 _backend: str | None = None
 
 
+def _wayland_env() -> dict[str, str]:
+    """Return env with WAYLAND_DISPLAY and DBUS_SESSION_BUS_ADDRESS filled in if missing."""
+    env = os.environ.copy()
+    if "WAYLAND_DISPLAY" not in env:
+        env["WAYLAND_DISPLAY"] = "wayland-1"
+    if "DBUS_SESSION_BUS_ADDRESS" not in env:
+        uid = os.getuid()
+        socket = f"/run/user/{uid}/bus"
+        if Path(socket).exists():
+            env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={socket}"
+    return env
+
+
 def _detect_backend() -> str:
-    """Return backend name depending on what works: mss, grim, gnome-screenshot, or spectacle."""
+    """Return backend name depending on what works."""
     import tempfile
+
+    # X11 / XWayland
     try:
         import mss
         import mss.tools
@@ -30,50 +46,68 @@ def _detect_backend() -> str:
             shot = sct.grab(sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0])
             with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as f:
                 mss.tools.to_png(shot.rgb, shot.size, output=f.name)
-        logger.info("Capture backend: mss (X11)")
+        logger.info("Capture backend: mss (X11/XWayland)")
         return "mss"
     except Exception:
         pass
 
+    # Wayland / wlroots (Sway, Hyprland, …)
     if shutil.which("grim"):
-        # Verify grim actually works with this compositor before committing to it.
-        import tempfile
         with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as f:
-            result = subprocess.run(["grim", f.name], capture_output=True)
+            result = subprocess.run(
+                ["grim", f.name], capture_output=True, env=_wayland_env()
+            )
         if result.returncode == 0:
-            logger.info("Capture backend: grim (Wayland/wlroots)")
+            logger.info("Capture backend: grim (wlroots)")
             return "grim"
         logger.info("grim found but compositor unsupported, trying other backends")
 
-    if shutil.which("gnome-screenshot"):
-        logger.info("Capture backend: gnome-screenshot (GNOME Wayland)")
-        return "gnome-screenshot"
+    # GNOME Wayland — call Shell DBus interface directly (avoids gnome-screenshot wrapper)
+    if shutil.which("gdbus"):
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as f:
+            result = subprocess.run(
+                [
+                    "gdbus", "call", "--session",
+                    "--dest", "org.gnome.Shell.Screenshot",
+                    "--object-path", "/org/gnome/Shell/Screenshot",
+                    "--method", "org.gnome.Shell.Screenshot.Screenshot",
+                    "false", "false", f.name,
+                ],
+                capture_output=True,
+                env=_wayland_env(),
+            )
+        if result.returncode == 0:
+            logger.info("Capture backend: gdbus GNOME Shell (GNOME Wayland)")
+            return "gnome-shell-dbus"
 
+    # KDE Wayland
     if shutil.which("spectacle"):
         logger.info("Capture backend: spectacle (KDE Wayland)")
         return "spectacle"
 
+    # XWayland fallback via scrot
+    if shutil.which("scrot"):
+        logger.info("Capture backend: scrot (XWayland)")
+        return "scrot"
+
     raise RuntimeError(
         "No capture backend available.\n"
-        "  X11:             pip install mss\n"
+        "  X11 / XWayland:  pip install mss   OR  sudo pacman -S scrot\n"
         "  Wayland/wlroots: sudo pacman -S grim\n"
-        "  GNOME Wayland:   sudo pacman -S gnome-screenshot\n"
+        "  GNOME Wayland:   gdbus ships with glib2 (usually already installed)\n"
         "  KDE Wayland:     sudo pacman -S spectacle"
     )
 
 
 def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
-    """Grab a single screenshot and save it as PNG.
-
-    Tries mss (X11) first, falls back to grim (Wayland) automatically.
-    """
+    """Grab a single screenshot and save it as PNG."""
     global _backend
     if _backend is None:
         _backend = _detect_backend()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if _backend == "mss":  # noqa: SIM102
+    if _backend == "mss":
         import mss
         import mss.tools
         with mss.mss() as sct:
@@ -83,31 +117,34 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
             mss.tools.to_png(shot.rgb, shot.size, output=str(output_path))
 
     elif _backend == "grim":
-        import os
-        env = os.environ.copy()
-        if "WAYLAND_DISPLAY" not in env:
-            env["WAYLAND_DISPLAY"] = "wayland-1"
-
+        env = _wayland_env()
         cmd = ["grim"]
         outputs = _grim_outputs()
         out_idx = monitor_index - 1
         if outputs and out_idx < len(outputs):
             cmd += ["-o", outputs[out_idx]]
         cmd.append(str(output_path))
-
         result = subprocess.run(cmd, capture_output=True, env=env)
         if result.returncode != 0:
             err = result.stderr.decode(errors="replace").strip()
             raise RuntimeError(f"grim failed (exit {result.returncode}): {err}")
 
-    elif _backend == "gnome-screenshot":
+    elif _backend == "gnome-shell-dbus":
+        env = _wayland_env()
         result = subprocess.run(
-            ["gnome-screenshot", "-f", str(output_path)],
+            [
+                "gdbus", "call", "--session",
+                "--dest", "org.gnome.Shell.Screenshot",
+                "--object-path", "/org/gnome/Shell/Screenshot",
+                "--method", "org.gnome.Shell.Screenshot.Screenshot",
+                "false", "false", str(output_path),
+            ],
             capture_output=True,
+            env=env,
         )
         if result.returncode != 0:
             err = result.stderr.decode(errors="replace").strip()
-            raise RuntimeError(f"gnome-screenshot failed (exit {result.returncode}): {err}")
+            raise RuntimeError(f"GNOME Shell screenshot failed (exit {result.returncode}): {err}")
 
     elif _backend == "spectacle":
         result = subprocess.run(
@@ -117,6 +154,15 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
         if result.returncode != 0:
             err = result.stderr.decode(errors="replace").strip()
             raise RuntimeError(f"spectacle failed (exit {result.returncode}): {err}")
+
+    elif _backend == "scrot":
+        result = subprocess.run(
+            ["scrot", str(output_path)],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            err = result.stderr.decode(errors="replace").strip()
+            raise RuntimeError(f"scrot failed (exit {result.returncode}): {err}")
 
     return output_path
 
