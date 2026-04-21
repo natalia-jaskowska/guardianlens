@@ -8,7 +8,7 @@
 **Pitch:** *Family Link counts minutes. GuardianLens understands what's happening.*
 
 Built for the **Gemma 4 Good Hackathon** (Kaggle x Google DeepMind).
-Targeting the Safety & Trust track + Ollama and Unsloth special prizes.
+Targeting the Safety & Trust track + Ollama special prize.
 
 ---
 
@@ -215,7 +215,6 @@ client/                 Standalone capture client (uv, pyproject.toml)
 Dockerfile              Server Docker image
 docker-compose.yaml     Ollama + GuardianLens stack
 outputs/                Screenshots, SQLite database (gitignored)
-notebooks/              Kaggle notebooks for Unsloth fine-tuning
 ```
 
 ---
