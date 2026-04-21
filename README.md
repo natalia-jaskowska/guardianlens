@@ -7,9 +7,9 @@
 
 **Pitch:** *Other apps count minutes. GuardianLens understands what's happening.*
 
-[![▶ Watch the demo on YouTube](https://img.youtube.com/vi/0IE97Btnrgc/maxresdefault.jpg)](https://youtu.be/0IE97Btnrgc)
+[![▶ Watch the demo on YouTube](https://img.youtube.com/vi/diCV7LlIw88/maxresdefault.jpg)](https://youtu.be/diCV7LlIw88)
 
-*▶ [Watch the demo on YouTube](https://youtu.be/0IE97Btnrgc)*
+*▶ [Watch the demo on YouTube](https://youtu.be/diCV7LlIw88)*
 
 Built for the **Gemma 4 Good Hackathon** (Kaggle x Google DeepMind).
 Targeting the Safety & Trust track + Ollama special prize.
@@ -26,7 +26,6 @@ Targeting the Safety & Trust track + Ollama special prize.
   2. `update_conversation_status` — threat level, category, confidence, indicators, narrative
   3. `generate_parent_alert` — concise summary the parent actually sees
 - A FastAPI dashboard streams the live status, alerts, and the model's full thinking chain via SSE.
-- Optional Telegram, email, or webhook notification on warning / alert / immediate.
 
 Everything runs locally. The child's chats never leave the device.
 
