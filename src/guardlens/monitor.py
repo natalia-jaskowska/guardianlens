@@ -12,6 +12,7 @@ gives the demo video deterministic, repeatable content.
 
 from __future__ import annotations
 
+import contextlib
 import itertools
 import time
 from collections.abc import Iterator
@@ -118,9 +119,7 @@ def _watch_folder_loop(config: MonitorConfig) -> Iterator[Path]:
 
     images = sorted(p for p in watch.iterdir() if p.suffix.lower() in _IMAGE_EXTS)
     if not images:
-        raise FileNotFoundError(
-            f"watch_folder {watch} has no .jpg/.jpeg/.png/.webp files"
-        )
+        raise FileNotFoundError(f"watch_folder {watch} has no .jpg/.jpeg/.png/.webp files")
 
     # Group by scenario prefix (everything before the trailing _NNNN suffix),
     # then shuffle the group order — so different scenarios interleave
@@ -128,6 +127,7 @@ def _watch_folder_loop(config: MonitorConfig) -> Iterator[Path]:
     # Within each group, frame order is preserved (they tell a progression).
     import random
     import re
+
     groups: dict[str, list[Path]] = {}
     for p in images:
         key = re.sub(r"_\d+$", "", p.stem)
@@ -169,7 +169,5 @@ def _prune_old_screenshots(screenshots_dir: Path, keep_last_n: int) -> None:
         return
     pngs = sorted(screenshots_dir.glob("*.png"), key=lambda p: p.stat().st_mtime)
     for stale in pngs[:-keep_last_n]:
-        try:
+        with contextlib.suppress(OSError):
             stale.unlink()
-        except OSError:
-            pass

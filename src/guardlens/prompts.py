@@ -82,7 +82,6 @@ sentences) — the dashboard renders it verbatim to the parent.
 """
 
 
-
 # ====================== New conversation-first pipeline prompts ======================
 
 FRAME_EXTRACT_SYSTEM_PROMPT = """\
@@ -204,4 +203,3 @@ FULL MESSAGE HISTORY ({total_count} messages):
 
 Review and call `update_conversation_status` with your revised assessment.
 """
-

@@ -23,13 +23,12 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from pathlib import Path
-
 import shutil
 import time
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
@@ -62,7 +61,11 @@ def create_app(config: GuardLensConfig) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         state.start()
-        logger.info("FastAPI dashboard ready on %s:%d", config.dashboard.server_name, config.dashboard.server_port)
+        logger.info(
+            "FastAPI dashboard ready on %s:%d",
+            config.dashboard.server_name,
+            config.dashboard.server_port,
+        )
         try:
             yield
         finally:
@@ -138,7 +141,7 @@ def create_app(config: GuardLensConfig) -> FastAPI:
                         break
                     snapshot = state.build_state()
                     payload = json.dumps(snapshot, default=str)
-                    yield f"data: {payload}\n\n".encode("utf-8")
+                    yield f"data: {payload}\n\n".encode()
                     await asyncio.sleep(STREAM_INTERVAL_SECONDS)
             except asyncio.CancelledError:
                 # Normal — client disconnected.
@@ -168,18 +171,26 @@ def create_app(config: GuardLensConfig) -> FastAPI:
     async def api_models() -> JSONResponse:
         """List Ollama models available on the local server."""
         import httpx
+
         try:
             r = httpx.get(f"{config.ollama.host}/api/tags", timeout=2.0)
             r.raise_for_status()
             data = r.json()
             names = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
-            return JSONResponse({
-                "models": sorted(names),
-                "current": config.ollama.inference_model,
-            })
+            return JSONResponse(
+                {
+                    "models": sorted(names),
+                    "current": config.ollama.inference_model,
+                }
+            )
         except (httpx.HTTPError, ValueError, KeyError) as exc:
             logger.warning("Failed to list Ollama models: %s", exc)
-            return JSONResponse({"models": [config.ollama.inference_model], "current": config.ollama.inference_model})
+            return JSONResponse(
+                {
+                    "models": [config.ollama.inference_model],
+                    "current": config.ollama.inference_model,
+                }
+            )
 
     @app.post("/api/config/model")
     async def api_set_model(request: Request) -> JSONResponse:

@@ -24,7 +24,7 @@ from guardlens.schema import (
 )
 
 
-def _enum_values(enum_cls: type) -> list[str]:
+def _enum_values(enum_cls: type[Any]) -> list[str]:
     """Helper: dump an Enum's values into a JSON-Schema-friendly list."""
     return [member.value for member in enum_cls]
 
@@ -97,7 +97,6 @@ CLASSIFY_THREAT_TOOL: dict[str, Any] = {
         },
     },
 }
-
 
 
 IDENTIFY_GROOMING_STAGE_TOOL: dict[str, Any] = {
@@ -289,8 +288,7 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                 "parent_alert_recommended": {
                     "type": "boolean",
                     "description": (
-                        "True only with medium/high certainty and "
-                        "warning/alert/critical level."
+                        "True only with medium/high certainty and warning/alert/critical level."
                     ),
                 },
                 "certainty": {
@@ -299,9 +297,14 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                 },
             },
             "required": [
-                "threat_level", "category", "confidence",
-                "short_summary", "narrative", "reasoning",
-                "parent_alert_recommended", "certainty",
+                "threat_level",
+                "category",
+                "confidence",
+                "short_summary",
+                "narrative",
+                "reasoning",
+                "parent_alert_recommended",
+                "certainty",
             ],
         },
     },

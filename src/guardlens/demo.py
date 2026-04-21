@@ -121,7 +121,6 @@ DEMO_FLAGS: dict[tuple[str, str], dict[int, str]] = {
 }
 
 
-
 # ----------------------------------------------------------------------- chat lines
 
 _SCENARIO_LINES: dict[Platform, dict[Scenario, list[tuple[str, str]]]] = {
@@ -185,10 +184,19 @@ _SCENARIO_LINES: dict[Platform, dict[Scenario, list[tuple[str, str]]]] = {
             ("ShadowPro", "nice im 15. you play super mature for your age tho"),
             ("ShadowPro", "i could coach you if you want, i know some tricks most people dont"),
             ("KidGamer09", "really? that would be awesome"),
-            ("ShadowPro", "yeah for sure. do you have snap? way easier to send clips and stuff there"),
-            ("ShadowPro", "prob better not to mention it in the server tho, people get weird about private coaching"),
+            (
+                "ShadowPro",
+                "yeah for sure. do you have snap? way easier to send clips and stuff there",
+            ),
+            (
+                "ShadowPro",
+                "prob better not to mention it in the server tho, people get weird about private coaching",
+            ),
             ("KidGamer09", "oh ok"),
-            ("ShadowPro", "ill send you some gift cards too for new skins, just keep it between us ok?"),
+            (
+                "ShadowPro",
+                "ill send you some gift cards too for new skins, just keep it between us ok?",
+            ),
         ],
         "bullying": [
             # Coordinated exclusion + humiliation — multiple attackers
@@ -221,7 +229,10 @@ _SCENARIO_LINES: dict[Platform, dict[Scenario, list[tuple[str, str]]]] = {
             ("NitroBot", "go to disc0rd-gifts.com and login with your discord email and password"),
             ("NitroBot", "hurry only 23 left now!!"),
             ("Sammy7", "wait that url looks weird, is that legit?"),
-            ("NitroBot", "its the official giveaway partner site. DM me if link doesnt work i can verify you manually"),
+            (
+                "NitroBot",
+                "its the official giveaway partner site. DM me if link doesnt work i can verify you manually",
+            ),
             ("NitroBot", "just send your login info and ill add nitro directly to your account"),
         ],
     },
@@ -361,7 +372,10 @@ DISCORD_TRAINING_SCENARIOS: dict[str, list[list[tuple[str, str]]]] = {
             ("KidGamer09", "thanks that means a lot"),
             ("NightOwl_", "hey do your parents check your discord?"),
             ("KidGamer09", "no not really"),
-            ("NightOwl_", "good cuz parents dont understand online friendships. lets keep this between us ok?"),
+            (
+                "NightOwl_",
+                "good cuz parents dont understand online friendships. lets keep this between us ok?",
+            ),
             ("NightOwl_", "download telegram its more private. ill be there whenever you need me"),
         ],
         # --- gift/obligation grooming: creates debt then exploits it ---
@@ -376,10 +390,16 @@ DISCORD_TRAINING_SCENARIOS: dict[str, list[list[tuple[str, str]]]] = {
             ("KidGamer09", "OMG THANK YOU SO MUCH"),
             ("xProGifter", "no prob :) hey how old are you btw? just curious"),
             ("KidGamer09", "11"),
-            ("xProGifter", "haha youre really good for 11. hey can you send me a selfie? i wanna see who i just gifted"),
+            (
+                "xProGifter",
+                "haha youre really good for 11. hey can you send me a selfie? i wanna see who i just gifted",
+            ),
             ("KidGamer09", "um idk"),
             ("xProGifter", "come on i just spent $20 on you. its just a pic no big deal"),
-            ("xProGifter", "also dont tell your parents i bought it they might make you give it back"),
+            (
+                "xProGifter",
+                "also dont tell your parents i bought it they might make you give it back",
+            ),
         ],
         # --- fake mentor / esports coach ---
         [
@@ -393,7 +413,10 @@ DISCORD_TRAINING_SCENARIOS: dict[str, list[list[tuple[str, str]]]] = {
             ("CoachDave", "lets set up private coaching sessions on discord calls"),
             ("CoachDave", "just you and me, late at night works best so theres no server lag"),
             ("KidGamer09", "my parents might not let me stay up that late"),
-            ("CoachDave", "just dont tell them. parents dont understand esports, theyll try to stop you"),
+            (
+                "CoachDave",
+                "just dont tell them. parents dont understand esports, theyll try to stop you",
+            ),
             ("CoachDave", "i need your instagram too so i can review your gameplay clips"),
         ],
     ],
@@ -449,7 +472,10 @@ DISCORD_TRAINING_SCENARIOS: dict[str, list[list[tuple[str, str]]]] = {
         # --- fake account-security panic ---
         [
             ("SecurityBot", "URGENT: Your account has been flagged for TOS violations"),
-            ("SecurityBot", "if you do not verify within 24hrs your account will be PERMANENTLY DELETED"),
+            (
+                "SecurityBot",
+                "if you do not verify within 24hrs your account will be PERMANENTLY DELETED",
+            ),
             ("KidGamer09", "what?? i didnt do anything wrong"),
             ("SecurityBot", "multiple reports were filed. to appeal verify your identity now"),
             ("SecurityBot", "send your email password and phone number to resolve immediately"),
@@ -465,12 +491,21 @@ DISCORD_TRAINING_SCENARIOS: dict[str, list[list[tuple[str, str]]]] = {
             ("KidGamer09", "what do you have?"),
             ("xTrader99", "dominus and valkyrie helm"),
             ("KidGamer09", "NO WAY those are worth so much"),
-            ("xTrader99", "yeah ill trade for your inventory. just need to verify through robl0x-trades.com"),
+            (
+                "xTrader99",
+                "yeah ill trade for your inventory. just need to verify through robl0x-trades.com",
+            ),
             ("KidGamer09", "is that the official site?"),
             ("xTrader99", "yeah its the official trading verification site everyone uses it"),
-            ("xTrader99", "just login with your roblox username and password so it can check your inventory"),
+            (
+                "xTrader99",
+                "just login with your roblox username and password so it can check your inventory",
+            ),
             ("KidGamer09", "it looks kinda different from normal roblox"),
-            ("xTrader99", "they updated the design recently. hurry someone else wants the dominus too"),
+            (
+                "xTrader99",
+                "they updated the design recently. hurry someone else wants the dominus too",
+            ),
             ("xTrader99", "i already put my items in escrow you just need to login quick"),
         ],
         # --- fake Steam gift card giveaway ---
@@ -481,10 +516,19 @@ DISCORD_TRAINING_SCENARIOS: dict[str, list[list[tuple[str, str]]]] = {
             ("GiveawayKing", "100%! check winners channel people already got theirs"),
             ("KidGamer09", "ok i shared it"),
             ("GiveawayKing", "nice! now just need to verify youre not a bot"),
-            ("GiveawayKing", "go to steam-verify.net and login so i can send the card to your account"),
+            (
+                "GiveawayKing",
+                "go to steam-verify.net and login so i can send the card to your account",
+            ),
             ("KidGamer09", "ok logging in now"),
-            ("GiveawayKing", "make sure to use your real steam password so the system can match your account"),
-            ("Sammy7", "dude thats a phishing link dont do it!! steam would never ask for your password like that"),
+            (
+                "GiveawayKing",
+                "make sure to use your real steam password so the system can match your account",
+            ),
+            (
+                "Sammy7",
+                "dude thats a phishing link dont do it!! steam would never ask for your password like that",
+            ),
         ],
     ],
 }
@@ -572,7 +616,7 @@ def get_all_discord_scenarios(
     Combines the primary scenario from ``_SCENARIO_LINES["discord"]`` with
     the extra variants in :data:`DISCORD_TRAINING_SCENARIOS`.
     """
-    primary = _SCENARIO_LINES.get("discord", {}).get(category)
+    primary = _SCENARIO_LINES.get("discord", {}).get(category)  # type: ignore[call-overload]
     extras = DISCORD_TRAINING_SCENARIOS.get(category, [])
     result: list[list[tuple[str, str]]] = []
     if primary:
@@ -653,8 +697,7 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
     for ring in range(1, 4):
         glow_alpha = 60 - ring * 18
         draw.ellipse(
-            (width - 155 - ring * 8, 35 - ring * 8,
-             width - 75 + ring * 8, 115 + ring * 8),
+            (width - 155 - ring * 8, 35 - ring * 8, width - 75 + ring * 8, 115 + ring * 8),
             outline=(255, 255, 210, max(glow_alpha, 10)),
         )
 
@@ -716,8 +759,7 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
         trunk_w = rng.randint(10, 16)
         # Trunk
         draw.rectangle(
-            (tx - trunk_w // 2, ground_y - trunk_h,
-             tx + trunk_w // 2, ground_y + 4),
+            (tx - trunk_w // 2, ground_y - trunk_h, tx + trunk_w // 2, ground_y + 4),
             fill=(rng.randint(85, 110), rng.randint(55, 75), rng.randint(25, 40)),
         )
         # Leaves (blocky cross shape)
@@ -731,13 +773,11 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
         # Side extensions
         ext = lw // 4
         draw.rectangle(
-            (tx - lw // 2 - ext, top_y + lh // 4,
-             tx - lw // 2, top_y + lh * 3 // 4),
+            (tx - lw // 2 - ext, top_y + lh // 4, tx - lw // 2, top_y + lh * 3 // 4),
             fill=leaf_col,
         )
         draw.rectangle(
-            (tx + lw // 2, top_y + lh // 4,
-             tx + lw // 2 + ext, top_y + lh * 3 // 4),
+            (tx + lw // 2, top_y + lh // 4, tx + lw // 2 + ext, top_y + lh * 3 // 4),
             fill=leaf_col,
         )
 
@@ -758,8 +798,12 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
     for dy in range(0, 44):
         indent = dy
         draw.rectangle(
-            (house_x - 6 + indent, house_base - house_h - 44 + dy,
-             house_x + house_w + 6 - indent, house_base - house_h - 44 + dy + 1),
+            (
+                house_x - 6 + indent,
+                house_base - house_h - 44 + dy,
+                house_x + house_w + 6 - indent,
+                house_base - house_h - 44 + dy + 1,
+            ),
             fill=(102, 52, 28),
         )
     # Window with glow
@@ -776,7 +820,8 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
     )
     draw.line(
         (door_x + 12, house_base - 48, door_x + 12, house_base - 2),
-        fill=(60, 40, 20), width=1,
+        fill=(60, 40, 20),
+        width=1,
     )
 
     # ---- Chat overlay (bottom-left, Minecraft-style with text shadow) ----
@@ -793,7 +838,7 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
     image.paste(overlay, (chat_x, chat_y), overlay)
     draw = ImageDraw.Draw(image)
 
-    def _mc_text(xy, text, fill):
+    def _mc_text(xy, text, fill):  # type: ignore[no-untyped-def]
         """Minecraft-style text with a 2px drop-shadow (signature look)."""
         x, y = xy
         # Darker shadow offset down-right, just like in-game
@@ -815,15 +860,18 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
         ax = width // 2 - 182 + i * 16
         # Empty armor slot (outlined triangle)
         draw.polygon(
-            [(ax + 6, armor_y), (ax + 12, armor_y + 6),
-             (ax + 6, armor_y + 10), (ax, armor_y + 6)],
+            [(ax + 6, armor_y), (ax + 12, armor_y + 6), (ax + 6, armor_y + 10), (ax, armor_y + 6)],
             fill=(40, 40, 40),
         )
         # Filled armor for first 7 (typical iron set partial)
         if i < 7:
             draw.polygon(
-                [(ax + 6, armor_y + 1), (ax + 11, armor_y + 6),
-                 (ax + 6, armor_y + 9), (ax + 1, armor_y + 6)],
+                [
+                    (ax + 6, armor_y + 1),
+                    (ax + 11, armor_y + 6),
+                    (ax + 6, armor_y + 9),
+                    (ax + 1, armor_y + 6),
+                ],
                 fill=(210, 210, 220),
             )
 
@@ -877,14 +925,22 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
     draw.rectangle((hb_x, hb_y, hb_x + hb_w - 1, hb_y + hb_h - 1), outline=(20, 20, 20), width=2)
 
     item_colors = [
-        (139, 90, 43), (110, 110, 110), (160, 160, 160), None, (220, 55, 55),
-        None, None, (60, 140, 220), (80, 190, 60),
+        (139, 90, 43),
+        (110, 110, 110),
+        (160, 160, 160),
+        None,
+        (220, 55, 55),
+        None,
+        None,
+        (60, 140, 220),
+        (80, 190, 60),
     ]
     for i in range(num_slots):
         sx = hb_x + 4 + i * (slot_s + gap)
         sy = hb_y + 4
-        draw.rectangle((sx, sy, sx + slot_s - 1, sy + slot_s - 1),
-                        fill=(55, 55, 55), outline=(25, 25, 25))
+        draw.rectangle(
+            (sx, sy, sx + slot_s - 1, sy + slot_s - 1), fill=(55, 55, 55), outline=(25, 25, 25)
+        )
         if item_colors[i]:
             draw.rectangle(
                 (sx + 7, sy + 7, sx + slot_s - 8, sy + slot_s - 8),
@@ -894,7 +950,8 @@ def _render_minecraft(scenario: Scenario) -> Image.Image:
     sel_x = hb_x + 4
     draw.rectangle(
         (sel_x - 2, hb_y + 2, sel_x + slot_s + 1, hb_y + slot_s + 5),
-        outline=(255, 255, 255), width=3,
+        outline=(255, 255, 255),
+        width=3,
     )
 
     # ---- Crosshair ----
@@ -920,11 +977,11 @@ _DC_DIVIDER = (64, 68, 75)
 _DC_ONLINE = (35, 165, 90)
 
 _DC_ROLE_COLORS = [
-    (88, 101, 242),   # blurple
-    (87, 242, 135),   # green
-    (235, 69, 158),   # pink
-    (254, 231, 92),   # yellow
-    (235, 69, 69),    # red
+    (88, 101, 242),  # blurple
+    (87, 242, 135),  # green
+    (235, 69, 158),  # pink
+    (254, 231, 92),  # yellow
+    (235, 69, 69),  # red
     (153, 170, 181),  # default grey
 ]
 
@@ -938,8 +995,11 @@ def _render_discord(scenario: Scenario) -> Image.Image:
     server_bar_w = 72
     draw.rectangle((0, 0, server_bar_w, height), fill=_DC_CHANNEL_BG)
     server_colors = [
-        (88, 101, 242), (235, 69, 158), (87, 242, 135),
-        (254, 231, 92), (235, 69, 69),
+        (88, 101, 242),
+        (235, 69, 158),
+        (87, 242, 135),
+        (254, 231, 92),
+        (235, 69, 69),
     ]
     for i, color in enumerate(server_colors):
         iy = 20 + i * 58
@@ -955,8 +1015,11 @@ def _render_discord(scenario: Scenario) -> Image.Image:
         draw.text((36 - iw // 2, iy + 12), initials[i], fill=_DC_USERNAME, font=init_font)
 
     # Separator line
-    draw.line((20, len(server_colors) * 58 + 26, 52, len(server_colors) * 58 + 26),
-              fill=(64, 68, 75), width=2)
+    draw.line(
+        (20, len(server_colors) * 58 + 26, 52, len(server_colors) * 58 + 26),
+        fill=(64, 68, 75),
+        width=2,
+    )
 
     # ---- Channel sidebar ----
     sidebar_x = server_bar_w
@@ -1302,17 +1365,22 @@ def _render_instagram(scenario: Scenario) -> Image.Image:
     # Gradient ring (Instagram purple → orange → pink)
     ring_outer = pc_r + 3
     ring_colors = [
-        (131, 58, 180),   # purple
-        (193, 53, 132),   # magenta
-        (253, 29, 29),    # red
-        (252, 175, 69),   # orange
+        (131, 58, 180),  # purple
+        (193, 53, 132),  # magenta
+        (253, 29, 29),  # red
+        (252, 175, 69),  # orange
     ]
     for i, rc in enumerate(ring_colors):
         offset = i * 1
         draw.arc(
-            (pc_x - ring_outer + offset, pc_cy - ring_outer + offset,
-             pc_x + ring_outer - offset, pc_cy + ring_outer - offset),
-            start=i * 90, end=(i + 1) * 90,
+            (
+                pc_x - ring_outer + offset,
+                pc_cy - ring_outer + offset,
+                pc_x + ring_outer - offset,
+                pc_cy + ring_outer - offset,
+            ),
+            start=i * 90,
+            end=(i + 1) * 90,
             fill=rc,
             width=3,
         )
@@ -1359,8 +1427,12 @@ def _render_instagram(scenario: Scenario) -> Image.Image:
         width=2,
     )
     draw.polygon(
-        [(cam_x + 26, cam_cy - 6), (cam_x + 36, cam_cy - 10),
-         (cam_x + 36, cam_cy + 10), (cam_x + 26, cam_cy + 6)],
+        [
+            (cam_x + 26, cam_cy - 6),
+            (cam_x + 36, cam_cy - 10),
+            (cam_x + 36, cam_cy + 10),
+            (cam_x + 26, cam_cy + 6),
+        ],
         fill=_IG_TEXT,
     )
     # Phone icon
@@ -1391,7 +1463,7 @@ def _render_instagram(scenario: Scenario) -> Image.Image:
     radius = 20
 
     last_sender: str | None = None
-    for msg_idx, (sender, msg) in enumerate(lines):
+    for _msg_idx, (sender, msg) in enumerate(lines):
         is_me = sender == "me"
 
         # Word-wrap
@@ -1440,7 +1512,7 @@ def _render_instagram(scenario: Scenario) -> Image.Image:
 
     # ---- Emoji quick-react row ----
     react_y = height - 112
-    react_font = _font("DejaVuSans.ttf", 22)
+    _font("DejaVuSans.ttf", 22)
     emojis_text = ["<3", "!!", "?!", "ha", "ok", "+1"]
     emoji_spacing = 52
     emoji_start = (width - len(emojis_text) * emoji_spacing) // 2
@@ -1543,8 +1615,10 @@ def _render_tiktok(scenario: Scenario) -> Image.Image:
             py = sy - d // 2
             if 0 <= px < width and 0 <= py < height:
                 # Very subtle lighter pixel
-                base_r, base_g, base_b = image.getpixel((px, py))
-                image.putpixel((px, py), (min(base_r + 8, 50), min(base_g + 4, 30), min(base_b + 10, 60)))
+                base_r, base_g, base_b = image.getpixel((px, py))  # type: ignore[misc]
+                image.putpixel(
+                    (px, py), (min(base_r + 8, 50), min(base_g + 4, 30), min(base_b + 10, 60))
+                )
 
     draw = ImageDraw.Draw(image)
 
@@ -1573,7 +1647,7 @@ def _render_tiktok(scenario: Scenario) -> Image.Image:
 
     # ---- Right-side action column ----
     actions_x = width - 56
-    icon_font = _font("DejaVuSans-Bold.ttf", 16)
+    _font("DejaVuSans-Bold.ttf", 16)
     count_font = _font("DejaVuSans.ttf", 11)
 
     # Profile pic at top of action column
@@ -1608,16 +1682,24 @@ def _render_tiktok(scenario: Scenario) -> Image.Image:
     hcy = heart_y + 14
     draw.ellipse((hcx - hr - 2, hcy - hr, hcx + 2, hcy + 2), fill=_TT_TEXT)
     draw.ellipse((hcx - 2, hcy - hr, hcx + hr + 2, hcy + 2), fill=_TT_TEXT)
-    draw.polygon([(hcx - hr - 2, hcy - 2), (hcx + hr + 2, hcy - 2), (hcx, hcy + hr + 4)], fill=_TT_TEXT)
+    draw.polygon(
+        [(hcx - hr - 2, hcy - 2), (hcx + hr + 2, hcy - 2), (hcx, hcy + hr + 4)], fill=_TT_TEXT
+    )
     draw.text((actions_x + 4, heart_y + 40), " 1.2M", fill=_TT_TEXT, font=count_font)
 
     # Comment bubble
     comment_y = heart_y + 64
     draw.ellipse((actions_x + 2, comment_y, actions_x + 38, comment_y + 36), fill=(40, 40, 40))
     # Speech bubble shape
-    draw.ellipse((actions_x + 8, comment_y + 6, actions_x + 32, comment_y + 26), outline=_TT_TEXT, width=2)
+    draw.ellipse(
+        (actions_x + 8, comment_y + 6, actions_x + 32, comment_y + 26), outline=_TT_TEXT, width=2
+    )
     draw.polygon(
-        [(actions_x + 14, comment_y + 24), (actions_x + 12, comment_y + 32), (actions_x + 22, comment_y + 24)],
+        [
+            (actions_x + 14, comment_y + 24),
+            (actions_x + 12, comment_y + 32),
+            (actions_x + 22, comment_y + 24),
+        ],
         fill=_TT_TEXT,
     )
     draw.text((actions_x + 4, comment_y + 40), " 8,442", fill=_TT_TEXT, font=count_font)
@@ -1627,7 +1709,11 @@ def _render_tiktok(scenario: Scenario) -> Image.Image:
     draw.ellipse((actions_x + 2, share_y, actions_x + 38, share_y + 36), fill=(40, 40, 40))
     # Arrow shape
     draw.polygon(
-        [(actions_x + 12, share_y + 10), (actions_x + 28, share_y + 18), (actions_x + 12, share_y + 26)],
+        [
+            (actions_x + 12, share_y + 10),
+            (actions_x + 28, share_y + 18),
+            (actions_x + 12, share_y + 26),
+        ],
         fill=_TT_TEXT,
     )
     draw.text((actions_x + 6, share_y + 40), " 2.1K", fill=_TT_TEXT, font=count_font)
@@ -1637,9 +1723,13 @@ def _render_tiktok(scenario: Scenario) -> Image.Image:
     draw.ellipse((actions_x + 2, bookmark_y, actions_x + 38, bookmark_y + 36), fill=(40, 40, 40))
     # Bookmark shape (rectangle with V cut at bottom)
     draw.polygon(
-        [(actions_x + 12, bookmark_y + 8), (actions_x + 12, bookmark_y + 28),
-         (actions_x + 20, bookmark_y + 22), (actions_x + 28, bookmark_y + 28),
-         (actions_x + 28, bookmark_y + 8)],
+        [
+            (actions_x + 12, bookmark_y + 8),
+            (actions_x + 12, bookmark_y + 28),
+            (actions_x + 20, bookmark_y + 22),
+            (actions_x + 28, bookmark_y + 28),
+            (actions_x + 28, bookmark_y + 8),
+        ],
         fill=_TT_TEXT,
     )
     draw.text((actions_x + 8, bookmark_y + 40), " save", fill=_TT_TEXT, font=count_font)
@@ -1713,17 +1803,26 @@ def _render_tiktok(scenario: Scenario) -> Image.Image:
         radius=2,
         fill=(80, 80, 80),
     )
-    draw.text((20, panel_top + 16), "Comments", fill=_TT_TEXT, font=_font("DejaVuSans-Bold.ttf", 16))
+    draw.text(
+        (20, panel_top + 16), "Comments", fill=_TT_TEXT, font=_font("DejaVuSans-Bold.ttf", 16)
+    )
 
     comment_font = _font("DejaVuSans.ttf", 13)
     user_font = _font("DejaVuSans-Bold.ttf", 13)
 
     lines = _SCENARIO_LINES["tiktok"][scenario]
-    avatar_colors = [_TT_PINK, _TT_CYAN, (131, 58, 180), (254, 231, 92), (87, 242, 135), (235, 69, 69)]
+    avatar_colors = [
+        _TT_PINK,
+        _TT_CYAN,
+        (131, 58, 180),
+        (254, 231, 92),
+        (87, 242, 135),
+        (235, 69, 69),
+    ]
     y = panel_top + 42
     # Show all comments that fit (up to 3)
     shown = lines[-3:] if len(lines) > 3 else lines
-    for c_idx, (user, msg) in enumerate(shown):
+    for _c_idx, (user, msg) in enumerate(shown):
         ac = avatar_colors[hash(user) % len(avatar_colors)]
         # Avatar circle
         draw.ellipse((20, y, 48, y + 28), fill=ac)
@@ -1747,8 +1846,7 @@ def _render_tiktok(scenario: Scenario) -> Image.Image:
     draw.rectangle((0, prog_y, int(width * progress), prog_y + 2), fill=_TT_TEXT)
     # Playback dot
     draw.ellipse(
-        (int(width * progress) - 4, prog_y - 3,
-         int(width * progress) + 4, prog_y + 5),
+        (int(width * progress) - 4, prog_y - 3, int(width * progress) + 4, prog_y + 5),
         fill=_TT_TEXT,
     )
 
@@ -1760,7 +1858,7 @@ def _render_tiktok(scenario: Scenario) -> Image.Image:
     nav_font = _font("DejaVuSans.ttf", 10)
     nav_items = ["Home", "Friends", "", "Inbox", "Profile"]
     nav_spacing = width // 5
-    for i, label in enumerate(nav_items):
+    for i, _label in enumerate(nav_items):
         nx = i * nav_spacing + nav_spacing // 2
         if i == 0:
             # Home icon (simple house: triangle + rectangle)

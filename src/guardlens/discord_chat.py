@@ -29,10 +29,11 @@ See ``scripts/render_discord.py`` for the CLI entry point.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Callable, Literal
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -40,48 +41,48 @@ from PIL import Image, ImageDraw, ImageFont
 # Colour palette (Discord 2024 refresh)
 # ---------------------------------------------------------------------------
 
-BG_PRIMARY = (49, 51, 56)          # #313338 — chat area
-BG_SECONDARY = (43, 45, 49)        # #2b2d31 — channel list, members panel
-BG_TERTIARY = (30, 31, 34)         # #1e1f22 — guild bar
-BG_ACCENT = (53, 55, 60)           # #35373c — hover / active channel
-BG_INPUT = (56, 58, 64)            # #383a40 — input box
-BG_MENTION = (74, 77, 140)         # mention highlight row
+BG_PRIMARY = (49, 51, 56)  # #313338 — chat area
+BG_SECONDARY = (43, 45, 49)  # #2b2d31 — channel list, members panel
+BG_TERTIARY = (30, 31, 34)  # #1e1f22 — guild bar
+BG_ACCENT = (53, 55, 60)  # #35373c — hover / active channel
+BG_INPUT = (56, 58, 64)  # #383a40 — input box
+BG_MENTION = (74, 77, 140)  # mention highlight row
 BG_REACTION = (43, 45, 49)
 BG_REACTION_SELF = (58, 64, 128)
 BG_GIF = (32, 34, 37)
 
-TEXT_NORMAL = (219, 222, 225)      # #dbdee1
-TEXT_MUTED = (148, 155, 164)       # #949ba4
-TEXT_HEADER = (242, 243, 245)      # #f2f3f5
-TEXT_LINK = (0, 168, 252)          # #00a8fc
-TEXT_MENTION = (201, 205, 251)     # #c9cdfb
+TEXT_NORMAL = (219, 222, 225)  # #dbdee1
+TEXT_MUTED = (148, 155, 164)  # #949ba4
+TEXT_HEADER = (242, 243, 245)  # #f2f3f5
+TEXT_LINK = (0, 168, 252)  # #00a8fc
+TEXT_MENTION = (201, 205, 251)  # #c9cdfb
 
-BLURPLE = (88, 101, 242)           # #5865f2
-ONLINE = (35, 165, 90)             # #23a55a
-IDLE = (240, 178, 50)              # #f0b232
-DND = (242, 63, 67)                # #f23f43
+BLURPLE = (88, 101, 242)  # #5865f2
+ONLINE = (35, 165, 90)  # #23a55a
+IDLE = (240, 178, 50)  # #f0b232
+DND = (242, 63, 67)  # #f23f43
 
 DIVIDER = (62, 64, 70)
 
 # Discord's default avatar colours
 AVATAR_COLORS: tuple[tuple[int, int, int], ...] = (
-    (88, 101, 242),   # blurple
+    (88, 101, 242),  # blurple
     (116, 127, 141),  # grey
-    (59, 165, 93),    # green
-    (250, 166, 26),   # yellow
-    (237, 66, 69),    # red
-    (235, 69, 158),   # fuchsia
+    (59, 165, 93),  # green
+    (250, 166, 26),  # yellow
+    (237, 66, 69),  # red
+    (235, 69, 158),  # fuchsia
 )
 
 # Role colours used for usernames in chat
 ROLE_COLORS: tuple[tuple[int, int, int], ...] = (
     (255, 115, 250),  # pink
-    (88, 101, 242),   # blurple
-    (59, 165, 93),    # green
-    (255, 200, 60),   # yellow
+    (88, 101, 242),  # blurple
+    (59, 165, 93),  # green
+    (255, 200, 60),  # yellow
     (240, 102, 100),  # red
-    (87, 242, 135),   # mint
-    (255, 170, 30),   # orange
+    (87, 242, 135),  # mint
+    (255, 170, 30),  # orange
     (200, 130, 255),  # purple
 )
 
@@ -139,7 +140,7 @@ class Attachment:
 class Reaction:
     """A reaction cluster displayed beneath a message."""
 
-    emoji: str           # single-char or short label rendered inside the pill
+    emoji: str  # single-char or short label rendered inside the pill
     count: int = 1
     self_reacted: bool = False
 
@@ -148,11 +149,11 @@ class Reaction:
 class Message:
     author: str
     text: str
-    timestamp: str = "14:22"                 # HH:MM, rendered as "Today at HH:MM"
-    reply_to: "Message | None" = None
+    timestamp: str = "14:22"  # HH:MM, rendered as "Today at HH:MM"
+    reply_to: Message | None = None
     attachment: Attachment | None = None
     reactions: list[Reaction] = field(default_factory=list)
-    mention: str | None = None               # @user span to highlight
+    mention: str | None = None  # @user span to highlight
     role_color: tuple[int, int, int] | None = None
 
 
@@ -171,7 +172,7 @@ class Member:
     name: str
     status: Status = "online"
     role_color: tuple[int, int, int] | None = None
-    activity: str | None = None              # "Playing Minecraft" etc.
+    activity: str | None = None  # "Playing Minecraft" etc.
 
 
 @dataclass
@@ -224,10 +225,8 @@ def _draw_circle(
     w, h = x1 - x0, y1 - y0
     ss = 4
     layer = Image.new("RGBA", (w * ss, h * ss), (0, 0, 0, 0))
-    ImageDraw.Draw(layer).ellipse(
-        (0, 0, w * ss - 1, h * ss - 1), fill=fill + (255,)
-    )
-    layer = layer.resize((w, h), Image.LANCZOS)
+    ImageDraw.Draw(layer).ellipse((0, 0, w * ss - 1, h * ss - 1), fill=(*fill, 255))
+    layer = layer.resize((w, h), Image.LANCZOS)  # type: ignore[attr-defined]
     canvas.paste(layer, (x0, y0), layer)
 
 
@@ -241,17 +240,14 @@ def _draw_rounded(
     x0, y0, x1, y1 = box
     w, h = x1 - x0, y1 - y0
     ss = 2
-    if len(fill) == 3:
-        fill_rgba = fill + (255,)
-    else:
-        fill_rgba = fill  # type: ignore[assignment]
+    fill_rgba = (*fill, 255) if len(fill) == 3 else fill
     layer = Image.new("RGBA", (w * ss, h * ss), (0, 0, 0, 0))
     ImageDraw.Draw(layer).rounded_rectangle(
         (0, 0, w * ss - 1, h * ss - 1),
         radius=radius * ss,
         fill=fill_rgba,
     )
-    layer = layer.resize((w, h), Image.LANCZOS)
+    layer = layer.resize((w, h), Image.LANCZOS)  # type: ignore[attr-defined]
     canvas.paste(layer, (x0, y0), layer)
 
 
@@ -331,7 +327,7 @@ def _draw_gif_embed(
 ) -> int:
     """Draw a fake GIF tile. Returns total height drawn (incl. footer)."""
     w, h = attachment.width, attachment.height
-    box = (x, y, x + w, y + h)
+    (x, y, x + w, y + h)
 
     # Background gradient (procedural, diagonal)
     tile = Image.new("RGB", (w, h), attachment.palette[0])
@@ -346,9 +342,7 @@ def _draw_gif_embed(
     # Soft diagonal light streak for motion feel
     for i in range(-h, w, 4):
         alpha_line = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-        ImageDraw.Draw(alpha_line).line(
-            (i, 0, i + h, h), fill=(255, 255, 255, 12), width=2
-        )
+        ImageDraw.Draw(alpha_line).line((i, 0, i + h, h), fill=(255, 255, 255, 12), width=2)
         tile = Image.alpha_composite(tile.convert("RGBA"), alpha_line).convert("RGB")
     # Mask to rounded rect
     mask = Image.new("L", (w, h), 0)
@@ -481,15 +475,15 @@ MEMBERS_W = 240
 HEADER_H = 48
 INPUT_H = 92
 
-CHAT_X0 = GUILD_BAR_W + CHANNEL_LIST_W          # 312
-CHAT_X1 = WIDTH - MEMBERS_W                     # 1680
-CHAT_Y0 = HEADER_H                              # 48
-CHAT_Y1 = HEIGHT - INPUT_H                      # 988
+CHAT_X0 = GUILD_BAR_W + CHANNEL_LIST_W  # 312
+CHAT_X1 = WIDTH - MEMBERS_W  # 1680
+CHAT_Y0 = HEADER_H  # 48
+CHAT_Y1 = HEIGHT - INPUT_H  # 988
 
 AVATAR_SIZE = 44
 MESSAGE_LEFT_MARGIN = 16
 MESSAGE_TEXT_X = CHAT_X0 + MESSAGE_LEFT_MARGIN + AVATAR_SIZE + 16  # 388
-MESSAGE_TEXT_MAX_W = CHAT_X1 - MESSAGE_TEXT_X - 40                 # 1252
+MESSAGE_TEXT_MAX_W = CHAT_X1 - MESSAGE_TEXT_X - 40  # 1252
 
 
 # ---------------------------------------------------------------------------
@@ -530,7 +524,7 @@ def _draw_guild_bar(canvas: Image.Image, draw: ImageDraw.ImageDraw) -> None:
 def _draw_channel_list(
     canvas: Image.Image,
     draw: ImageDraw.ImageDraw,
-    server: "Server",
+    server: Server,
     channels: Sequence[Channel],
 ) -> None:
     x0 = GUILD_BAR_W
@@ -628,8 +622,8 @@ def _draw_channel_list(
     )
     # Icons (mic / deafen / settings) — stylised with letters
     icon_font = _font(_BOLD, 14)
-    for i, ch in enumerate(["M", "H", "*"]):
-        draw.text((x1 - 72 + i * 22, panel_y + 20), ch, fill=TEXT_MUTED, font=icon_font)
+    for i, icon_char in enumerate(["M", "H", "*"]):
+        draw.text((x1 - 72 + i * 22, panel_y + 20), icon_char, fill=TEXT_MUTED, font=icon_font)
 
 
 def _draw_channel_header(
@@ -661,9 +655,7 @@ def _draw_channel_header(
     sx1 = WIDTH - 24
     sx0 = sx1 - search_w
     sy0 = 12
-    _draw_rounded(
-        canvas, (sx0, sy0, sx1, sy0 + search_h), radius=4, fill=BG_TERTIARY
-    )
+    _draw_rounded(canvas, (sx0, sy0, sx1, sy0 + search_h), radius=4, fill=BG_TERTIARY)
     draw.text(
         (sx0 + 10, sy0 + 4),
         "Search",
@@ -1026,9 +1018,8 @@ def _draw_member_row(
         status=member.status,
         status_bg=BG_SECONDARY,
     )
-    name_color = (
-        member.role_color
-        or (_role_color(member.name) if member.status != "offline" else TEXT_MUTED)
+    name_color = member.role_color or (
+        _role_color(member.name) if member.status != "offline" else TEXT_MUTED
     )
     text_y = y + (4 if member.activity else 8)
     draw.text((x0 + 52, text_y), member.name, fill=name_color, font=name_font)
@@ -1106,36 +1097,40 @@ def _safe_scenario() -> DiscordScenario:
 
     # Classmates planning a study session — includes address-sharing and
     # age-asking in a clearly safe context (same school, parent awareness).
-    m1 = Message("PixelBuilder", "yo did anyone start the science project yet?",
-                 timestamp="14:02")
+    m1 = Message("PixelBuilder", "yo did anyone start the science project yet?", timestamp="14:02")
     m2 = Message("Em_22", "yeah i picked volcanoes lol", timestamp="14:02")
-    m3 = Message("Sammy7",
-                 "me and jake are doing ours together, wanna join our group?",
-                 timestamp="14:03", reply_to=m2)
-    m4 = Message("PixelBuilder", "yeah sure! when are we meeting?",
-                 timestamp="14:03")
-    m5 = Message("Em_22",
-                 "we could do saturday at my house, my mom said its ok",
-                 timestamp="14:04",
-                 reactions=[Reaction("+1", 2, self_reacted=True)])
-    m6 = Message("Sammy7", "works for me. whats the address again?",
-                 timestamp="14:04")
+    m3 = Message(
+        "Sammy7",
+        "me and jake are doing ours together, wanna join our group?",
+        timestamp="14:03",
+        reply_to=m2,
+    )
+    m4 = Message("PixelBuilder", "yeah sure! when are we meeting?", timestamp="14:03")
+    m5 = Message(
+        "Em_22",
+        "we could do saturday at my house, my mom said its ok",
+        timestamp="14:04",
+        reactions=[Reaction("+1", 2, self_reacted=True)],
+    )
+    m6 = Message("Sammy7", "works for me. whats the address again?", timestamp="14:04")
     m7 = Message("Em_22", "412 oak street, come around 2", timestamp="14:05")
-    m8 = Message("PixelBuilder",
-                 "wait is jake in our class? how old is he",
-                 timestamp="14:05", reply_to=m3)
-    m9 = Message("Sammy7", "yeah hes 13 hes in mr davis period 3",
-                 timestamp="14:06")
-    m10 = Message("PixelBuilder", "oh cool ok im bringing snacks",
-                  timestamp="14:07",
-                  attachment=Attachment(
-                      caption="snack time",
-                      palette=((50, 160, 80), (220, 200, 40)),
-                  ))
-    m11 = Message("Em_22", "yesss get hot cheetos", timestamp="14:07",
-                  reactions=[Reaction("fire", 3)])
-    m12 = Message("Sammy7", "lol u guys always want hot cheetos",
-                  timestamp="14:08")
+    m8 = Message(
+        "PixelBuilder", "wait is jake in our class? how old is he", timestamp="14:05", reply_to=m3
+    )
+    m9 = Message("Sammy7", "yeah hes 13 hes in mr davis period 3", timestamp="14:06")
+    m10 = Message(
+        "PixelBuilder",
+        "oh cool ok im bringing snacks",
+        timestamp="14:07",
+        attachment=Attachment(
+            caption="snack time",
+            palette=((50, 160, 80), (220, 200, 40)),
+        ),
+    )
+    m11 = Message(
+        "Em_22", "yesss get hot cheetos", timestamp="14:07", reactions=[Reaction("fire", 3)]
+    )
+    m12 = Message("Sammy7", "lol u guys always want hot cheetos", timestamp="14:08")
 
     return DiscordScenario(
         server=server,
@@ -1167,19 +1162,17 @@ def _grooming_scenario() -> DiscordScenario:
     # flattery → gift offering → platform switch → secrecy demand.
     # Longer than the old version so the escalation *pattern* is clear
     # and the model can distinguish it from normal teen chat.
-    m1 = Message("ShadowPro", "gg that last round was crazy",
-                 timestamp="16:42")
-    m2 = Message("KidGamer09",
-                 "thanks! ive been practicing a lot lately",
-                 timestamp="16:42")
-    m3 = Message("ShadowPro",
-                 "i can tell. how long have you been playing?",
-                 timestamp="16:43", reply_to=m2)
-    m4 = Message("KidGamer09", "like 6 months maybe",
-                 timestamp="16:43")
-    m5 = Message("ShadowPro",
-                 "wow youre way better than i was at 6 months. how old are you btw?",
-                 timestamp="16:44")
+    m1 = Message("ShadowPro", "gg that last round was crazy", timestamp="16:42")
+    m2 = Message("KidGamer09", "thanks! ive been practicing a lot lately", timestamp="16:42")
+    m3 = Message(
+        "ShadowPro", "i can tell. how long have you been playing?", timestamp="16:43", reply_to=m2
+    )
+    m4 = Message("KidGamer09", "like 6 months maybe", timestamp="16:43")
+    m5 = Message(
+        "ShadowPro",
+        "wow youre way better than i was at 6 months. how old are you btw?",
+        timestamp="16:44",
+    )
     m6 = Message("KidGamer09", "13", timestamp="16:44")
     m7 = Message(
         "ShadowPro",
@@ -1190,22 +1183,34 @@ def _grooming_scenario() -> DiscordScenario:
             palette=((220, 60, 120), (255, 180, 100)),
         ),
     )
-    m8 = Message("ShadowPro",
-                 "i could coach you if you want, i know some tricks most people dont",
-                 timestamp="16:46")
-    m9 = Message("KidGamer09", "really? that would be awesome",
-                 timestamp="16:46",
-                 reactions=[Reaction("+1", 1)])
-    m10 = Message("ShadowPro",
-                  "yeah for sure. do you have snap? way easier to send clips and stuff there",
-                  timestamp="16:47", reply_to=m9)
-    m11 = Message("ShadowPro",
-                  "prob better not to mention it in the server tho, people get weird about private coaching",
-                  timestamp="16:47")
+    m8 = Message(
+        "ShadowPro",
+        "i could coach you if you want, i know some tricks most people dont",
+        timestamp="16:46",
+    )
+    m9 = Message(
+        "KidGamer09",
+        "really? that would be awesome",
+        timestamp="16:46",
+        reactions=[Reaction("+1", 1)],
+    )
+    m10 = Message(
+        "ShadowPro",
+        "yeah for sure. do you have snap? way easier to send clips and stuff there",
+        timestamp="16:47",
+        reply_to=m9,
+    )
+    m11 = Message(
+        "ShadowPro",
+        "prob better not to mention it in the server tho, people get weird about private coaching",
+        timestamp="16:47",
+    )
     m12 = Message("KidGamer09", "oh ok", timestamp="16:48")
-    m13 = Message("ShadowPro",
-                  "ill send you some gift cards too for new skins, just keep it between us ok?",
-                  timestamp="16:48")
+    m13 = Message(
+        "ShadowPro",
+        "ill send you some gift cards too for new skins, just keep it between us ok?",
+        timestamp="16:48",
+    )
 
     return DiscordScenario(
         server=server,
@@ -1236,28 +1241,19 @@ def _bullying_scenario() -> DiscordScenario:
     # Coordinated exclusion + humiliation. Multiple attackers gang up,
     # escalate from gatekeeping ("invite only") to personal attacks and
     # screenshot-sharing. Victim tries to de-escalate repeatedly.
-    m1 = Message("KidGamer09", "hey can i come to the movie night?",
-                 timestamp="20:12")
-    m2 = Message("Maxxx_", "uhh this is invite only", timestamp="20:12",
-                 reply_to=m1)
-    m3 = Message("Lyla.x", "yeah we already have enough people",
-                 timestamp="20:13")
-    m4 = Message("KidGamer09",
-                 "oh, em said it was open to everyone",
-                 timestamp="20:13")
+    m1 = Message("KidGamer09", "hey can i come to the movie night?", timestamp="20:12")
+    m2 = Message("Maxxx_", "uhh this is invite only", timestamp="20:12", reply_to=m1)
+    m3 = Message("Lyla.x", "yeah we already have enough people", timestamp="20:13")
+    m4 = Message("KidGamer09", "oh, em said it was open to everyone", timestamp="20:13")
     m5 = Message(
         "Maxxx_",
         "well she was wrong. you specifically cant come",
         timestamp="20:14",
         reactions=[Reaction("skull", 3), Reaction("clown", 2)],
     )
-    m6 = Message("Lyla.x",
-                 "literally nobody wants you there lol",
-                 timestamp="20:14")
+    m6 = Message("Lyla.x", "literally nobody wants you there lol", timestamp="20:14")
     m7 = Message("xJess", "yikes just take the hint", timestamp="20:15")
-    m8 = Message("KidGamer09",
-                 "why are you guys being like this",
-                 timestamp="20:15")
+    m8 = Message("KidGamer09", "why are you guys being like this", timestamp="20:15")
     m9 = Message(
         "Maxxx_",
         "because youre annoying and everyone thinks so",
@@ -1299,14 +1295,17 @@ def _scam_scenario() -> DiscordScenario:
     server = Server(name="Free Nitro Hub", icon="$")
     channels = [
         Channel(name="read-me", icon="#"),
-        Channel(name="giveaway", icon="#", active=True,
-                topic="FREE DISCORD NITRO — claim before it expires!"),
+        Channel(
+            name="giveaway",
+            icon="#",
+            active=True,
+            topic="FREE DISCORD NITRO — claim before it expires!",
+        ),
         Channel(name="winners", icon="#", mention_count=12),
         Channel(name="claim-now", icon="#", unread=True),
     ]
     members = [
-        Member("NitroBot", "online", role_color=(250, 166, 26),
-               activity="Giving away Nitro"),
+        Member("NitroBot", "online", role_color=(250, 166, 26), activity="Giving away Nitro"),
         Member("KidGamer09", "online"),
         Member("Sammy7", "online"),
         Member("Winner01", "idle"),
@@ -1359,8 +1358,7 @@ def _scam_scenario() -> DiscordScenario:
         timestamp="18:35",
         role_color=(250, 166, 26),
     )
-    m9 = Message("Sammy7", "wait that url looks weird, is that legit?",
-                 timestamp="18:36")
+    m9 = Message("Sammy7", "wait that url looks weird, is that legit?", timestamp="18:36")
     m10 = Message(
         "NitroBot",
         "its the official giveaway partner site. DM me if link doesnt work i can verify you manually",
@@ -1384,7 +1382,7 @@ def _scam_scenario() -> DiscordScenario:
     )
 
 
-SCENARIO_BUILDERS: dict[Scenario, callable] = {  # type: ignore[type-arg]
+SCENARIO_BUILDERS: dict[Scenario, Callable[[], DiscordScenario]] = {
     "safe": _safe_scenario,
     "grooming": _grooming_scenario,
     "bullying": _bullying_scenario,
@@ -1394,9 +1392,7 @@ SCENARIO_BUILDERS: dict[Scenario, callable] = {  # type: ignore[type-arg]
 
 def build_scenario(name: Scenario) -> DiscordScenario:
     if name not in SCENARIO_BUILDERS:
-        raise ValueError(
-            f"unknown scenario {name!r}; expected one of {sorted(SCENARIO_BUILDERS)}"
-        )
+        raise ValueError(f"unknown scenario {name!r}; expected one of {sorted(SCENARIO_BUILDERS)}")
     return SCENARIO_BUILDERS[name]()
 
 

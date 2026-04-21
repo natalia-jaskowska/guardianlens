@@ -12,7 +12,7 @@ from typing import Any
 from unittest.mock import patch
 
 from guardlens.analyzer import GuardLensAnalyzer
-from guardlens.config import GuardLensConfig, OllamaConfig
+from guardlens.config import OllamaConfig
 from guardlens.database import GuardLensDatabase
 from guardlens.pipeline import ConversationPipeline, _fuzzy_merge
 from guardlens.schema import (
@@ -20,7 +20,6 @@ from guardlens.schema import (
     ScreenAnalysis,
     ThreatLevel,
 )
-
 
 _FAKE_OLLAMA_RESPONSE: dict[str, Any] = {
     "message": {
@@ -90,7 +89,6 @@ def test_analyzer_parses_full_tool_chain(tmp_path: Path) -> None:
     assert result.needs_parent_attention is True
 
 
-
 # ---------------------------------------------------------------------------
 # Pipeline unit tests
 # ---------------------------------------------------------------------------
@@ -157,20 +155,25 @@ def test_db_conversation_crud(tmp_path: Path) -> None:
     assert row["platform"] == "discord"
 
     import json
+
     assert json.loads(row["participants_json"]) == ["Alice", "Bob"]
 
     db.update_conversation(
         conv_id,
-        messages_json=json.dumps([
-            {"sender": "Alice", "text": "hi"},
-            {"sender": "Bob", "text": "hello"},
-        ]),
+        messages_json=json.dumps(
+            [
+                {"sender": "Alice", "text": "hi"},
+                {"sender": "Bob", "text": "hello"},
+            ]
+        ),
         status_json=json.dumps({"threat_level": "caution", "confidence": 70}),
         status_reasoning="Watching",
-        screenshots_json=json.dumps([
-            {"path": "/tmp/1.png", "timestamp": now},
-            {"path": "/tmp/2.png", "timestamp": now},
-        ]),
+        screenshots_json=json.dumps(
+            [
+                {"path": "/tmp/1.png", "timestamp": now},
+                {"path": "/tmp/2.png", "timestamp": now},
+            ]
+        ),
         last_seen=now,
     )
 

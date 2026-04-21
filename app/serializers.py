@@ -14,6 +14,7 @@ Keeping the serialization logic in its own module means:
 
 from __future__ import annotations
 
+import contextlib
 import re
 from datetime import datetime
 from typing import Any
@@ -70,9 +71,7 @@ def serialize_analysis(
         "threat_level": cls.threat_level.value,
         "category": cls.category.value,
         "category_label": (
-            ""
-            if cls.category.value == "none"
-            else cls.category.value.upper().replace("_", " ")
+            "" if cls.category.value == "none" else cls.category.value.upper().replace("_", " ")
         ),
         "confidence": round(cls.confidence, 0),
         "reasoning": cls.reasoning,
@@ -189,9 +188,9 @@ def metric_sublabels(totals: dict[str, int]) -> dict[str, str]:
         "screenshots": "live",
         "safe": f"{safe_pct}% of scans",
         "caution": f"{caution_pct}% of scans",
-        "alerts": "no active threats" if alerts == 0 else (
-            "1 active threat" if alerts == 1 else f"{alerts} active threats"
-        ),
+        "alerts": "no active threats"
+        if alerts == 0
+        else ("1 active threat" if alerts == 1 else f"{alerts} active threats"),
     }
 
 
@@ -274,9 +273,7 @@ def build_session_health(
     # Top 4 platforms by count, with human-friendly display labels.
     platforms: list[dict[str, Any]] = [
         {"name": _platform_display_label(bucket), "count": count}
-        for bucket, count in sorted(
-            collapsed.items(), key=lambda item: (-item[1], item[0])
-        )[:4]
+        for bucket, count in sorted(collapsed.items(), key=lambda item: (-item[1], item[0]))[:4]
     ]
     avg_label = (
         f"{avg_inference_seconds:.1f}s avg" if avg_inference_seconds is not None else "— avg"
@@ -365,21 +362,18 @@ def build_alert_history(
             else:
                 category = cls.category.value
             urgency = alert.urgency.value if alert.urgency else "medium"
-            if urgency in ("immediate", "high"):
-                severity = "alert"
-            else:
-                severity = "caution"
+            severity = "alert" if urgency in ("immediate", "high") else "caution"
             level = cls.threat_level.value
             confidence = cls.confidence
         else:
             level = cls.threat_level.value
             category = cls.category.value
             confidence = cls.confidence
-            if level in ("alert", "critical"):
-                severity = "alert"
-            elif category in ("grooming", "inappropriate_content") and confidence >= 80:
-                severity = "alert"
-            elif category == "bullying" and confidence >= 90:
+            if (
+                level in ("alert", "critical")
+                or (category in ("grooming", "inappropriate_content") and confidence >= 80)
+                or (category == "bullying" and confidence >= 90)
+            ):
                 severity = "alert"
             else:
                 severity = "caution"
@@ -399,10 +393,8 @@ def build_alert_history(
         # independent of which summary path we take.
         stage_idx = 0
         if analysis.grooming_stage and analysis.grooming_stage.stage != GroomingStage.NONE:
-            try:
+            with contextlib.suppress(ValueError):
                 stage_idx = GROOMING_STAGE_ORDER.index(analysis.grooming_stage.stage) + 1
-            except ValueError:
-                pass
 
         # Session-level alerts carry a parent_alert with a narrative-based
         # summary. Prefer that over the per-frame indicator list.
@@ -410,7 +402,11 @@ def build_alert_history(
             summary = analysis.parent_alert.summary[:96]
         else:
             # Fallback: per-frame indicators + grooming stage
-            indicator_words = [t for t in (_clean_indicator(s) for s in (cls.indicators_found or [])[:5]) if t is not None]
+            indicator_words = [
+                t
+                for t in (_clean_indicator(s) for s in (cls.indicators_found or [])[:5])
+                if t is not None
+            ]
             summary_bits: list[str] = []
             if indicator_words:
                 summary_bits.append(", ".join(indicator_words[:2]))
@@ -788,9 +784,7 @@ _DEFAULT_USERNAMES: dict[str, str] = {
     "unknown": "unknown user",
 }
 
-_GENERIC_SENDERS: frozenset[str] = frozenset(
-    {"me", "self", "child", "them", "other", "user"}
-)
+_GENERIC_SENDERS: frozenset[str] = frozenset({"me", "self", "child", "them", "other", "user"})
 
 
 def _conversation_meta(analysis: ScreenAnalysis) -> dict[str, Any]:
@@ -812,7 +806,9 @@ def _conversation_meta(analysis: ScreenAnalysis) -> dict[str, Any]:
         other_username = sender
         break
 
-    display = (other_username or _DEFAULT_USERNAMES.get(key, "unknown user")).lstrip("@<").rstrip(">")
+    display = (
+        (other_username or _DEFAULT_USERNAMES.get(key, "unknown user")).lstrip("@<").rstrip(">")
+    )
     return {
         "username": display,
         "url": _PLATFORM_URLS.get(key, _PLATFORM_URLS["unknown"]),
@@ -845,16 +841,11 @@ def _stage_segments(analysis: ScreenAnalysis) -> dict[str, Any]:
     Delegates to :func:`serialize_stage` for the actual segment logic.
     """
     stage = (
-        analysis.grooming_stage.stage
-        if analysis.grooming_stage is not None
-        else GroomingStage.NONE
+        analysis.grooming_stage.stage if analysis.grooming_stage is not None else GroomingStage.NONE
     )
     data = serialize_stage(stage)
     return {
-        "segments": [
-            {"state": s["state"], "label": s["label"]}
-            for s in data["segments"]
-        ],
+        "segments": [{"state": s["state"], "label": s["label"]} for s in data["segments"]],
         "current_index": data["current_index"],
     }
 
@@ -910,7 +901,7 @@ def generate_reasoning_chain(
             steps.append(
                 {
                     "label": "",
-                    "text": f'→ \u201c{quote}\u201d [{msg.flag}]',
+                    "text": f"→ \u201c{quote}\u201d [{msg.flag}]",
                     "type": "flag",
                 }
             )
@@ -930,10 +921,7 @@ def generate_reasoning_chain(
             (h for h in history if h.classification.threat_level != ThreatLevel.SAFE),
             None,
         )
-        if (
-            first_unsafe is not None
-            and first_unsafe.timestamp < analysis.timestamp
-        ):
+        if first_unsafe is not None and first_unsafe.timestamp < analysis.timestamp:
             steps.append(
                 {"label": "STEP 4", "text": "Cross-reference previous scans:", "type": "info"}
             )
@@ -1002,19 +990,19 @@ def generate_why_this_matters(analysis: ScreenAnalysis) -> str:
 
     if cls.category == ThreatCategory.INAPPROPRIATE_CONTENT:
         return (
-            f"Content unsuitable for your child's age was detected."
-            f"\nThis type of exposure can be harmful, especially without context or guidance."
+            "Content unsuitable for your child's age was detected."
+            "\nThis type of exposure can be harmful, especially without context or guidance."
         )
 
     if cls.category == ThreatCategory.PERSONAL_INFO_SHARING:
         return (
-            f"Your child may be sharing personal details that could identify them offline."
-            f"\nThis information could be used by someone with bad intentions."
+            "Your child may be sharing personal details that could identify them offline."
+            "\nThis information could be used by someone with bad intentions."
         )
 
     return (
-        f"Risk indicators were flagged in this conversation."
-        f"\nReview the breakdown above for details."
+        "Risk indicators were flagged in this conversation."
+        "\nReview the breakdown above for details."
     )
 
 
@@ -1065,5 +1053,3 @@ def generate_recommended_action(
         ]
 
     return {"steps": steps, "privacy_note": privacy_note}
-
-

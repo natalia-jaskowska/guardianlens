@@ -265,9 +265,7 @@ class GuardLensDatabase:
             logger.warning("Failed to deserialize analysis from DB: %s", exc)
             return None
 
-    def recent_alert_analyses(
-        self, limit: int = 10
-    ) -> list[tuple[int, int, ScreenAnalysis]]:
+    def recent_alert_analyses(self, limit: int = 10) -> list[tuple[int, int, ScreenAnalysis]]:
         """Reconstruct the N most recent *alerted* :class:`ScreenAnalysis` rows.
 
         Only returns analyses that have a matching row in the ``alerts``
@@ -490,7 +488,7 @@ class GuardLensDatabase:
 
     def get_conversation(self, conv_id: int) -> sqlite3.Row | None:
         with self._lock:
-            return self._conn.execute(
+            return self._conn.execute(  # type: ignore[no-any-return]
                 "SELECT * FROM conversations WHERE id = ?", (conv_id,)
             ).fetchone()
 
@@ -556,8 +554,15 @@ class GuardLensDatabase:
                         screenshots_json = ?, last_seen = ?, participants_json = ?
                     WHERE id = ?
                     """,
-                    (messages_json, status_json, status_reasoning,
-                     screenshots_json, last_seen, participants_json, conv_id),
+                    (
+                        messages_json,
+                        status_json,
+                        status_reasoning,
+                        screenshots_json,
+                        last_seen,
+                        participants_json,
+                        conv_id,
+                    ),
                 )
         else:
             with self._lock:
@@ -568,8 +573,14 @@ class GuardLensDatabase:
                         screenshots_json = ?, last_seen = ?
                     WHERE id = ?
                     """,
-                    (messages_json, status_json, status_reasoning,
-                     screenshots_json, last_seen, conv_id),
+                    (
+                        messages_json,
+                        status_json,
+                        status_reasoning,
+                        screenshots_json,
+                        last_seen,
+                        conv_id,
+                    ),
                 )
 
     def insert_fragment(

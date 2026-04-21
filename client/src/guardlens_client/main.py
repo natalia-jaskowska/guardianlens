@@ -91,7 +91,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     args = _parse_args()
     _setup_logging(args.log_level)
-    log = logging.getLogger("guardlens_client")
+    logging.getLogger("guardlens_client")
 
     with FrameSender(args.server) as sender:
         console.print(f"[bold cyan]GuardianLens Client[/bold cyan] → [green]{args.server}[/green]")
@@ -101,7 +101,7 @@ def main() -> int:
             if sender.check_server():
                 console.print("[green]Server reachable ✓[/green]")
                 break
-            wait = min(2 ** attempt, 30)
+            wait = min(2**attempt, 30)
             console.print(f"[yellow]Server not ready, retrying in {wait}s…[/yellow]")
             time.sleep(wait)
         else:

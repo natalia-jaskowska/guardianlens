@@ -8,13 +8,13 @@ boundary catches malformed tool calls before they reach the dashboard.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, Field
 
 
-class ThreatLevel(str, Enum):
+class ThreatLevel(StrEnum):
     """Coarse-grained safety verdict for a single screenshot."""
 
     SAFE = "safe"
@@ -24,7 +24,7 @@ class ThreatLevel(str, Enum):
     CRITICAL = "critical"
 
 
-class ThreatCategory(str, Enum):
+class ThreatCategory(StrEnum):
     """Specific category of harmful content, if any."""
 
     NONE = "none"
@@ -35,7 +35,7 @@ class ThreatCategory(str, Enum):
     SCAM = "scam"
 
 
-class GroomingStage(str, Enum):
+class GroomingStage(StrEnum):
     """Stage of the grooming pipeline (Olson et al. taxonomy)."""
 
     NONE = "none"
@@ -46,14 +46,13 @@ class GroomingStage(str, Enum):
     MAINTAINING_CONTROL = "maintaining_control"
 
 
-class AlertUrgency(str, Enum):
+class AlertUrgency(StrEnum):
     """How quickly a parent should look at the alert."""
 
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
     IMMEDIATE = "immediate"
-
 
 
 class ChatMessage(BaseModel):
@@ -138,7 +137,7 @@ class ParentAlert(BaseModel):
     urgency: AlertUrgency
 
 
-class SessionCertainty(str, Enum):
+class SessionCertainty(StrEnum):
     """How much evidence the conversation-level verdict is based on.
 
     Distinct from per-verdict ``confidence``: a single frame can be 100%
@@ -216,5 +215,3 @@ class FrameAnalysis(BaseModel):
     conversations: list[ConversationFragment] = Field(default_factory=list)
     raw_thinking: str | None = None
     inference_seconds: float = 0.0
-
-

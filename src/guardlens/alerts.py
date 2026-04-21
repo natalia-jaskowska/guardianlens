@@ -115,7 +115,7 @@ class AlertSender:
         )
         try:
             with urllib.request.urlopen(request, timeout=10) as response:
-                return 200 <= response.status < 300
+                return 200 <= response.status < 300  # type: ignore[no-any-return]
         except (urllib.error.URLError, OSError) as exc:
             logger.error("Failed to POST webhook alert: %s", exc)
             return False
@@ -132,9 +132,7 @@ class AlertSender:
         token = self.config.telegram_bot_token
         chat_id = self.config.telegram_chat_id
         if not token or not chat_id:
-            logger.warning(
-                "Telegram enabled but bot token or chat_id missing — skipping send."
-            )
+            logger.warning("Telegram enabled but bot token or chat_id missing — skipping send.")
             return False
 
         text = format_telegram_message(alert)
@@ -163,10 +161,8 @@ class AlertSender:
                         alert.alert_title,
                     )
                 else:
-                    logger.error(
-                        "Telegram alert returned HTTP %s", response.status
-                    )
-                return ok
+                    logger.error("Telegram alert returned HTTP %s", response.status)
+                return ok  # type: ignore[no-any-return]
         except (urllib.error.URLError, OSError) as exc:
             logger.error("Failed to POST Telegram alert: %s", exc)
             return False

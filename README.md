@@ -21,8 +21,8 @@ Targeting the Safety & Trust track + Ollama special prize.
   1. `extract_conversations` — platform, participants, visible messages
   2. `update_conversation_status` — threat level, category, confidence, indicators, narrative
   3. `generate_parent_alert` — concise summary the parent actually sees
-- A FastAPI dashboard streams the live status, alerts, and the model's full thinking chain.
-- Optional email or webhook notification on warning / alert / critical.
+- A FastAPI dashboard streams the live status, alerts, and the model's full thinking chain via SSE.
+- Optional Telegram, email, or webhook notification on warning / alert / immediate.
 
 Everything runs locally. The child's chats never leave the device.
 
@@ -137,7 +137,9 @@ python run.py --no-capture
 | `--ollama-host` | `http://localhost:11434` | Ollama server URL |
 | `--interval` | `15` | Seconds between captures |
 | `--dashboard-port` | `7860` | Dashboard HTTP port |
+| `--bind` | `0.0.0.0` | Dashboard bind address |
 | `--demo-mode` | off | Synthetic screenshots, no display required |
+| `--watch-folder` | off | Analyze images from a folder instead of live capture |
 | `--no-capture` | off | Receive frames from remote client via API |
 | `--log-level` | `INFO` | DEBUG / INFO / WARNING / ERROR |
 

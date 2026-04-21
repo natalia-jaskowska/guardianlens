@@ -14,6 +14,7 @@ Requires: ``pip install playwright pytest-playwright``
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from datetime import datetime
@@ -22,9 +23,9 @@ from typing import Any
 
 import pytest
 import uvicorn
+from app.server import create_app
 from playwright.sync_api import Page, expect
 
-from app.server import create_app
 from guardlens.config import GuardLensConfig
 from guardlens.schema import (
     AlertUrgency,
@@ -37,7 +38,6 @@ from guardlens.schema import (
     ThreatClassification,
     ThreatLevel,
 )
-
 
 _PIPELINE_OLLAMA_RESPONSE: dict[str, Any] = {
     "message": {
@@ -96,9 +96,7 @@ def server_url(tmp_path_factory: pytest.TempPathFactory) -> str:
     tmp = tmp_path_factory.mktemp("browser")
     screenshots_dir = tmp / "screenshots"
     screenshots_dir.mkdir()
-    (screenshots_dir / "fake_alert.png").write_bytes(
-        b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
-    )
+    (screenshots_dir / "fake_alert.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
 
     cfg = GuardLensConfig()
     cfg.database.path = tmp / "test.db"
@@ -152,10 +150,12 @@ def server_url(tmp_path_factory: pytest.TempPathFactory) -> str:
                 {"sender": "child", "text": "14"},
                 {"sender": "ShadowPro", "text": "cool, wanna add me on snap?"},
             ],
-            screenshots=[{
-                "path": str(tmp / "screenshots" / "fake_alert.png"),
-                "timestamp": datetime.now().isoformat(),
-            }],
+            screenshots=[
+                {
+                    "path": str(tmp / "screenshots" / "fake_alert.png"),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            ],
             status={
                 "threat_level": "alert",
                 "category": "grooming",
@@ -200,9 +200,9 @@ class TestPageLoad:
         page.goto(server_url)
         expect(page.locator("#bellWrap")).to_be_visible()
 
-    def test_capture_card_renders(self, page: Page, server_url: str) -> None:
+    def test_overview_hero_renders(self, page: Page, server_url: str) -> None:
         page.goto(server_url)
-        expect(page.locator("#captureCard")).to_be_visible()
+        expect(page.locator("#overviewHero")).to_be_visible()
 
     def test_left_panel_has_activity_list(self, page: Page, server_url: str) -> None:
         page.goto(server_url)
@@ -244,9 +244,9 @@ class TestSSEUpdates:
     def test_stats_row_has_values(self, page: Page, server_url: str) -> None:
         page.goto(server_url)
         # Wait for SSE to render — stat cells should be attached.
-        expect(page.locator("#statScans")).to_be_visible(timeout=10_000)
-        expect(page.locator("#statActivities")).to_be_visible()
-        expect(page.locator("#statAlerts")).to_be_visible()
+        expect(page.locator("#ovMonitored")).to_be_visible(timeout=10_000)
+        expect(page.locator("#ovConversations")).to_be_visible()
+        expect(page.locator("#ovSafeRate")).to_be_visible()
 
     def test_no_js_errors_on_render(self, page: Page, server_url: str) -> None:
         """No uncaught JS errors during SSE-driven rendering."""
@@ -267,20 +267,18 @@ class TestPauseResume:
         btn = page.locator("#pauseBtn")
         expect(btn).to_be_visible()
 
-        # Click pause — capture overlay should become visible.
+        # Click pause — button gets .paused class.
         btn.click()
-        overlay = page.locator("#captureOverlay")
-        # The .hidden class is stripped when paused.
         page.wait_for_function(
-            "() => !document.getElementById('captureOverlay').classList.contains('hidden')",
+            "() => document.getElementById('pauseBtn').classList.contains('paused')",
             timeout=5_000,
         )
-        expect(overlay).to_be_visible()
+        expect(btn).to_have_class(re.compile(r"paused"))
 
-        # Click resume — overlay hides again.
+        # Click resume — .paused class is removed.
         btn.click()
         page.wait_for_function(
-            "() => document.getElementById('captureOverlay').classList.contains('hidden')",
+            "() => !document.getElementById('pauseBtn').classList.contains('paused')",
             timeout=5_000,
         )
 
@@ -354,10 +352,7 @@ class TestSessionOverview:
 
     def _goto_session(self, page: Page, server_url: str) -> None:
         page.goto(server_url)
-        # Wait for the auto-popped conversation detail, then hit Back.
-        expect(page.locator("#stateConversation")).to_be_visible(timeout=10_000)
-        page.locator("#stateConversation [data-back]").click()
-        expect(page.locator("#stateSession")).to_be_visible(timeout=3_000)
+        expect(page.locator("#stateSession")).to_be_visible(timeout=5_000)
 
     def test_hero_renders(self, page: Page, server_url: str) -> None:
         self._goto_session(page, server_url)
@@ -366,7 +361,7 @@ class TestSessionOverview:
 
     def test_narrative_card_present(self, page: Page, server_url: str) -> None:
         self._goto_session(page, server_url)
-        expect(page.locator(".gl-narrative-card")).to_be_visible()
+        expect(page.locator("#narrativePanel")).to_be_visible()
 
     def test_actions_list_present(self, page: Page, server_url: str) -> None:
         page.goto(server_url)

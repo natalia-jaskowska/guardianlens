@@ -1,73 +1,94 @@
 # Architecture
 
 ```
-+-------------------+      +-------------------+      +----------------------+
-|  Screen capture   | ---> |   GuardLens       | ---> |    Gradio UI         |
-|  (mss, every 15s) |      |   Analyzer        |      |  - status badge      |
-|                   |      |  (Ollama + Gemma) |      |  - latest screenshot |
-+-------------------+      +-------------------+      |  - timeline          |
-                                    |                 |  - thinking chain    |
-                                    v                 +----------------------+
-                            +---------------+                  |
-                            | SessionTracker|                  v
-                            |  sliding win  |          +---------------+
-                            +---------------+          |  AlertSender  |
-                                                       | email/webhook |
-                                                       +---------------+
++-------------------+      +----------------------------+      +-------------------+
+|  Screen capture   | ---> |  ConversationPipeline      | ---> |  FastAPI dashboard|
+|  (mss / client /  |      |  (Ollama + Gemma 4)        |      |  SSE stream       |
+|   demo / folder)  |      |  1. extract_conversations  |      |  :7860            |
++-------------------+      |  2. match & merge history  |      +-------------------+
+                           |  3. update_conv_status     |              |
+                           |  4. generate_parent_alert  |              v
+                           +----------------------------+      +-------------------+
+                                        |                      |   AlertSender     |
+                                        v                      | Telegram/email/   |
+                                 +-----------+                 | webhook           |
+                                 |  SQLite   |                 +-------------------+
+                                 |  database |
+                                 +-----------+
 ```
 
 ## Module map
 
-| Module                                | Purpose                                              |
-|--------------------------------------|------------------------------------------------------|
-| `guardlens.config`                    | Pydantic Settings — single source of truth.          |
-| `guardlens.schema`                    | Typed analysis results (`ScreenAnalysis`, ...).      |
-| `guardlens.prompts`                   | Versioned prompt templates.                          |
-| `guardlens.tools`                     | Function-calling tool definitions.                   |
-| `guardlens.monitor`                   | `mss` capture loop generator.                        |
-| `guardlens.analyzer`                  | `GuardLensAnalyzer` — only place that talks to Ollama. |
-| `guardlens.session_tracker`           | Sliding window of recent analyses.                   |
-| `guardlens.alerts`                    | Email + webhook dispatch.                            |
-| `guardlens.utils`                     | `seed_everything`, logging setup.                    |
-| `app.dashboard`                       | Gradio Blocks app + background `MonitorWorker`.      |
+| Module                         | Purpose                                                        |
+|-------------------------------|----------------------------------------------------------------|
+| `guardlens.config`             | Pydantic Settings — single source of truth for all settings.  |
+| `guardlens.schema`             | Typed results: `ScreenAnalysis`, `ThreatClassification`, etc. |
+| `guardlens.prompts`            | Versioned system prompt templates.                            |
+| `guardlens.tools`              | Ollama function-calling tool definitions.                     |
+| `guardlens.ollama_utils`       | Helpers: `find_call`, `extract_thinking`, `get_tool_calls`.   |
+| `guardlens.pipeline`           | `ConversationPipeline` — orchestrates 4 LLM calls per frame.  |
+| `guardlens.monitor`            | `mss` capture loop (generator); symlinks watch-folder images. |
+| `guardlens.database`           | `GuardLensDatabase` — all state persisted in SQLite.          |
+| `guardlens.alerts`             | `AlertSender` — Telegram, email, webhook dispatch.            |
+| `guardlens.privacy`            | Privacy-by-design enforcement (redaction, byte counter).      |
+| `guardlens.demo`               | Synthetic screenshot generator for demo / headless mode.      |
+| `guardlens.utils`              | `seed_everything`, logging setup.                             |
+| `app.server`                   | FastAPI app factory; SSE stream, REST API, frame receiver.    |
+| `app.state`                    | `AppState` + `MonitorWorker` — thread-safe bridge to pipeline.|
+| `app.serializers`              | Convert `ScreenAnalysis` → JSON-friendly dicts for the UI.    |
 
 ## Threading model
 
-- **Main thread:** Gradio event loop + UI rendering.
-- **Monitor thread:** runs `capture_loop`, calls the analyzer, and pushes
-  results onto a `queue.Queue`. Started by `MonitorWorker.start()`. Daemon
-  thread, so it dies with the process.
-- The dashboard polls the worker via `worker.latest()` every 2 seconds (Gradio
-  `Timer`). Side effect of polling: latest analysis is pushed into the session
-  tracker and the alert sender.
+- **Main thread:** `asyncio` event loop running FastAPI (uvicorn).
+- **Monitor thread:** daemon thread running `MonitorWorker._run()`. Drives the
+  capture loop, calls `ConversationPipeline.push_screenshot()`, and updates
+  shared state (scan count, latest screenshot path, latest conversation IDs).
+- **SSE clients** poll `GET /api/stream` (server-sent events). The event
+  generator reads `AppState` and serializes it every second. No queue needed —
+  each SSE tick reads current state directly.
 
-This single-worker model is intentional — it keeps Ollama load predictable
-(one in-flight request at a time) and means we never have to reason about
-concurrent writes to the session window.
+This single-worker model is intentional: one in-flight Ollama request at a
+time keeps GPU load predictable and avoids concurrent writes to SQLite.
 
 ## Configuration flow
 
 ```
-configs/default.yaml -----.
-                          v
-.env / env vars  -----> load_config() -----> GuardLensConfig (Pydantic)
-                          ^
-                          |
-              kwargs passed in code
+configs/default.yaml ---------.
+                               v
+env vars / .env  ---------> GuardLensConfig (pydantic-settings)
+                               ^
+                               |
+                  CLI flags (argparse → override dict)
 ```
 
-Every module takes the relevant *sub-section* of the config (e.g.
-`MonitorConfig`, `OllamaConfig`) rather than the full object — keeps tests
-isolated and signatures honest.
+Environment variables take priority over the YAML file. CLI flags are passed
+as override kwargs but `settings_customise_sources` ensures env vars win.
+Every sub-module receives only its own config slice (`OllamaConfig`,
+`MonitorConfig`, etc.) to keep tests isolated and signatures honest.
 
-## Why this shape
+## Analysis pipeline (per frame)
 
-- **One analyzer class, no global state.** Easy to swap models for the
-  fine-tuned demo (`use_finetuned=True`), and easy to mock in tests.
-- **Pydantic at every boundary.** Tool calls from Ollama get validated as
-  soon as they enter the codebase. The dashboard never has to deal with raw
-  dicts.
-- **Sliding window in its own class.** Lets us add escalation heuristics
-  without touching the analyzer.
-- **No Docker yet.** Per CONTEXT.md the local Ollama install is good enough
-  through demo recording. Containerization is a Week 6 stretch goal.
+`ConversationPipeline.push_screenshot(path)` runs up to 4 sequential LLM calls:
+
+1. **`extract_conversations`** — vision model identifies all visible chat
+   fragments, platform, and participants from the screenshot.
+2. **Match & merge** — each fragment is fuzzy-matched to an existing
+   conversation in the database (or a new one is created). New messages are
+   deduplicated against stored history.
+3. **`update_conversation_status`** — full conversation history is reassessed:
+   threat level, category, confidence, grooming stage, indicators, narrative.
+4. **`generate_parent_alert`** — if threat level ≥ WARNING, a concise
+   parent-facing summary is generated and dispatched via `AlertSender`.
+
+All intermediate state is committed to SQLite after each step so a crash
+mid-pipeline loses at most one frame.
+
+## Docker deployment
+
+`docker-compose.yaml` starts two containers:
+
+- `ollama` — Gemma 4 model server on port `11434`
+- `guardlens` — FastAPI dashboard on port `7860`, `--no-capture` by default
+  (receives frames from `guardlens-client` running on the child's device)
+
+The server and client can also run on the same machine for standalone use.

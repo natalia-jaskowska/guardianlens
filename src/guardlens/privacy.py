@@ -102,7 +102,7 @@ class PrivacyGuard:
             "grooming_stage": (
                 analysis.grooming_stage.stage.value if analysis.grooming_stage else None
             ),
-            "content_type": analysis.content_type.value if analysis.content_type else None,
+            "content_type": getattr(analysis, "content_type", None),
         }
         if not self._config.strip_raw_text_from_storage:
             payload["visible_messages"] = [

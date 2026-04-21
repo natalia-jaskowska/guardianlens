@@ -116,7 +116,6 @@ def test_serialize_stage_first_and_last() -> None:
     assert last["segments"][-1]["state"] == "current"
 
 
-
 def test_session_totals_aggregates_caution_and_alert() -> None:
     summary = {"safe": 12, "caution": 1, "warning": 2, "alert": 1, "critical": 1}
     totals = session_totals(summary)
@@ -242,5 +241,3 @@ def test_dedup_indicators_filters_empty() -> None:
     raw = ["", "Flattery", "   ", "Isolation"]
     result = _dedup_indicators(raw)
     assert result == ["Flattery", "Isolation"]
-
-

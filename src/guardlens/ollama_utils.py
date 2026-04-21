@@ -28,7 +28,7 @@ def get_message(response: Any) -> dict[str, Any]:
         return {}
 
     if hasattr(message, "model_dump"):
-        return message.model_dump()
+        return message.model_dump()  # type: ignore[no-any-return]
     if isinstance(message, dict):
         return message
     return {}

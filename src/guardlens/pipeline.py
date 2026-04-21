@@ -132,11 +132,9 @@ class ConversationPipeline:
 
         now = datetime.now().isoformat()
         screenshot_entry = {"path": str(image_path), "timestamp": now}
-        screenshots = prior_screenshots + [screenshot_entry]
+        screenshots = [*prior_screenshots, screenshot_entry]
 
-        all_participants = _dedup_participants(
-            prior_participants + fragment.participants
-        )
+        all_participants = _dedup_participants(prior_participants + fragment.participants)
 
         if conv_id is None:
             conv_id = database.create_conversation(
@@ -397,9 +395,7 @@ def _fuzzy_name_match(a: str, b: str) -> bool:
     if len(shorter) >= 3 and longer.startswith(shorter):
         return True
     # Close OCR drift (one char added/changed on short names).
-    if abs(len(a) - len(b)) <= 2 and difflib.SequenceMatcher(None, a, b).ratio() >= 0.85:
-        return True
-    return False
+    return bool(abs(len(a) - len(b)) <= 2 and difflib.SequenceMatcher(None, a, b).ratio() >= 0.85)
 
 
 def _score_match(
@@ -429,15 +425,11 @@ def _score_match(
     if not candidates:
         return None
 
-    frag_parts = [
-        _normalize_name(p)
-        for p in fragment.participants
-        if p and p.lower() != "child"
-    ]
+    frag_parts = [_normalize_name(p) for p in fragment.participants if p and p.lower() != "child"]
     frag_parts = [p for p in frag_parts if p]
 
     frag_texts_raw = [
-        _normalize_text(m.text if hasattr(m, "text") else m.get("text", ""))
+        _normalize_text(m.text)
         for m in fragment.messages
     ]
     frag_texts = [t for t in frag_texts_raw if len(t) >= 4]
@@ -494,16 +486,12 @@ def _score_match(
         run_len = _longest_contiguous_run(frag_texts_raw, cand_texts_raw)
 
         total_hits = exact_hits + fuzzy_hits
-        strong = (
-            long_hits >= 1
-            or total_hits >= 2
-            or run_len >= MATCH_MIN_RUN
-        )
+        strong = long_hits >= 1 or total_hits >= 2 or run_len >= MATCH_MIN_RUN
 
         if frag_size == 1:
             # Only accept a single-message fragment when the one message
             # is itself distinctive (long exact / fuzzy / inside a run).
-            single_ok = long_hits >= 1 or run_len >= 1 and total_hits >= 1
+            single_ok = long_hits >= 1 or (run_len >= 1 and total_hits >= 1)
             strong = strong and single_ok
 
         score = (
@@ -532,7 +520,9 @@ def _score_match(
     if best_id is not None:
         logger.info(
             "Matched fragment (size=%d) to conv=%d (score=%d)",
-            frag_size, best_id, best_score,
+            frag_size,
+            best_id,
+            best_score,
         )
         return best_id
 
@@ -599,11 +589,9 @@ def _messages_are_same(a_sender: str, a_text: str, b_sender: str, b_text: str) -
     if len(shorter) >= 6 and (longer.startswith(shorter) or longer.endswith(shorter)):
         return True
 
-    if min(len(ta), len(tb)) >= 10:
-        if difflib.SequenceMatcher(None, ta, tb).ratio() >= 0.85:
-            return True
-
-    return False
+    return bool(
+        min(len(ta), len(tb)) >= 10 and difflib.SequenceMatcher(None, ta, tb).ratio() >= 0.85
+    )
 
 
 def _better_sender(a: str, b: str) -> str:
@@ -686,6 +674,7 @@ def _normalize_name(s: str) -> str:
     ``Em``, ``Em_22`` map to ``em``. ``Lyla``, ``Lyla.x`` map to ``lyla``.
     """
     import re
+
     s = s.strip().lower()
     # strip trailing digit suffixes with optional punctuation (Em_22, 09)
     s = re.sub(r"[_\-\.\s]*\d+$", "", s)
@@ -717,5 +706,3 @@ def _dedup_participants(names: list[str]) -> list[str]:
         if existing is None or len(name) > len(existing):
             canonical[key] = name
     return list(canonical.values())
-
-

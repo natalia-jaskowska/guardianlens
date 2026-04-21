@@ -7,6 +7,7 @@ Supports two modes:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import shutil
@@ -42,6 +43,7 @@ def _detect_backend() -> str:
     try:
         import mss
         import mss.tools
+
         with mss.mss() as sct:
             shot = sct.grab(sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0])
             with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as f:
@@ -54,12 +56,14 @@ def _detect_backend() -> str:
     # macOS built-in screencapture
     if shutil.which("screencapture"):
         import tempfile
+
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
             probe_path = Path(f.name)
         try:
             result = subprocess.run(
                 ["screencapture", "-x", str(probe_path)],
-                capture_output=True, timeout=10,
+                capture_output=True,
+                timeout=10,
             )
             if result.returncode == 0 and probe_path.exists():
                 probe_path.unlink(missing_ok=True)
@@ -72,9 +76,7 @@ def _detect_backend() -> str:
     # Wayland / wlroots (Sway, Hyprland, …)
     if shutil.which("grim"):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as f:
-            result = subprocess.run(
-                ["grim", f.name], capture_output=True, env=_wayland_env()
-            )
+            result = subprocess.run(["grim", f.name], capture_output=True, env=_wayland_env())
         if result.returncode == 0:
             logger.info("Capture backend: grim (wlroots)")
             return "grim"
@@ -88,11 +90,18 @@ def _detect_backend() -> str:
         probe_path.unlink(missing_ok=True)
         result = subprocess.run(
             [
-                "gdbus", "call", "--session",
-                "--dest", "org.gnome.Shell.Screenshot",
-                "--object-path", "/org/gnome/Shell/Screenshot",
-                "--method", "org.gnome.Shell.Screenshot.Screenshot",
-                "false", "false", str(probe_path),
+                "gdbus",
+                "call",
+                "--session",
+                "--dest",
+                "org.gnome.Shell.Screenshot",
+                "--object-path",
+                "/org/gnome/Shell/Screenshot",
+                "--method",
+                "org.gnome.Shell.Screenshot.Screenshot",
+                "false",
+                "false",
+                str(probe_path),
             ],
             capture_output=True,
             env=_wayland_env(),
@@ -164,6 +173,7 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
     if _backend == "mss":
         import mss
         import mss.tools
+
         with mss.mss() as sct:
             monitors = sct.monitors
             idx = monitor_index if monitor_index < len(monitors) else 1
@@ -196,11 +206,18 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
         env = _wayland_env()
         result = subprocess.run(
             [
-                "gdbus", "call", "--session",
-                "--dest", "org.gnome.Shell.Screenshot",
-                "--object-path", "/org/gnome/Shell/Screenshot",
-                "--method", "org.gnome.Shell.Screenshot.Screenshot",
-                "false", "false", str(output_path),
+                "gdbus",
+                "call",
+                "--session",
+                "--dest",
+                "org.gnome.Shell.Screenshot",
+                "--object-path",
+                "/org/gnome/Shell/Screenshot",
+                "--method",
+                "org.gnome.Shell.Screenshot.Screenshot",
+                "false",
+                "false",
+                str(output_path),
             ],
             capture_output=True,
             env=env,
@@ -250,6 +267,7 @@ def _grim_outputs() -> list[str]:
             continue
         try:
             import json
+
             result = subprocess.run([tool, *args], capture_output=True, text=True, timeout=3)
             data = json.loads(result.stdout)
             return [o["name"] for o in data if o.get("active", True)]
@@ -311,6 +329,7 @@ def _demo_loop(
         dest = output_dir / f"demo_{ts}_{src.stem}.png"
         try:
             from PIL import Image
+
             Image.open(src).save(dest, "PNG")
             logger.debug("Demo frame: %s", dest.name)
             _prune(output_dir, keep_last_n)
@@ -324,7 +343,5 @@ def _demo_loop(
 def _prune(directory: Path, keep: int) -> None:
     files = sorted(directory.glob("*.png"), key=lambda p: p.stat().st_mtime)
     for old in files[:-keep]:
-        try:
+        with contextlib.suppress(OSError):
             old.unlink()
-        except OSError:
-            pass

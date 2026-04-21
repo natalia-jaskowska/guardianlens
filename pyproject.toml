@@ -59,14 +59,17 @@ select = [
     "TCH", # type-checking imports
 ]
 ignore = [
-    "ANN101", # missing self type
-    "ANN102", # missing cls type
     "E501",   # line too long (handled by formatter)
+    "TC001", # app imports used at runtime too
+    "TC003", # stdlib imports used at runtime too
+    "ANN401", # Any is fine in internal helpers
+    "RUF002", # multiplication sign in docstrings is intentional
+    "B008",   # FastAPI File(...) default pattern
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"notebooks/**" = ["ANN", "E", "F"]
 "tests/**" = ["ANN"]
+"src/guardlens/demo.py" = ["ANN"]  # render helpers have many nested fns
 
 [tool.ruff.format]
 quote-style = "double"
@@ -83,7 +86,7 @@ check_untyped_defs = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["mss.*", "ollama.*"]
+module = ["mss.*", "ollama.*", "torch.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

@@ -240,7 +240,8 @@ def _serialize_db_conversation(row: Any) -> dict[str, Any]:
     screenshots_raw = json.loads(row["screenshots_json"]) if row["screenshots_json"] else []
     screenshots = [
         {"url": f"/screenshots/{Path(s['path']).name}", "timestamp": s.get("timestamp", "")}
-        for s in screenshots_raw if s.get("path")
+        for s in screenshots_raw
+        if s.get("path")
     ]
     return {
         "conversation_id": row["id"],
@@ -282,40 +283,43 @@ def _build_session_narrative(
     during the session — that's the historical log, not the "now".
     """
     non_safe = [
-        c for c in conversations
-        if c["threat_level"] in {"caution", "warning", "alert", "critical"}
+        c for c in conversations if c["threat_level"] in {"caution", "warning", "alert", "critical"}
     ]
     safe = [c for c in conversations if c["threat_level"] == "safe"]
 
     concerns: list[dict[str, str]] = []
     for c in non_safe:
-        concerns.append({
-            "kind": "conversation",
-            "name": _participant_label(c),
-            "platform": c["platform"],
-            "level": c["threat_level"],
-            "category": c["category"],
-            "conversation_id": c.get("conversation_id"),
-            "participant": c.get("participant"),
-            "summary": (
-                c.get("short_summary")
-                or c.get("narrative")
-                or f"{c['category']} pattern on {c['platform']}"
-            ),
-        })
+        concerns.append(
+            {
+                "kind": "conversation",
+                "name": _participant_label(c),
+                "platform": c["platform"],
+                "level": c["threat_level"],
+                "category": c["category"],
+                "conversation_id": str(c.get("conversation_id") or ""),
+                "participant": str(c.get("participant") or ""),
+                "summary": (
+                    c.get("short_summary")
+                    or c.get("narrative")
+                    or f"{c['category']} pattern on {c['platform']}"
+                ),
+            }
+        )
 
     if latest_level in {"alert", "critical"}:
         tone = "alert"
         headline = "Alert active"
         subhead = (
-            latest_conv.get("short_summary") if latest_conv and latest_conv.get("short_summary")
+            latest_conv.get("short_summary")
+            if latest_conv and latest_conv.get("short_summary")
             else "Latest capture shows a high-severity pattern"
         )
     elif latest_level in {"warning", "caution"}:
         tone = "warning"
         headline = "Concerning pattern"
         subhead = (
-            latest_conv.get("short_summary") if latest_conv and latest_conv.get("short_summary")
+            latest_conv.get("short_summary")
+            if latest_conv and latest_conv.get("short_summary")
             else "Latest capture flagged for review"
         )
     else:
@@ -351,7 +355,6 @@ def _build_session_narrative(
 
     # Pick the conversation whose threat_level matches the session peak.
     # That's the one Peak links to so clicking it jumps to that detail.
-    peak_rank = {"safe": 0, "caution": 1, "warning": 2, "alert": 3, "critical": 4}
     peak_conv_summary = None
     if peak != "safe":
         peak_conv = next(
@@ -417,9 +420,12 @@ def _build_recommendations(
             top = concerns[0]
             cat = (top.get("category") or "").lower()
             cat_label = (
-                "grooming conversation" if "grooming" in cat
-                else "bullying episode" if "bullying" in cat
-                else "scam / phishing attempt" if "scam" in cat or "phish" in cat
+                "grooming conversation"
+                if "grooming" in cat
+                else "bullying episode"
+                if "bullying" in cat
+                else "scam / phishing attempt"
+                if "scam" in cat or "phish" in cat
                 else "concerning activity"
             )
             return [
@@ -433,60 +439,40 @@ def _build_recommendations(
 
     name = latest_conv.get("participant") or latest_conv.get("name") or "the user"
     platform = latest_conv.get("platform") or "the platform"
-    summary = (
-        latest_conv.get("short_summary")
-        or latest_conv.get("narrative")
-        or ""
-    ).strip()
+    summary = (latest_conv.get("short_summary") or latest_conv.get("narrative") or "").strip()
     category = (latest_conv.get("category") or "").lower()
 
     summary_tail = f" ({summary})" if summary and len(summary) <= 220 else ""
 
     recs: list[str] = []
     if "grooming" in category:
+        recs.append(f"Talk to your child calmly about their chat with {name}{summary_tail}")
         recs.append(
-            f"Talk to your child calmly about their chat with {name}{summary_tail}"
+            f"Ask how they met {name} and whether {name} has asked personal questions or offered gifts."
         )
-        recs.append(
-            f'Ask how they met {name} and whether {name} has asked personal questions or offered gifts.'
-        )
-        recs.append(
-            f"Consider blocking and reporting {name} on {platform}."
-        )
+        recs.append(f"Consider blocking and reporting {name} on {platform}.")
     elif "bullying" in category:
-        recs.append(
-            f"Check in emotionally about the exchange with {name}{summary_tail}"
-        )
+        recs.append(f"Check in emotionally about the exchange with {name}{summary_tail}")
         recs.append(
             "Save screenshots before anything is deleted — they may be needed for the school or platform."
         )
-        recs.append(
-            f"Consider muting or blocking {name} and reporting the messages to {platform}."
-        )
+        recs.append(f"Consider muting or blocking {name} and reporting the messages to {platform}.")
     elif "scam" in category or "phish" in category:
-        recs.append(
-            f"Make sure your child hasn't clicked any links from {name}{summary_tail}"
-        )
-        recs.append(
-            "Remind them: real giveaways never require password or account verification."
-        )
-        recs.append(
-            f"Report {name} as a scam on {platform} and block the account."
-        )
+        recs.append(f"Make sure your child hasn't clicked any links from {name}{summary_tail}")
+        recs.append("Remind them: real giveaways never require password or account verification.")
+        recs.append(f"Report {name} as a scam on {platform} and block the account.")
     else:
+        recs.append(f"Review the chat with {name} together{summary_tail}")
         recs.append(
-            f"Review the chat with {name} together{summary_tail}"
-        )
-        recs.append(
-            f"Ask your child to walk you through what happened before and after the flagged moment."
+            "Ask your child to walk you through what happened before and after the flagged moment."
         )
 
     if len(concerns) >= 2:
-        others = [c["name"] for c in concerns if c.get("participant") != latest_conv.get("participant")][:2]
+        others = [
+            c["name"] for c in concerns if c.get("participant") != latest_conv.get("participant")
+        ][:2]
         if others:
-            recs.append(
-                f'Also check earlier concerns: {", ".join(others)}.'
-            )
+            recs.append(f"Also check earlier concerns: {', '.join(others)}.")
 
     return recs
 
@@ -572,8 +558,7 @@ class AppState:
         latest_screenshot = self.worker.latest_screenshot
         latest_platform = self.worker.latest_platform
         alerting_count = sum(
-            1 for c in conv_list
-            if c["threat_level"] in {"warning", "alert", "critical"}
+            1 for c in conv_list if c["threat_level"] in {"warning", "alert", "critical"}
         )
         totals["alerts"] = alerting_count
 
@@ -589,7 +574,11 @@ class AppState:
         latest_convs = [c for c in conv_list if c.get("conversation_id") in latest_conv_ids]
         latest_worst = _worst_level(latest_convs) if latest_convs else "safe"
         latest_worst_conv = next(
-            (c for c in latest_convs if c["threat_level"] == latest_worst and latest_worst != "safe"),
+            (
+                c
+                for c in latest_convs
+                if c["threat_level"] == latest_worst and latest_worst != "safe"
+            ),
             None,
         )
 

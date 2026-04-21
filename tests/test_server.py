@@ -6,15 +6,14 @@ the pipeline so no Ollama call happens, and exercise the endpoints.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from app.server import create_app
 from fastapi.testclient import TestClient
 
-from app.server import create_app
 from guardlens.config import GuardLensConfig
 from guardlens.schema import (
     ScreenAnalysis,
@@ -63,7 +62,7 @@ def test_index_returns_html_with_initial_state(client: TestClient) -> None:
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
     body = response.text
-    assert "GuardianLens" in body
+    assert "Guardian" in body
     assert 'id="activityList"' in body
     assert 'id="stateSession"' in body
     assert 'id="stateConversation"' in body
@@ -97,9 +96,7 @@ def test_healthz(client: TestClient) -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_state_shows_injected_conversation(
-    client: TestClient, config: GuardLensConfig
-) -> None:
+def test_state_shows_injected_conversation(client: TestClient, config: GuardLensConfig) -> None:
     """Inject a conversation into the DB and confirm it appears in /api/state."""
     state = client.app.state.guardlens
     state.database.create_conversation(
@@ -163,9 +160,7 @@ def test_api_analysis_not_found(client: TestClient) -> None:
     assert response.json() == {"error": "not found"}
 
 
-def test_api_analysis_returns_full_payload(
-    client: TestClient, config: GuardLensConfig
-) -> None:
+def test_api_analysis_returns_full_payload(client: TestClient, config: GuardLensConfig) -> None:
     state = client.app.state.guardlens
     fake = ScreenAnalysis(
         timestamp=datetime.now(),

@@ -179,7 +179,6 @@ def main() -> int:
     # Late imports so the CLI's --help stays fast and uvicorn / FastAPI
     # are not loaded before logging is configured.
     import uvicorn
-
     from app.server import create_app
 
     app = create_app(config)

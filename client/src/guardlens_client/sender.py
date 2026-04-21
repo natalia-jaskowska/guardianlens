@@ -40,7 +40,9 @@ class FrameSender:
                 logger.info("Frame sent: %s → %s", path.name, resp.json().get("file", "?"))
                 return True
             except httpx.HTTPStatusError as exc:
-                logger.error("Server rejected frame (HTTP %d): %s", exc.response.status_code, path.name)
+                logger.error(
+                    "Server rejected frame (HTTP %d): %s", exc.response.status_code, path.name
+                )
                 return False
             except httpx.RequestError as exc:
                 logger.warning("Send attempt %d failed (%s): %s", attempt, exc, path.name)
