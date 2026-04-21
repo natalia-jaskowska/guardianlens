@@ -95,11 +95,32 @@ def _detect_backend() -> str:
         logger.info("Capture backend: spectacle (KDE Wayland)")
         return "spectacle"
 
+    # flameshot — works on GNOME/KDE Wayland via xdg-portal ScreenCast
+    if shutil.which("flameshot"):
+        uid = os.getuid()
+        probe_path = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{uid}")) / "gl_probe_fs.png"
+        probe_path.unlink(missing_ok=True)
+        result = subprocess.run(
+            ["flameshot", "screen", "-p", str(probe_path)],
+            capture_output=True,
+            env=_wayland_env(),
+            timeout=15,
+        )
+        if probe_path.exists():
+            probe_path.unlink(missing_ok=True)
+            logger.info("Capture backend: flameshot (Wayland via xdg-portal)")
+            return "flameshot"
+        logger.info(
+            "flameshot probe failed (exit %d): %s",
+            result.returncode,
+            result.stderr.decode(errors="replace").strip(),
+        )
+
     # XWayland fallback via scrot — NOTE: captures black on GNOME Wayland
     if shutil.which("scrot"):
         logger.warning(
             "Capture backend: scrot (XWayland) — will be BLACK on GNOME Wayland. "
-            "Install flameshot or ensure DBUS_SESSION_BUS_ADDRESS is set."
+            "Install flameshot: sudo pacman -S flameshot"
         )
         return "scrot"
 
@@ -107,8 +128,8 @@ def _detect_backend() -> str:
         "No capture backend available.\n"
         "  X11 / XWayland:  pip install mss   OR  sudo pacman -S scrot\n"
         "  Wayland/wlroots: sudo pacman -S grim\n"
-        "  GNOME Wayland:   gdbus ships with glib2 (usually already installed)\n"
-        "  KDE Wayland:     sudo pacman -S spectacle"
+        "  GNOME Wayland:   sudo pacman -S flameshot\n"
+        "  KDE Wayland:     sudo pacman -S spectacle  OR  sudo pacman -S flameshot"
     )
 
 
@@ -167,6 +188,16 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
         if result.returncode != 0:
             err = result.stderr.decode(errors="replace").strip()
             raise RuntimeError(f"spectacle failed (exit {result.returncode}): {err}")
+
+    elif _backend == "flameshot":
+        result = subprocess.run(
+            ["flameshot", "screen", "-p", str(output_path)],
+            capture_output=True,
+            env=_wayland_env(),
+        )
+        if not output_path.exists():
+            err = result.stderr.decode(errors="replace").strip()
+            raise RuntimeError(f"flameshot failed (exit {result.returncode}): {err}")
 
     elif _backend == "scrot":
         result = subprocess.run(
