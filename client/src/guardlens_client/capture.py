@@ -51,6 +51,24 @@ def _detect_backend() -> str:
     except Exception:
         pass
 
+    # macOS built-in screencapture
+    if shutil.which("screencapture"):
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            probe_path = Path(f.name)
+        try:
+            result = subprocess.run(
+                ["screencapture", "-x", str(probe_path)],
+                capture_output=True, timeout=10,
+            )
+            if result.returncode == 0 and probe_path.exists():
+                probe_path.unlink(missing_ok=True)
+                logger.info("Capture backend: screencapture (macOS)")
+                return "screencapture"
+        except Exception:
+            pass
+        probe_path.unlink(missing_ok=True)
+
     # Wayland / wlroots (Sway, Hyprland, …)
     if shutil.which("grim"):
         with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as f:
@@ -126,6 +144,8 @@ def _detect_backend() -> str:
 
     raise RuntimeError(
         "No capture backend available.\n"
+        "  macOS:           pip install mss  (screencapture is built-in fallback)\n"
+        "  Windows:         pip install mss\n"
         "  X11 / XWayland:  pip install mss   OR  sudo pacman -S scrot\n"
         "  Wayland/wlroots: sudo pacman -S grim\n"
         "  GNOME Wayland:   sudo pacman -S flameshot\n"
@@ -149,6 +169,15 @@ def capture_screen(output_path: Path, monitor_index: int = 1) -> Path:
             idx = monitor_index if monitor_index < len(monitors) else 1
             shot = sct.grab(monitors[idx])
             mss.tools.to_png(shot.rgb, shot.size, output=str(output_path))
+
+    elif _backend == "screencapture":
+        result = subprocess.run(
+            ["screencapture", "-x", str(output_path)],
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            err = result.stderr.decode(errors="replace").strip()
+            raise RuntimeError(f"screencapture failed (exit {result.returncode}): {err}")
 
     elif _backend == "grim":
         env = _wayland_env()
