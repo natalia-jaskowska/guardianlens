@@ -7,7 +7,7 @@
 
 **Pitch:** *Other apps count minutes. GuardianLens understands what's happening.*
 
-**[Watch the demo on YouTube →](https://youtu.be/0IE97Btnrgc)**
+[![Watch the demo](https://img.youtube.com/vi/0IE97Btnrgc/maxresdefault.jpg)](https://youtu.be/0IE97Btnrgc)
 
 Built for the **Gemma 4 Good Hackathon** (Kaggle x Google DeepMind).
 Targeting the Safety & Trust track + Ollama special prize.
