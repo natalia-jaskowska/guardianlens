@@ -62,32 +62,45 @@ def _detect_backend() -> str:
             return "grim"
         logger.info("grim found but compositor unsupported, trying other backends")
 
-    # GNOME Wayland — call Shell DBus interface directly (avoids gnome-screenshot wrapper)
+    # GNOME Wayland — call Shell DBus interface directly.
+    # Probe with a real file in XDG_RUNTIME_DIR (GNOME Shell may refuse /tmp).
     if shutil.which("gdbus"):
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=True) as f:
-            result = subprocess.run(
-                [
-                    "gdbus", "call", "--session",
-                    "--dest", "org.gnome.Shell.Screenshot",
-                    "--object-path", "/org/gnome/Shell/Screenshot",
-                    "--method", "org.gnome.Shell.Screenshot.Screenshot",
-                    "false", "false", f.name,
-                ],
-                capture_output=True,
-                env=_wayland_env(),
-            )
+        uid = os.getuid()
+        probe_path = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{uid}")) / "gl_probe.png"
+        probe_path.unlink(missing_ok=True)
+        result = subprocess.run(
+            [
+                "gdbus", "call", "--session",
+                "--dest", "org.gnome.Shell.Screenshot",
+                "--object-path", "/org/gnome/Shell/Screenshot",
+                "--method", "org.gnome.Shell.Screenshot.Screenshot",
+                "false", "false", str(probe_path),
+            ],
+            capture_output=True,
+            env=_wayland_env(),
+            timeout=10,
+        )
+        probe_path.unlink(missing_ok=True)
         if result.returncode == 0:
             logger.info("Capture backend: gdbus GNOME Shell (GNOME Wayland)")
             return "gnome-shell-dbus"
+        logger.info(
+            "gdbus GNOME Shell probe failed (exit %d): %s",
+            result.returncode,
+            result.stderr.decode(errors="replace").strip(),
+        )
 
     # KDE Wayland
     if shutil.which("spectacle"):
         logger.info("Capture backend: spectacle (KDE Wayland)")
         return "spectacle"
 
-    # XWayland fallback via scrot
+    # XWayland fallback via scrot — NOTE: captures black on GNOME Wayland
     if shutil.which("scrot"):
-        logger.info("Capture backend: scrot (XWayland)")
+        logger.warning(
+            "Capture backend: scrot (XWayland) — will be BLACK on GNOME Wayland. "
+            "Install flameshot or ensure DBUS_SESSION_BUS_ADDRESS is set."
+        )
         return "scrot"
 
     raise RuntimeError(
