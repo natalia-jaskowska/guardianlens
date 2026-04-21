@@ -5,7 +5,7 @@
 > explainable reasoning, and alerts the parent — without ever sending chat data
 > to the cloud.
 
-**Pitch:** *Family Link counts minutes. GuardianLens understands what's happening.*
+**Pitch:** *Other apps count minutes. GuardianLens understands what's happening.*
 
 Built for the **Gemma 4 Good Hackathon** (Kaggle x Google DeepMind).
 Targeting the Safety & Trust track + Ollama special prize.
