@@ -165,6 +165,32 @@ def test_hero_reflects_db_latest_when_worker_bypassed(
     assert payload["is_alert"] is True
 
 
+def test_push_frame_drops_stale_when_replaced(
+    client: TestClient, config: GuardLensConfig
+) -> None:
+    """Receive mode is "process the latest screenshot". When a new
+    frame arrives while one is already pending, the old pending frame
+    is dropped — we don't pile up a backlog of stale snapshots.
+
+    This test exercises the slot directly (not via the worker thread)
+    so it deterministically verifies the replace semantics without
+    depending on inference timing.
+    """
+    state = client.app.state.guardlens
+    worker = state.worker
+    a = config.monitor.screenshots_dir / "first.png"
+    b = config.monitor.screenshots_dir / "second.png"
+    a.write_bytes(b"\x89PNG\r\n\x1a\n")
+    b.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    worker.push_frame(a)
+    worker.push_frame(b)
+
+    # The slot now holds only `b`; `a` was replaced.
+    assert worker._pending_frame == b
+    assert worker._pending_event.is_set()
+
+
 def test_pause_resume_endpoints(client: TestClient) -> None:
     assert client.get("/api/state").json()["paused"] is False
 

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import logging
-import queue
 import threading
 import time
 from pathlib import Path
@@ -56,7 +55,14 @@ class MonitorWorker:
         self._privacy = privacy_guard or PrivacyGuard(config.privacy)
         self._stop_event = threading.Event()
         self._pause_event = threading.Event()
-        self._frame_queue: queue.Queue[Path | None] = queue.Queue()
+        # Latest-frame slot for receive mode. We deliberately do NOT use
+        # a queue: the value of an old frame falls off a cliff once a
+        # newer one arrives (we only care about "what's on screen now").
+        # If a frame lands while the pipeline is busy, it overwrites any
+        # previously-pending frame instead of stacking.
+        self._pending_frame: Path | None = None
+        self._pending_lock = threading.Lock()
+        self._pending_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._started_at: float | None = None
         self._paused_at: float | None = None
@@ -159,8 +165,20 @@ class MonitorWorker:
     # ------------------------------------------------------------------ thread body
 
     def push_frame(self, path: Path) -> None:
-        """Enqueue an externally supplied frame for processing (receive mode)."""
-        self._frame_queue.put(path)
+        """Set the latest frame as the next-to-process. Drops any frame
+        already waiting — receive mode is "process the most recent
+        screenshot", not "process every screenshot ever sent". A
+        production sender pushing at 1 Hz into a 50 s pipeline would
+        otherwise pile up a 50× backlog of stale snapshots."""
+        with self._pending_lock:
+            previous = self._pending_frame
+            self._pending_frame = path
+            self._pending_event.set()
+        if previous is not None:
+            logger.info(
+                "Dropping pending frame %s — replaced by newer %s",
+                previous.name, path.name,
+            )
 
     def _run(self) -> None:
         if self._config.monitor.receive_mode:
@@ -171,13 +189,15 @@ class MonitorWorker:
     def _run_receive_mode(self) -> None:
         logger.info("Monitor running in receive mode — waiting for frames via API.")
         while not self._stop_event.is_set():
-            try:
-                path = self._frame_queue.get(timeout=1.0)
-            except queue.Empty:
+            # Poll the event so we wake up at least every 1 s to check stop.
+            if not self._pending_event.wait(timeout=1.0):
                 continue
-            if path is None:
-                break
-            self._process_frame(path)
+            with self._pending_lock:
+                path = self._pending_frame
+                self._pending_frame = None
+                self._pending_event.clear()
+            if path is not None:
+                self._process_frame(path)
 
     def _run_capture_mode(self) -> None:
         for screenshot_path in capture_loop(self._config.monitor):
