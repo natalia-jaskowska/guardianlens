@@ -572,6 +572,16 @@ class AppState:
         # screenshot (the pipeline returned its IDs).
         latest_conv_ids = set(self.worker.latest_conv_ids)
         latest_convs = [c for c in conv_list if c.get("conversation_id") in latest_conv_ids]
+        # Fallback: if the worker has no frame-level signal (empty set, or
+        # the ids don't intersect conv_list because rows got created by a
+        # code path that bypasses MonitorWorker — e.g. a notebook calling
+        # pipeline.push_screenshot directly while a separate dashboard
+        # subprocess reads the DB), treat the most recently updated
+        # conversation as "latest". In normal capture-loop operation the
+        # two definitions coincide (worker just processed it, last_seen is
+        # fresh), so this only kicks in for out-of-band insertions.
+        if not latest_convs and conv_list:
+            latest_convs = [max(conv_list, key=lambda c: c.get("last_seen") or "")]
         latest_worst = _worst_level(latest_convs) if latest_convs else "safe"
         latest_worst_conv = next(
             (

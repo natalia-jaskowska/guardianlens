@@ -128,6 +128,43 @@ def test_state_shows_injected_conversation(client: TestClient, config: GuardLens
     assert conv["platform"] == "Minecraft"
 
 
+def test_hero_reflects_db_latest_when_worker_bypassed(
+    client: TestClient, config: GuardLensConfig
+) -> None:
+    """Inserting a flagged conversation directly (bypassing MonitorWorker)
+    should still drive the right-panel hero into an alert tone.
+
+    Context: the Kaggle demo notebook runs the pipeline in the kernel and
+    writes to SQLite while a separate dashboard subprocess reads it. That
+    subprocess's worker.latest_conv_ids is never populated, so the hero
+    must fall back to the DB-latest conversation. Without this fallback
+    the hero stays on "Currently safe" even as toasts and the bell fire.
+    """
+    state = client.app.state.guardlens
+    state.database.create_conversation(
+        platform="Discord",
+        participants=["ShadowPro"],
+        first_seen=datetime.now().isoformat(),
+        messages=[{"sender": "ShadowPro", "text": "how old are you?"}],
+        screenshots=[],
+        status={
+            "threat_level": "alert",
+            "category": "grooming",
+            "confidence": 93,
+            "narrative": "ShadowPro escalated to age inquiry.",
+            "reasoning": "grooming pattern",
+            "parent_alert_recommended": True,
+            "certainty": "high",
+        },
+    )
+
+    payload = client.get("/api/state").json()
+    narrative = payload["session_narrative"]
+    assert narrative["tone"] == "alert"
+    assert narrative["headline"] == "Alert active"
+    assert payload["is_alert"] is True
+
+
 def test_pause_resume_endpoints(client: TestClient) -> None:
     assert client.get("/api/state").json()["paused"] is False
 
