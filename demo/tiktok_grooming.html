@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TikTok — grooming DM</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+html, body {
+  background: #000;
+  height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  font-family: -apple-system, 'SF Pro Display', 'Inter', sans-serif;
+  overflow: hidden;
+}
+.phone {
+  width: 390px; height: 844px;
+  background: #000;
+  border-radius: 44px;
+  box-shadow: 0 0 0 12px #1a1a1a, 0 24px 80px rgba(0,0,0,0.6);
+  display: flex; flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.notch {
+  position: absolute; top: 12px; left: 50%;
+  transform: translateX(-50%);
+  width: 120px; height: 32px;
+  background: #000;
+  border-radius: 18px;
+  z-index: 20;
+}
+.status-bar {
+  height: 54px; flex-shrink: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 32px 0 28px;
+  color: white; font-size: 15px; font-weight: 600;
+}
+.status-icons { display: flex; gap: 5px; align-items: center; }
+.status-icons svg { display: block; }
+
+.header {
+  height: 56px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 14px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.08);
+}
+.back {
+  color: white; font-size: 24px; line-height: 1; cursor: pointer;
+  width: 28px; text-align: center;
+}
+.header-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  /* Neutral blue-gray gradient — unknown user, no warm indicators. */
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #1e40af 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 13px; font-weight: 700;
+  flex-shrink: 0;
+}
+.header-meta { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.header-name { color: white; font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
+.header-sub { color: rgba(255,255,255,0.5); font-size: 11px; margin-top: 1px; }
+.header-actions { display: flex; gap: 16px; color: white; font-size: 22px; }
+.header-actions span { cursor: pointer; }
+
+/* "Not following" banner at top — classic signal in TikTok UI that this
+   is a DM from a stranger, not a mutual. Realistic and important for
+   the grooming scenario. */
+.not-following {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+  text-align: center;
+  padding: 10px 18px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.06);
+}
+.not-following a {
+  color: #fe2c55;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 10px;
+  display: flex; flex-direction: column; gap: 4px;
+  scroll-behavior: smooth;
+}
+.messages::-webkit-scrollbar { width: 0; }
+
+.day-label {
+  align-self: center;
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  font-weight: 500;
+  margin: 4px 0 12px;
+}
+
+.row {
+  display: flex; align-items: flex-end; gap: 8px;
+  opacity: 0; transform: translateY(8px);
+  animation: pop 0.35s ease-out forwards;
+  margin-bottom: 2px;
+  will-change: transform, opacity;
+}
+.row.them { justify-content: flex-start; }
+.row.you  { justify-content: flex-end; }
+
+@keyframes pop {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 50%, #1e40af 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 11px; font-weight: 700;
+  flex-shrink: 0; margin-bottom: 2px;
+}
+.avatar.spacer { background: transparent; visibility: hidden; }
+
+.bubble {
+  max-width: 258px;
+  padding: 10px 14px;
+  border-radius: 18px;
+  font-size: 15px;
+  line-height: 1.3;
+  color: white;
+  word-wrap: break-word;
+}
+.bubble.them {
+  background: #2a2a2a;
+  border-bottom-left-radius: 6px;
+}
+.bubble.you {
+  background: linear-gradient(135deg, #fe2c55 0%, #ff4570 100%);
+  border-bottom-right-radius: 6px;
+  color: white;
+}
+
+.typing {
+  display: flex; gap: 8px; align-items: flex-end;
+  opacity: 0; transform: translateY(8px);
+  animation: pop 0.3s ease-out forwards;
+  margin-bottom: 2px;
+  will-change: transform, opacity;
+}
+.typing .bubble {
+  background: #2a2a2a;
+  border-bottom-left-radius: 6px;
+  padding: 12px 16px;
+  display: flex; gap: 4px; align-items: center;
+}
+.dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(255,255,255,0.6);
+  animation: blink 1.3s ease-in-out infinite;
+}
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+.input-bar {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px 22px;
+  border-top: 0.5px solid rgba(255,255,255,0.08);
+}
+.input {
+  flex: 1;
+  background: #1a1a1a;
+  border-radius: 22px;
+  padding: 10px 16px;
+  color: rgba(255,255,255,0.5);
+  font-size: 14px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.input-actions { display: flex; gap: 12px; color: rgba(255,255,255,0.5); font-size: 18px; }
+
+.home-indicator {
+  position: absolute; bottom: 8px; left: 50%;
+  transform: translateX(-50%);
+  width: 134px; height: 5px;
+  background: white;
+  border-radius: 3px;
+  opacity: 0.9;
+}
+
+/* Start overlay — click to begin animation. Lets the user hit
+   "Record" first, then click to fire the script. */
+.start-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.82);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+  z-index: 50;
+  cursor: pointer;
+  transition: opacity 0.4s;
+  backdrop-filter: blur(8px);
+}
+.start-overlay.hidden { opacity: 0; pointer-events: none; }
+.start-title { color: white; font-size: 22px; font-weight: 600; }
+.start-hint { color: rgba(255,255,255,0.6); font-size: 13px; }
+.start-btn {
+  margin-top: 8px;
+  background: linear-gradient(135deg, #fe2c55 0%, #ff4570 100%);
+  color: white;
+  padding: 12px 28px;
+  border-radius: 24px;
+  font-size: 15px; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(254, 44, 85, 0.4);
+}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="status-icons">
+      <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><path d="M1 10h2v-2H1v2zM5 10h2V6H5v4zM9 10h2V3H9v7zM13 10h2V0h-2v10z" fill="white"/></svg>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M8 2.5c2.5 0 4.7 1 6.3 2.6l1.4-1.4C13.8 1.8 11 0.5 8 0.5S2.2 1.8 0.3 3.7l1.4 1.4C3.3 3.5 5.5 2.5 8 2.5zM8 5.5c1.7 0 3.2 0.7 4.3 1.8l1.4-1.4C12.1 4.5 10.1 3.5 8 3.5S3.9 4.5 2.3 5.9l1.4 1.4C4.8 6.2 6.3 5.5 8 5.5zM8 8.5c1 0 1.9 0.4 2.5 1.1l1.4-1.4C10.9 7.4 9.5 6.8 8 6.8S5.1 7.4 4.1 8.2l1.4 1.4C6.1 8.9 7 8.5 8 8.5z" fill="white"/></svg>
+      <svg width="24" height="11" viewBox="0 0 24 11" fill="none"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" stroke="white" stroke-opacity="0.4"/><rect x="2" y="2" width="18" height="7" rx="1" fill="white"/><rect x="22.5" y="4" width="1.5" height="3" rx="0.5" fill="white" fill-opacity="0.4"/></svg>
+    </div>
+  </div>
+
+  <div class="header">
+    <div class="back">&lsaquo;</div>
+    <div class="header-avatar">JR</div>
+    <div class="header-meta">
+      <div class="header-name">jake_r23</div>
+      <div class="header-sub">Not following you</div>
+    </div>
+    <div class="header-actions">
+      <span>⋯</span>
+    </div>
+  </div>
+
+  <div class="not-following">
+    You don't follow each other. <a href="#">Block or report</a>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="day-label">Today</div>
+  </div>
+
+  <div class="input-bar">
+    <div class="input">
+      <span>Send a message…</span>
+      <div class="input-actions">
+        <span>😊</span>
+        <span>❤️</span>
+      </div>
+    </div>
+  </div>
+  <div class="home-indicator"></div>
+
+  <!-- Start overlay — click once recording is running. -->
+  <div class="start-overlay" id="startOverlay">
+    <div class="start-title">TikTok — DM from a stranger</div>
+    <div class="start-hint">Start your screen recorder first, then tap</div>
+    <div class="start-btn">▶ Play conversation</div>
+  </div>
+</div>
+
+<script>
+// Realistic grooming DM from a stranger to Emma (13). The script is
+// intentionally understated — real predator behaviour isn't cartoonish.
+// Each line alone is plausible; the *sequence* (age ask + flattery
+// keyed to age + unsolicited "opportunity" + platform migration ask)
+// is the pattern Gemma 4 should catch.
+//
+// Olson et al. stages covered in order:
+//   1. Targeting       — responds to public dance content
+//   2. Trust building  — compliments, shared-interest framing
+//   3. Risk assessment — probes age
+//   4. Exclusivity     — "opportunity just for you"
+//   5. Isolation ask   — move off TikTok to a less-moderated platform
+const SCRIPT = [
+  { who: 'them', text: 'your latest dance is insane 🔥' },
+  { who: 'them', text: 'you\'ve got real talent' },
+  { who: 'you',  text: 'omg thank you!! 😊' },
+  { who: 'them', text: 'how long have you been dancing?' },
+  { who: 'you',  text: 'since i was like 8' },
+  { who: 'them', text: 'you\'re so mature for 13' },
+  { who: 'them', text: 'you look older than 13 tbh' },
+  { who: 'you',  text: 'haha ty' },
+  { who: 'them', text: 'you\'re really cute btw 😉' },
+  { who: 'them', text: 'i bet the guys at school love you' },
+  { who: 'you',  text: 'uhh idk lol' },
+  { who: 'them', text: 'btw i work with some modeling agencies' },
+  { who: 'them', text: 'might have an opportunity for you' },
+  { who: 'you',  text: 'really?? 👀' },
+  { who: 'them', text: 'can you send more dance videos? just for me 👀' },
+  { who: 'them', text: 'tiktok dms are so limited tho' },
+  { who: 'them', text: 'what\'s your snap? we can chat properly' },
+];
+
+const messagesEl = document.getElementById('messages');
+
+function addTyping() {
+  const el = document.createElement('div');
+  el.className = 'typing';
+  el.innerHTML = `
+    <div class="avatar">JR</div>
+    <div class="bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+  `;
+  messagesEl.appendChild(el);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return el;
+}
+
+function addMessage(who, text, withAvatar) {
+  const row = document.createElement('div');
+  row.className = 'row ' + who;
+  if (who === 'them') {
+    row.innerHTML = `
+      <div class="avatar ${withAvatar ? '' : 'spacer'}">JR</div>
+      <div class="bubble them">${text}</div>
+    `;
+  } else {
+    row.innerHTML = `<div class="bubble you">${text}</div>`;
+  }
+  messagesEl.appendChild(row);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function play() {
+  // ~2× slower than the safe chat — a predator composing messages
+  // carefully. Also gives viewers time to read each escalation beat.
+  // Total run ≈ 38 s.
+  await sleep(1200);
+  let prevWho = null;
+  for (let i = 0; i < SCRIPT.length; i++) {
+    const msg = SCRIPT[i];
+    const sameAsPrev = msg.who === prevWho;
+    if (msg.who === 'them' && !sameAsPrev) {
+      const t = addTyping();
+      await sleep(2200 + Math.random() * 800);
+      t.remove();
+    } else if (!sameAsPrev) {
+      await sleep(1400);
+    } else {
+      await sleep(900);
+    }
+    addMessage(msg.who, msg.text, !sameAsPrev);
+    prevWho = msg.who;
+  }
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Hold until the user taps the overlay so they can start the screen
+// recorder first. Keyboard Space/Enter also works.
+// URL param `?record` skips the overlay for automated capture.
+const overlay = document.getElementById('startOverlay');
+function begin() {
+  if (overlay.classList.contains('hidden')) return;
+  overlay.classList.add('hidden');
+  play();
+}
+overlay.addEventListener('click', begin);
+window.addEventListener('keydown', (e) => {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); begin(); }
+});
+if (new URLSearchParams(location.search).has('record')) {
+  overlay.classList.add('hidden');
+  setTimeout(play, 300);
+}
+</script>
+</body>
+</html>
