@@ -43,9 +43,15 @@ function markSeen(key) {
 const ui = {
   snapshot: null,
   selection: null,
-  lastAutoAlertKey: null,
-  lastFrameKey: null,
   seenAlerts: loadSeen(),
+  // Alert keys we've observed in any SSE snapshot. Initialized lazily
+  // on the first snapshot so preexisting alerts don't fire toasts on
+  // page load — only alerts that arrive *after* the page is loaded do.
+  knownAlerts: null,
+  // Alert key → toast DOM element. Used to dedupe (same alert appearing
+  // in successive SSE ticks shouldn't stack multiple toasts) and to
+  // clear stale toasts if needed.
+  activeToasts: new Map(),
 };
 
 /* ----------------------------- formatters --------------------------- */
@@ -229,10 +235,8 @@ function convCard(c) {
   const openDetail = () => {
     markSeen(alertId("conversation", c));
     ui.selection = { kind: "conversation", platform: c.platform, participant: c.participant };
-    // Include the current threat_level so a later escalation from
-    // caution → alert produces a fresh key and re-pops the detail view.
-    ui.lastAutoAlertKey = `${selectionKey(ui.selection)}:${c.threat_level}`;
     render();
+    scrollDetailIntoView();
   };
   card.addEventListener("click", openDetail);
   card.addEventListener("keydown", (e) => {
@@ -696,13 +700,6 @@ function showState(which) {
   });
 }
 
-function selectionKey(sel) {
-  if (!sel) return null;
-  return sel.kind === "conversation"
-    ? `c:${sel.platform}:${sel.participant}`
-    : `e:${sel.platform}:${sel.context}`;
-}
-
 /* ---------------------------- main render --------------------------- */
 function render() {
   const snapshot = ui.snapshot;
@@ -756,6 +753,21 @@ function render() {
   } else {
     bell.classList.remove("has-alerts");
     badge.hidden = true;
+  }
+
+  // Toast any flagged items whose keys are new since the last snapshot.
+  // First snapshot primes ui.knownAlerts without toasting — the user
+  // opens the page to the current state, not a flurry of historical
+  // alerts. Subsequent snapshots produce toasts only for keys never seen
+  // before, which includes escalations (alertId encodes threat_level).
+  if (ui.knownAlerts === null) {
+    ui.knownAlerts = new Set(flaggedItems.map((it) => alertId(it.kind, it.data)));
+  } else {
+    const fresh = findFreshAlertItems(flaggedItems, ui.knownAlerts);
+    for (const it of fresh) {
+      ui.knownAlerts.add(alertId(it.kind, it.data));
+      spawnAlertToast(it);
+    }
   }
 
   renderAlertsMenu(snapshot, flaggedItems);
@@ -880,6 +892,7 @@ function renderAlertsMenu(snapshot, items) {
         ui.selection = { kind: "conversation", platform: c.platform, participant: c.participant };
         closeAlertsMenu();
         render();
+        scrollDetailIntoView();
       });
     } else {
       const e = it.data;
@@ -896,6 +909,7 @@ function renderAlertsMenu(snapshot, items) {
         ui.selection = { kind: "environment", platform: e.platform, context: e.context };
         closeAlertsMenu();
         render();
+        scrollDetailIntoView();
       });
     }
     list.appendChild(row);
@@ -907,6 +921,100 @@ function toggleAlertsMenu() {
   m.hidden = !m.hidden;
 }
 function closeAlertsMenu() { $("alertsMenu").hidden = true; }
+
+/* ---------------------------- toasts -------------------------------- */
+// Live "a new alert just landed" moment: when the SSE stream brings a
+// flagged item whose key is new relative to everything we've seen so
+// far, we slide a toast in from the right. Clicking the body opens the
+// conversation detail (and scrolls it into view); the × dismisses.
+
+// Pure: diff current items against observed keys. Exported via the
+// global so tests can exercise it without a browser.
+function findFreshAlertItems(items, knownKeys) {
+  return items.filter((it) => !knownKeys.has(alertId(it.kind, it.data)));
+}
+
+function scrollDetailIntoView() {
+  // Reset scroll of whichever detail container is active — otherwise a
+  // parent returning to a deep conversation sees the previous scroll
+  // position, which hides the new headline the toast just teased.
+  const right = $("rightPanel");
+  if (right) right.scrollTop = 0;
+  for (const id of ["stateConversation", "stateEnvironment"]) {
+    const el = $(id);
+    if (el && !el.hidden) el.scrollTop = 0;
+  }
+}
+
+function spawnAlertToast(item) {
+  const container = $("toastContainer");
+  if (!container) return;  // template without toast slot — skip silently
+
+  const key = alertId(item.kind, item.data);
+  const existing = ui.activeToasts.get(key);
+  if (existing && existing.isConnected) return;  // already showing
+
+  const c = item.data;
+  const lvl = levelClass(item.level);
+  const el = document.createElement("div");
+  el.className = `gl-toast ${lvl}`;
+  el.setAttribute("role", "alert");
+  el.setAttribute("data-alert-key", key);
+
+  const labelName = item.kind === "conversation"
+    ? (c.participant || (c.participants && c.participants[0]) || "Unknown")
+    : c.platform;
+  const sub = item.kind === "conversation"
+    ? (shortNarrative(c) || `New ${item.level} on ${platformLabel(c.platform)}`)
+    : (c.content_summary || `${c.platform} environment flagged`);
+
+  el.innerHTML = `
+    <div class="gl-toast-icon ${lvl}">${escapeHtml(initials(labelName))}</div>
+    <div class="gl-toast-body">
+      <div class="gl-toast-title">${escapeHtml(labelName)}
+        <span class="gl-toast-level ${lvl}">${escapeHtml(item.level)}</span>
+      </div>
+      <div class="gl-toast-sub">${escapeHtml(sub)}</div>
+    </div>
+    <button class="gl-toast-close" type="button" aria-label="Dismiss alert">×</button>
+  `;
+  container.appendChild(el);
+  ui.activeToasts.set(key, el);
+
+  const dismiss = () => {
+    if (!el.isConnected) return;
+    el.classList.add("leaving");
+    setTimeout(() => {
+      el.remove();
+      if (ui.activeToasts.get(key) === el) ui.activeToasts.delete(key);
+    }, 220);
+  };
+
+  el.addEventListener("click", (ev) => {
+    if (ev.target.closest(".gl-toast-close")) { dismiss(); return; }
+    markSeen(key);
+    if (item.kind === "conversation") {
+      ui.selection = {
+        kind: "conversation",
+        platform: c.platform,
+        participant: c.participant,
+      };
+    } else {
+      ui.selection = {
+        kind: "environment",
+        platform: c.platform,
+        context: c.context,
+      };
+    }
+    render();
+    scrollDetailIntoView();
+    dismiss();
+  });
+
+  // Auto-dismiss. Long enough for a video demo to narrate; short enough
+  // that a real user isn't stuck with stale banners.
+  setTimeout(dismiss, 7000);
+}
 
 /* ---------------------------- events -------------------------------- */
 document.addEventListener("click", (evt) => {

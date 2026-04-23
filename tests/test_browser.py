@@ -367,3 +367,208 @@ class TestSessionOverview:
         page.goto(server_url)
         # Attached check works from any right-panel state.
         expect(page.locator("#actionsList")).to_be_attached()
+
+
+# ---------------------------------------------------------------------------
+# Live-alert toast: new alert arrives *after* page load
+# ---------------------------------------------------------------------------
+
+
+class _Injectable:
+    """Bundle of (url, state, tmp) returned by the injectable_server fixture.
+
+    The module-scoped ``server_url`` fixture above pre-seeds a conversation
+    before the browser connects, which is the right shape for static
+    rendering tests but cannot exercise the "new alert just landed"
+    codepath — by the time the page loads, the alert is already present.
+    This fixture starts a server with an empty database so tests can
+    inject a conversation *after* the dashboard has connected and
+    primed its ``knownAlerts`` set.
+    """
+
+    def __init__(self, url: str, state: Any, tmp: Path) -> None:
+        self.url = url
+        self.state = state
+        self.tmp = tmp
+
+
+@pytest.fixture(scope="class")
+def injectable_server(tmp_path_factory: pytest.TempPathFactory) -> _Injectable:
+    """Start a server with an empty DB; tests inject alerts post-load."""
+    from unittest.mock import patch
+
+    tmp = tmp_path_factory.mktemp("browser_live")
+    screenshots_dir = tmp / "screenshots"
+    screenshots_dir.mkdir()
+    (screenshots_dir / "live_alert.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+
+    cfg = GuardLensConfig()
+    cfg.database.path = tmp / "live.db"
+    cfg.monitor.screenshots_dir = screenshots_dir
+    cfg.monitor.demo_mode = True
+    cfg.monitor.capture_interval_seconds = 300.0
+    cfg.dashboard.server_port = 0
+    cfg.dashboard.title = "GuardianLens — Live Test"
+
+    with patch("guardlens.pipeline.ollama.Client") as mock_cls:
+        mock_client = mock_cls.return_value
+        mock_client.chat.return_value = _PIPELINE_OLLAMA_RESPONSE
+
+        app = create_app(cfg)
+        config = uvicorn.Config(app, host="127.0.0.1", port=0,
+                                log_level="warning", access_log=False)
+        server = uvicorn.Server(config)
+        thread = threading.Thread(target=server.run, daemon=True)
+        thread.start()
+
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            if server.started:
+                break
+            time.sleep(0.05)
+        else:
+            raise RuntimeError("Server did not start within 10 seconds")
+
+        port = server.servers[0].sockets[0].getsockname()[1]
+        yield _Injectable(
+            url=f"http://127.0.0.1:{port}",
+            state=app.state.guardlens,
+            tmp=tmp,
+        )
+
+        server.should_exit = True
+        thread.join(timeout=5)
+
+
+def _inject_conversation(
+    state: Any,
+    *,
+    platform: str,
+    participant: str,
+    level: str = "alert",
+    narrative: str = "User asked age, then pushed private contact.",
+) -> None:
+    """Insert a flagged conversation into the live DB. The next SSE tick
+    will carry it to the browser, which should fire a toast."""
+    state.database.create_conversation(
+        platform=platform,
+        participants=[participant],
+        first_seen=datetime.now().isoformat(),
+        messages=[{"sender": participant, "text": "hey how old are you?"}],
+        screenshots=[],
+        status={
+            "threat_level": level,
+            "category": "grooming",
+            "confidence": 91,
+            "grooming_stage": "trust_building",
+            "indicators": ["age inquiry", "platform switch"],
+            "narrative": narrative,
+            "reasoning": narrative,
+            "parent_alert_recommended": True,
+            "certainty": "high",
+        },
+        status_reasoning=narrative,
+    )
+
+
+class TestLiveAlertToast:
+    """The "ding" moment: a flagged conversation appearing in a fresh SSE
+    snapshot should slide a toast in. Clicking the toast opens detail
+    and scrolls it into view; the × button dismisses without navigating."""
+
+    def test_toast_spawns_on_new_alert(
+        self, page: Page, injectable_server: _Injectable
+    ) -> None:
+        page.goto(injectable_server.url)
+        # Let the first render prime ui.knownAlerts. `ui` is a top-level
+        # `const` in a classic script, so it is accessible by bare name
+        # inside the page context but NOT as window.ui.
+        page.wait_for_function(
+            "() => typeof ui !== 'undefined' && ui.knownAlerts instanceof Set",
+            timeout=10_000,
+        )
+        # No toast until we inject something.
+        expect(page.locator(".gl-toast")).to_have_count(0)
+
+        _inject_conversation(
+            injectable_server.state,
+            platform="Discord",
+            participant="NewPredator",
+        )
+        # SSE tick is 2s — give it a bit more for the round-trip.
+        expect(page.locator(".gl-toast")).to_have_count(1, timeout=6_000)
+        expect(page.locator(".gl-toast .gl-toast-title")).to_contain_text(
+            "NewPredator"
+        )
+
+    def test_clicking_toast_opens_conversation_detail(
+        self, page: Page, injectable_server: _Injectable
+    ) -> None:
+        page.goto(injectable_server.url)
+        page.wait_for_function(
+            "() => typeof ui !== 'undefined' && ui.knownAlerts instanceof Set",
+            timeout=10_000,
+        )
+        _inject_conversation(
+            injectable_server.state,
+            platform="Instagram",
+            participant="ClickTargetUser",
+            narrative="Flattery escalating to private-DM ask.",
+        )
+        toast = page.locator(".gl-toast").filter(has_text="ClickTargetUser").first
+        expect(toast).to_be_visible(timeout=6_000)
+        # Click the body of the toast (not the close button).
+        toast.locator(".gl-toast-body").click()
+        expect(page.locator("#stateConversation")).to_be_visible(timeout=3_000)
+        expect(page.locator("#convName")).to_contain_text("ClickTargetUser")
+
+    def test_close_button_dismisses_without_navigating(
+        self, page: Page, injectable_server: _Injectable
+    ) -> None:
+        page.goto(injectable_server.url)
+        page.wait_for_function(
+            "() => typeof ui !== 'undefined' && ui.knownAlerts instanceof Set",
+            timeout=10_000,
+        )
+        _inject_conversation(
+            injectable_server.state,
+            platform="Minecraft",
+            participant="DismissTargetUser",
+        )
+        toast = page.locator(".gl-toast").filter(has_text="DismissTargetUser").first
+        expect(toast).to_be_visible(timeout=6_000)
+        # Session overview remains visible before we click the X.
+        expect(page.locator("#stateSession")).to_be_visible()
+        toast.locator(".gl-toast-close").click()
+        # After the dismissal animation, the toast is gone.
+        expect(toast).to_have_count(0, timeout=3_000)
+        # And we're still on the session overview — the close button did NOT open detail.
+        expect(page.locator("#stateSession")).to_be_visible()
+        expect(page.locator("#stateConversation")).to_be_hidden()
+
+
+class TestFreshAlertItemsHelper:
+    """Exercise the pure `findFreshAlertItems` helper directly in the
+    browser context. Keeps the diff logic honest without requiring a
+    full SSE round-trip."""
+
+    def test_finds_only_new_keys(
+        self, page: Page, injectable_server: _Injectable
+    ) -> None:
+        page.goto(injectable_server.url)
+        page.wait_for_function(
+            "() => typeof findFreshAlertItems === 'function'",
+            timeout=10_000,
+        )
+        # Two items, one whose key is already known.
+        result = page.evaluate(
+            """() => {
+              const items = [
+                {kind: 'conversation', data: {platform: 'Discord', participant: 'A', threat_level: 'alert'}, level: 'alert'},
+                {kind: 'conversation', data: {platform: 'Discord', participant: 'B', threat_level: 'alert'}, level: 'alert'},
+              ];
+              const known = new Set([alertId('conversation', items[0].data)]);
+              return findFreshAlertItems(items, known).map(it => it.data.participant);
+            }"""
+        )
+        assert result == ["B"]
