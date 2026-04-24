@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import difflib
+import io
 import json
 import logging
 import time
@@ -23,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import ollama
+from PIL import Image
 
 from guardlens.alerts import AlertSender
 from guardlens.config import OllamaConfig
@@ -367,9 +369,28 @@ class ConversationPipeline:
 # ------------------------------------------------------------------
 
 
+_MAX_EDGE_PX = 1280
+
+
 def _encode_image(image_path: Path) -> str:
-    with image_path.open("rb") as f:
-        return base64.b64encode(f.read()).decode("utf-8")
+    # Cap the longest edge at 1280 px before sending to the vision model.
+    # Gemma 3/4 vision tiles at 896x896; sending a raw 1920x1080 frame
+    # either downscales internally (wasting the bytes we sent) or triggers
+    # multi-tile Pan&Scan (multiplying prefill cost). 1280 keeps in-game
+    # chat text readable (~10 px on a 1920x1080 source) while staying in
+    # the two-tile budget.
+    with Image.open(image_path) as img:
+        img.load()
+    w, h = img.size
+    longest = max(w, h)
+    if longest > _MAX_EDGE_PX:
+        scale = _MAX_EDGE_PX / longest
+        img = img.resize((round(w * scale), round(h * scale)), Image.LANCZOS)
+    if img.mode != "RGB":
+        img = img.convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", compress_level=1)
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
 def _format_message_dicts(messages: list[dict[str, str]]) -> str:
