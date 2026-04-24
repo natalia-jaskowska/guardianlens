@@ -130,7 +130,20 @@ class ConversationPipeline:
             prior_participants = []
 
         merged = self._merge_messages(prior_messages, fragment.messages)
-        new_status = self._update_status(prior_status, merged)
+
+        # Skip the ~10 s status LLM call when the merged history is
+        # bit-for-bit identical to the DB's prior copy — no new messages,
+        # no OCR-cleaned text, nothing that could shift the classification.
+        # If anything changed (including an existing message's text being
+        # upgraded by `_fuzzy_merge`), re-run status for correctness.
+        if prior_status and merged == prior_messages:
+            logger.info(
+                "Conversation unchanged (%d msg) — reusing status.",
+                len(prior_messages),
+            )
+            new_status = ConversationStatus.model_validate(prior_status)
+        else:
+            new_status = self._update_status(prior_status, merged)
 
         now = datetime.now().isoformat()
         screenshot_entry = {"path": str(image_path), "timestamp": now}

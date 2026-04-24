@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+from PIL import Image
+
 from guardlens.analyzer import GuardLensAnalyzer
 from guardlens.config import OllamaConfig
 from guardlens.database import GuardLensDatabase
@@ -20,6 +22,10 @@ from guardlens.schema import (
     ScreenAnalysis,
     ThreatLevel,
 )
+
+
+def _write_tiny_png(path: Path) -> None:
+    Image.new("RGB", (4, 4), "white").save(path)
 
 _FAKE_OLLAMA_RESPONSE: dict[str, Any] = {
     "message": {
@@ -72,7 +78,7 @@ _FAKE_OLLAMA_RESPONSE: dict[str, Any] = {
 def test_analyzer_parses_full_tool_chain(tmp_path: Path) -> None:
     """The analyzer should turn a happy-path Ollama response into a typed result."""
     image = tmp_path / "fake.png"
-    image.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    _write_tiny_png(image)
 
     analyzer = GuardLensAnalyzer(OllamaConfig())
 
@@ -200,7 +206,7 @@ def test_pipeline_frame_analysis_fallback(tmp_path: Path) -> None:
     """When the model doesn't call extract_conversations, pipeline returns empty."""
     pipeline = ConversationPipeline(OllamaConfig())
     image = tmp_path / "fake.png"
-    image.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    _write_tiny_png(image)
 
     empty_response = {"message": {"role": "assistant", "content": "no tools", "tool_calls": []}}
 
@@ -217,7 +223,7 @@ def test_pipeline_push_screenshot_empty_frame(tmp_path: Path) -> None:
     db = GuardLensDatabase(tmp_path / "test.db")
     db.start_session()
     image = tmp_path / "fake.png"
-    image.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    _write_tiny_png(image)
 
     empty_response = {"message": {"role": "assistant", "content": "", "tool_calls": []}}
 
