@@ -213,6 +213,7 @@ class ConversationPipeline:
             logger.exception("Frame analysis failed (%s): %s", type(exc).__name__, exc)
             return FrameAnalysis()
         elapsed = time.perf_counter() - start
+        _log_call_metrics("extract", elapsed, response)
 
         message = get_message(response)
         tool_calls = get_tool_calls(message)
@@ -290,6 +291,7 @@ class ConversationPipeline:
             transcript=transcript,
         )
 
+        start = time.perf_counter()
         try:
             response = self._client.chat(
                 model=self._config.inference_model,
@@ -303,6 +305,7 @@ class ConversationPipeline:
         except (ollama.RequestError, ollama.ResponseError, TimeoutError, ConnectionError) as exc:
             logger.error("Status update call failed: %s — safe fallback", exc)
             return ConversationStatus()
+        _log_call_metrics("status ", time.perf_counter() - start, response)
 
         message = get_message(response)
         tool_calls = get_tool_calls(message)
@@ -383,6 +386,22 @@ class ConversationPipeline:
 
 
 _MAX_EDGE_PX = 1280
+
+
+def _log_call_metrics(label: str, elapsed_s: float, response: Any) -> None:
+    # Ollama reports prompt_eval_count / eval_count (tokens) and
+    # prompt_eval_duration / eval_duration (nanoseconds). Any field may
+    # be absent depending on backend, so default everything to 0.
+    get = response.get if hasattr(response, "get") else lambda k, d=0: getattr(response, k, d)
+    pe = get("prompt_eval_count", 0) or 0
+    ev = get("eval_count", 0) or 0
+    pe_s = (get("prompt_eval_duration", 0) or 0) / 1e9
+    ev_s = (get("eval_duration", 0) or 0) / 1e9
+    gen_tps = (ev / ev_s) if ev_s > 0 else 0.0
+    logger.info(
+        "LLM %s: wall=%.2fs  prefill=%d tok (%.2fs)  gen=%d tok (%.2fs, %.1f tok/s)",
+        label, elapsed_s, pe, pe_s, ev, ev_s, gen_tps,
+    )
 
 
 def _encode_image(image_path: Path) -> str:
