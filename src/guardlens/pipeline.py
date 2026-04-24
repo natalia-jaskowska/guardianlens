@@ -385,7 +385,7 @@ class ConversationPipeline:
 # ------------------------------------------------------------------
 
 
-_MAX_EDGE_PX = 1280
+_MAX_EDGE_PX = 600
 
 
 def _log_call_metrics(label: str, elapsed_s: float, response: Any) -> None:
