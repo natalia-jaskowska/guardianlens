@@ -29,7 +29,7 @@ from PIL import Image
 from guardlens.alerts import AlertSender
 from guardlens.config import OllamaConfig
 from guardlens.database import GuardLensDatabase
-from guardlens.ollama_utils import extract_thinking, find_call, get_message, get_tool_calls
+from guardlens.ollama_utils import extract_thinking, get_message
 from guardlens.prompts import (
     FRAME_EXTRACT_SYSTEM_PROMPT,
     FRAME_EXTRACT_USER_PROMPT,
@@ -44,8 +44,8 @@ from guardlens.schema import (
     ThreatLevel,
 )
 from guardlens.tools import (
-    PIPELINE_FRAME_TOOLS,
-    PIPELINE_STATUS_TOOLS,
+    EXTRACT_CONVERSATIONS_SCHEMA,
+    UPDATE_CONVERSATION_STATUS_SCHEMA,
 )
 
 MATCH_LONG_MSG_MIN = 15
@@ -203,7 +203,8 @@ class ConversationPipeline:
                         "images": [image_b64],
                     },
                 ],
-                tools=PIPELINE_FRAME_TOOLS,
+                format=EXTRACT_CONVERSATIONS_SCHEMA,
+                think="low",
                 options={
                     "temperature": self._config.temperature,
                     "num_ctx": self._config.num_ctx,
@@ -216,11 +217,10 @@ class ConversationPipeline:
         _log_call_metrics("extract", elapsed, response)
 
         message = get_message(response)
-        tool_calls = get_tool_calls(message)
-        args = find_call(tool_calls, "extract_conversations")
+        args = _parse_structured_content(message)
 
         if args is None:
-            logger.warning("Model did not call extract_conversations — empty frame.")
+            logger.warning("Model returned no parseable JSON — empty frame.")
             return FrameAnalysis(
                 raw_thinking=extract_thinking(message),
                 inference_seconds=elapsed,
@@ -299,7 +299,8 @@ class ConversationPipeline:
                     {"role": "system", "content": STATUS_UPDATE_SYSTEM_PROMPT},
                     {"role": "user", "content": prompt},
                 ],
-                tools=PIPELINE_STATUS_TOOLS,
+                format=UPDATE_CONVERSATION_STATUS_SCHEMA,
+                think="low",
                 options={"temperature": 0.1, "num_ctx": self._config.num_ctx},
             )
         except (ollama.RequestError, ollama.ResponseError, TimeoutError, ConnectionError) as exc:
@@ -308,11 +309,10 @@ class ConversationPipeline:
         _log_call_metrics("status ", time.perf_counter() - start, response)
 
         message = get_message(response)
-        tool_calls = get_tool_calls(message)
-        args = find_call(tool_calls, "update_conversation_status")
+        args = _parse_structured_content(message)
 
         if args is None:
-            logger.warning("Model did not call update_conversation_status — safe fallback.")
+            logger.warning("Model returned no parseable JSON — safe fallback.")
             return ConversationStatus()
 
         # Some models return confidence as a fraction (0.99) instead of
@@ -386,6 +386,22 @@ class ConversationPipeline:
 
 
 _MAX_EDGE_PX = 600
+
+
+def _parse_structured_content(message: Any) -> dict | None:
+    # With `format=<json_schema>`, Ollama returns the model's structured
+    # output in message.content as a JSON string (grammar-constrained, so it
+    # is always well-formed). Thinking output is in message.thinking, not
+    # mixed in. Return None if the content is empty or not a JSON object.
+    content = message.get("content") if hasattr(message, "get") else getattr(message, "content", None)
+    if not content or not isinstance(content, str):
+        return None
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError as exc:
+        logger.warning("Structured-output JSON decode failed: %s", exc)
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def _log_call_metrics(label: str, elapsed_s: float, response: Any) -> None:

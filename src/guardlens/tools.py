@@ -313,3 +313,10 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
 
 PIPELINE_FRAME_TOOLS: list[dict[str, Any]] = [EXTRACT_CONVERSATIONS_TOOL]
 PIPELINE_STATUS_TOOLS: list[dict[str, Any]] = [UPDATE_CONVERSATION_STATUS_TOOL]
+
+# Structured-output schemas. Ollama's `format=<json_schema>` accepts the raw
+# JSON Schema (minus the tool-call wrapper) and uses grammar-constrained
+# decoding. This is cheaper than tool-calling: no {"function":{"name":...,
+# "arguments":...}} boilerplate to generate, and invalid JSON is impossible.
+EXTRACT_CONVERSATIONS_SCHEMA: dict[str, Any] = EXTRACT_CONVERSATIONS_TOOL["function"]["parameters"]
+UPDATE_CONVERSATION_STATUS_SCHEMA: dict[str, Any] = UPDATE_CONVERSATION_STATUS_TOOL["function"]["parameters"]
