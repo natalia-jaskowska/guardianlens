@@ -257,32 +257,15 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                 "indicators": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Specific indicator labels supporting this verdict.",
+                    "maxItems": 3,
+                    "description": "Up to 3 short indicator labels supporting the verdict.",
                 },
                 "short_summary": {
                     "type": "string",
                     "description": (
-                        "ONE-LINE summary of what's happening in this "
-                        "conversation — max 20 words. Parent-facing. "
-                        "Example: 'Coordinating a school science project; "
-                        "friendly peer chat about weekend plans.'"
-                    ),
-                },
-                "narrative": {
-                    "type": "string",
-                    "description": (
-                        "2-4 sentence plain-English summary of the conversation "
-                        "pattern. Parent-facing. No raw message text."
-                    ),
-                },
-                "reasoning": {
-                    "type": "string",
-                    "description": (
-                        "VERBOSE chain-of-thought walkthrough (3-6 sentences, "
-                        "up to ~150 words) explaining WHY you reached this "
-                        "verdict. Reference specific messages, dynamics, and "
-                        "patterns. Describe what you considered and ruled "
-                        "out. This is shown to the parent under 'AI reasoning'."
+                        "ONE sentence, max 20 words, parent-facing. "
+                        "Example: 'Adult-presenting user asking child's age, "
+                        "steering to private DMs.'"
                     ),
                 },
                 "parent_alert_recommended": {
@@ -301,8 +284,6 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                 "category",
                 "confidence",
                 "short_summary",
-                "narrative",
-                "reasoning",
                 "parent_alert_recommended",
                 "certainty",
             ],

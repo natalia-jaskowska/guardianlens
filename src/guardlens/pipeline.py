@@ -204,7 +204,7 @@ class ConversationPipeline:
                     },
                 ],
                 format=EXTRACT_CONVERSATIONS_SCHEMA,
-                think="low",
+                think=False,
                 options={
                     "temperature": self._config.temperature,
                     "num_ctx": self._config.num_ctx,
@@ -300,7 +300,7 @@ class ConversationPipeline:
                     {"role": "user", "content": prompt},
                 ],
                 format=UPDATE_CONVERSATION_STATUS_SCHEMA,
-                think="low",
+                think=False,
                 options={"temperature": 0.1, "num_ctx": self._config.num_ctx},
             )
         except (ollama.RequestError, ollama.ResponseError, TimeoutError, ConnectionError) as exc:
