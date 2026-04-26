@@ -123,13 +123,23 @@ html, body {
   width: 36px; height: 36px; border-radius: 50%;
   flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  color: white; font-size: 13px; font-weight: 700;
+  color: white; font-size: 14px; font-weight: 700;
+  letter-spacing: -0.3px;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+  position: relative;
+  overflow: hidden;
 }
+/* Maya — cool pink/purple selfie-light vibe. */
 .msg-avatar.them {
-  background: linear-gradient(135deg, #f472b6 0%, #c084fc 50%, #818cf8 100%);
+  background:
+    radial-gradient(circle at 30% 30%, #fce7f3 0%, transparent 35%),
+    linear-gradient(135deg, #f472b6 0%, #c084fc 55%, #818cf8 100%);
 }
+/* Emma — warm sunset, sparkle accent. The owner of the phone. */
 .msg-avatar.you {
-  background: linear-gradient(135deg, #5865f2 0%, #4752c4 100%);
+  background:
+    radial-gradient(circle at 30% 30%, #fef3c7 0%, transparent 38%),
+    linear-gradient(135deg, #fb923c 0%, #f43f5e 50%, #a855f7 100%);
 }
 .msg-avatar.spacer { background: transparent; visibility: hidden; }
 .msg-body { flex: 1; min-width: 0; }
@@ -296,21 +306,25 @@ html, body {
 </div>
 
 <script>
-// Safe peer-to-peer chat: two friends planning to play ranked tonight.
-// Realistic teen Discord patterns — short messages, gaming references,
-// platform-specific lingo ("vc", "rotate", "queue"). Nothing here should
-// trigger any threat indicator; this is the "normal day" baseline that
-// the dashboard should classify as SAFE with high confidence.
+// Safe peer-to-peer chat: Emma (the phone owner, 13) and her friend
+// Maya planning a ranked-game session tonight. Real-texting cadence
+// — typing indicators on both sides, ~2-3 s between messages, occasional
+// double-text. Nothing here should trigger any threat indicator; this
+// is the "normal day" baseline the dashboard should classify SAFE.
+//
+// `think` is the typing-indicator hold time (ms) before the message
+// lands, simulating the sender composing it. `pause` is the dead air
+// after the previous message before they start typing.
 const SCRIPT = [
-  { who: 'them', name: 'maya.exe', text: 'yo are you on tonight' },
-  { who: 'them', name: 'maya.exe', text: 'I wanna grind ranked' },
-  { who: 'you',  name: 'you',      text: 'ya gimme like 20 min, finishing math hw' },
-  { who: 'them', name: 'maya.exe', text: 'no rush' },
-  { who: 'them', name: 'maya.exe', text: 'we can hop in vc whenever' },
-  { who: 'you',  name: 'you',      text: 'k' },
-  { who: 'them', name: 'maya.exe', text: 'also tara might queue with us' },
-  { who: 'them', name: 'maya.exe', text: 'she just hit plat 🥳' },
-  { who: 'you',  name: 'you',      text: 'lets goooo' },
+  { who: 'them', name: 'maya.exe', text: 'hey are you on tonight?',          pause: 600,  think: 1900 },
+  { who: 'you',  name: 'Emma',     text: 'yeahh just finishing math hw 😩', pause: 1100, think: 2200 },
+  { who: 'them', name: 'maya.exe', text: 'okk wanna grind ranked after?',    pause: 1100, think: 2000 },
+  { who: 'them', name: 'maya.exe', text: 'i really wanna hit plat this week 🥹', pause: 600, think: 1800 },
+  { who: 'you',  name: 'Emma',     text: 'omg yes',                           pause: 1300, think: 1100 },
+  { who: 'you',  name: 'Emma',     text: 'gimme like 15 min',                 pause: 400,  think: 1300 },
+  { who: 'them', name: 'maya.exe', text: 'no rush, im in vc whenever',        pause: 1000, think: 1900 },
+  { who: 'them', name: 'maya.exe', text: 'tara is queuing with us btw',       pause: 700,  think: 1700 },
+  { who: 'you',  name: 'Emma',     text: 'lets goooo 🎮',                    pause: 1100, think: 1500 },
 ];
 
 const messagesEl = document.getElementById('messages');
@@ -357,23 +371,23 @@ function addMessage(who, name, text, isFollowup) {
 }
 
 async function play() {
-  // Brisk peer chat — short pauses between messages. Total ~14 s.
-  await sleep(800);
-  let prevWho = null, prevName = null;
+  // Real-texting cadence — pause + typing indicator on every message
+  // (both sides), ~3 s per turn, total ~30 s. Gives Gemma multiple
+  // worker cycles inside the conversation so the matcher gets to flex.
+  await sleep(700);
+  let prevName = null;
   for (let i = 0; i < SCRIPT.length; i++) {
     const msg = SCRIPT[i];
-    const sameAsPrev = msg.who === prevWho && msg.name === prevName;
-    if (msg.who === 'them' && !sameAsPrev) {
-      const t = addTyping(msg.name);
-      await sleep(900 + Math.random() * 400);
-      t.remove();
-    } else if (!sameAsPrev) {
-      await sleep(700);
-    } else {
-      await sleep(500);
-    }
-    addMessage(msg.who, msg.name, msg.text, sameAsPrev);
-    prevWho = msg.who; prevName = msg.name;
+    const isFollowup = msg.name === prevName;
+    await sleep(msg.pause || 800);
+    // Show "X is typing..." for both directions — Discord on mobile
+    // shows it for the remote user; for the local user we fake an
+    // indicator in the input bar to keep the visual rhythm.
+    const t = addTyping(msg.name);
+    await sleep(msg.think || 1500);
+    t.remove();
+    addMessage(msg.who, msg.name, msg.text, isFollowup);
+    prevName = msg.name;
   }
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
