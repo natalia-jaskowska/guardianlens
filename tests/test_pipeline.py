@@ -284,6 +284,30 @@ def test_score_match_chat_type_dm_keeps_strict_gate_even_for_minecraft() -> None
     assert _score_match(fragment, [candidate]) is None
 
 
+def test_score_match_global_chat_rejects_stale_candidate() -> None:
+    """Global-chat merging is bounded by recency. A 60 s old "safe peer
+    chat" Minecraft conv must NOT swallow a fresh bullying frame, so
+    the bullying scene starts a clean conversation without inheriting
+    the safe prior status."""
+    from datetime import datetime, timedelta
+
+    fragment = ConversationFragment(
+        platform="Minecraft",
+        chat_type="global",
+        participants=["Bymonkee"],
+        messages=[ChatMessage(sender="Bymonkee", text="get out of my server loser")],
+    )
+    stale_ts = (datetime.now() - timedelta(seconds=60)).isoformat()
+    stale_candidate = {
+        "id": 1,
+        "platform": "Minecraft",
+        "participants_json": '["Jake"]',
+        "messages_json": '[{"sender":"Jake","text":"hey"}]',
+        "last_seen": stale_ts,
+    }
+    assert _score_match(fragment, [stale_candidate]) is None
+
+
 def test_score_match_unknown_participant_does_not_block_merge() -> None:
     """A fragment whose participant is the placeholder 'Unknown' should
     still merge into a real Minecraft conversation via the global-chat

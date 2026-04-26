@@ -67,6 +67,15 @@ _GLOBAL_CHAT_PLATFORM_HINTS = {
     "league of legends", "csgo", "counter-strike",
     "twitch", "youtube live",
 }
+_GLOBAL_CHAT_MAX_STALENESS_S = 25.0
+"""Tighter recency window for global-chat merging. Conversation
+identity on these platforms is the channel/server, but the *threat
+profile* can pivot fast — a friendly group chat can shift into a
+pile-on within seconds. If we'd merge a fresh frame into a candidate
+last seen >25 s ago, the model gets biased by an obsolete prior
+status (e.g. "safe peer chat") and may refuse to escalate when the
+new content is clearly hostile. Beyond this gap, force a new
+conversation so re-classification starts from a clean slate."""
 """Defensive fallback for ``_infer_chat_type``: when the vision model
 omits the ``chat_type`` field, treat these well-known game/stream
 platforms as global chats. The model's own classification — when it
@@ -541,6 +550,25 @@ def _score_match(
     for c in candidates:
         if c["platform"] != fragment.platform:
             continue
+
+        # For global-chat platforms, refuse to merge into a stale
+        # candidate even though the platform matches. Otherwise a
+        # safe-tone "session 1" gets reused as the prior status when
+        # session 2 is clearly hostile, and the model anchors on the
+        # safe prior. See _GLOBAL_CHAT_MAX_STALENESS_S above.
+        if is_global_chat:
+            last_seen_raw = None
+            try:
+                last_seen_raw = c["last_seen"]
+            except (KeyError, IndexError):
+                pass
+            if last_seen_raw:
+                try:
+                    last = datetime.fromisoformat(last_seen_raw)
+                    if (datetime.now() - last).total_seconds() > _GLOBAL_CHAT_MAX_STALENESS_S:
+                        continue
+                except (ValueError, TypeError):
+                    pass
 
         cand_parts = [
             _normalize_name(p)
