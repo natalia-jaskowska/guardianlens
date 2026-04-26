@@ -182,21 +182,83 @@ def test_score_match_does_not_cross_platforms() -> None:
     assert _score_match(fragment, [candidate]) is None
 
 
-def test_score_match_no_overlap_no_merge() -> None:
-    """Same platform but different participants and no text overlap →
-    do NOT merge (would happily over-merge on platform alone otherwise)."""
+def test_score_match_dm_platform_no_overlap_no_merge() -> None:
+    """For DM-style platforms (TikTok, Discord), same platform but different
+    participants with no text overlap must NOT merge — different threads."""
     fragment = ConversationFragment(
-        platform="Minecraft",
+        platform="TikTok",
         participants=["Alex"],
         messages=[ChatMessage(sender="Alex", text="lol")],
     )
     candidate = {
         "id": 1,
-        "platform": "Minecraft",
+        "platform": "TikTok",
         "participants_json": '["Steve_2009"]',
         "messages_json": '[{"sender":"Steve_2009","text":"hey"}]',
     }
     assert _score_match(fragment, [candidate]) is None
+
+
+def test_score_match_global_chat_merges_disjoint_participants() -> None:
+    """Minecraft / Roblox / etc. show a rolling chat window — different
+    speakers per frame is normal. Same-platform candidate should merge
+    even with zero participant or text overlap."""
+    fragment = ConversationFragment(
+        platform="Minecraft",
+        participants=["Bymonkee"],
+        messages=[ChatMessage(sender="Bymonkee", text="check this out")],
+    )
+    candidate = {
+        "id": 7,
+        "platform": "Minecraft",
+        "participants_json": '["Jake"]',
+        "messages_json": '[{"sender":"Jake","text":"omg"}]',
+    }
+    assert _score_match(fragment, [candidate]) == 7
+
+
+def test_score_match_global_chat_picks_most_recent_candidate() -> None:
+    """When multiple same-platform candidates exist, the matcher should
+    pick the most recently updated. The DB query orders DESC by last_seen,
+    so the candidate at index 0 is most recent. Verify the matcher honors
+    that ordering even when scores tie at zero."""
+    fragment = ConversationFragment(
+        platform="Minecraft",
+        participants=["Liam"],
+        messages=[ChatMessage(sender="Liam", text="gg")],
+    )
+    most_recent = {
+        "id": 9,
+        "platform": "Minecraft",
+        "participants_json": '["Bymonkee"]',
+        "messages_json": '[{"sender":"Bymonkee","text":"omg"}]',
+    }
+    older = {
+        "id": 3,
+        "platform": "Minecraft",
+        "participants_json": '["Jake"]',
+        "messages_json": '[{"sender":"Jake","text":"hey"}]',
+    }
+    # Candidates passed in DB order: most-recent first.
+    assert _score_match(fragment, [most_recent, older]) == 9
+
+
+def test_score_match_unknown_participant_does_not_block_merge() -> None:
+    """A fragment whose participant is the placeholder 'Unknown' should
+    still merge into a real Minecraft conversation via the global-chat
+    rule (platform alone)."""
+    fragment = ConversationFragment(
+        platform="Minecraft",
+        participants=["Unknown"],
+        messages=[ChatMessage(sender="Unknown", text="lol")],
+    )
+    candidate = {
+        "id": 4,
+        "platform": "Minecraft",
+        "participants_json": '["Jake"]',
+        "messages_json": '[{"sender":"Jake","text":"hey"}]',
+    }
+    assert _score_match(fragment, [candidate]) == 4
 
 
 def test_db_conversation_crud(tmp_path: Path) -> None:

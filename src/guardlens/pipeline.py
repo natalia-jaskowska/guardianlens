@@ -55,6 +55,25 @@ to serve as a standalone merge signal."""
 MATCH_MIN_RUN = 2
 """Minimum number of contiguous in-order message matches to count as a run."""
 
+_PLACEHOLDER_PARTICIPANT_NAMES = {"unknown", "user", "anon", "anonymous", "?"}
+"""Names the vision model emits when it can't read a username. They must
+not count for or against participant overlap — otherwise two fragments
+that both contain "Unknown" would falsely "match" and two fragments
+where one says "Unknown" and the other names a real player would falsely
+fail to match because of the placeholder."""
+
+_GLOBAL_CHAT_PLATFORMS = {
+    "minecraft", "roblox", "fortnite", "valorant",
+    "league of legends", "csgo", "counter-strike",
+    "twitch", "youtube live",
+}
+"""Platforms where conversation identity is the *server / channel*, not
+the visible participants. In these the on-screen chat shows a rolling
+window of messages from many speakers, so consecutive worker frames
+legitimately have non-overlapping participant lists. Fragments on these
+platforms merge into any same-platform candidate within the staleness
+window — see ``_score_match``."""
+
 logger = logging.getLogger(__name__)
 
 
@@ -495,7 +514,8 @@ def _score_match(
         return None
 
     frag_parts = [_normalize_name(p) for p in fragment.participants if p and p.lower() != "child"]
-    frag_parts = [p for p in frag_parts if p]
+    frag_parts = [p for p in frag_parts if p and p not in _PLACEHOLDER_PARTICIPANT_NAMES]
+    is_global_chat = fragment.platform.strip().lower() in _GLOBAL_CHAT_PLATFORMS
 
     frag_texts_raw = [
         _normalize_text(m.text)
@@ -505,7 +525,11 @@ def _score_match(
     frag_size = len(fragment.messages)
 
     best_id: int | None = None
-    best_score = 0
+    # Start below 0 so a strong-but-zero-score candidate (e.g. a global-chat
+    # platform with no text/participant overlap) still wins. Candidates are
+    # already ordered last_seen DESC by the DB query, so on score ties the
+    # most recent wins via the strict `>` comparison below.
+    best_score = -1
     breakdowns: list[str] = []
 
     for c in candidates:
@@ -517,7 +541,7 @@ def _score_match(
             for p in json.loads(c["participants_json"])
             if p and p.lower() != "child"
         ]
-        cand_parts = [p for p in cand_parts if p]
+        cand_parts = [p for p in cand_parts if p and p not in _PLACEHOLDER_PARTICIPANT_NAMES]
 
         cand_messages = json.loads(c["messages_json"])
         cand_texts_raw = [_normalize_text(m.get("text", "")) for m in cand_messages]
@@ -555,26 +579,24 @@ def _score_match(
         run_len = _longest_contiguous_run(frag_texts_raw, cand_texts_raw)
 
         total_hits = exact_hits + fuzzy_hits
-        # Same platform + ≥1 named participant overlap is itself a strong
-        # signal: in chat apps with fading message history (Minecraft
-        # in-game chat, Roblox, etc.) the on-screen text rolls out faster
-        # than our worker re-samples, so consecutive frames legitimately
-        # share zero message text but are still the same conversation.
-        # Without this gate every Minecraft scroll spawns a fresh alert.
+        # Strong-match gate. Same platform + ≥1 named participant overlap
+        # OR (for "global chat" platforms like Minecraft / Roblox where
+        # the chat window rolls many speakers per scroll) just being on
+        # the same platform is enough — see _GLOBAL_CHAT_PLATFORMS.
         strong = (
             long_hits >= 1
             or total_hits >= 2
             or run_len >= MATCH_MIN_RUN
             or part_hits >= 1
+            or is_global_chat
         )
 
         if frag_size == 1:
-            # A single-message fragment may merge when the message is
-            # distinctive on its own OR when the participant carries over.
             single_ok = (
                 long_hits >= 1
                 or (run_len >= 1 and total_hits >= 1)
                 or part_hits >= 1
+                or is_global_chat
             )
             strong = strong and single_ok
 
