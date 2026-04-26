@@ -280,6 +280,16 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                         "steering to private DMs.'"
                     ),
                 },
+                "reasoning": {
+                    "type": "string",
+                    "description": (
+                        "ONE short sentence (≤25 words) explaining WHY "
+                        "you reached this verdict. Reference the specific "
+                        "signal(s) you saw — e.g. 'Stranger asked age then "
+                        "proposed moving to Snapchat — classic isolation "
+                        "step.' Shown to the parent under 'AI Reasoning'."
+                    ),
+                },
                 "parent_alert_recommended": {
                     "type": "boolean",
                     "description": (
@@ -296,6 +306,7 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                 "category",
                 "confidence",
                 "short_summary",
+                "reasoning",
                 "parent_alert_recommended",
                 "certainty",
             ],
