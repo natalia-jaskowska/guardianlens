@@ -16,8 +16,10 @@ from PIL import Image
 from guardlens.analyzer import GuardLensAnalyzer
 from guardlens.config import OllamaConfig
 from guardlens.database import GuardLensDatabase
-from guardlens.pipeline import ConversationPipeline, _fuzzy_merge
+from guardlens.pipeline import ConversationPipeline, _fuzzy_merge, _score_match
 from guardlens.schema import (
+    ChatMessage,
+    ConversationFragment,
     FrameAnalysis,
     ScreenAnalysis,
     ThreatLevel,
@@ -138,6 +140,63 @@ def test_fuzzy_merge_keeps_distinct_messages_from_same_sender() -> None:
     new = [{"sender": "Maxx", "text": "bye"}]
     result = _fuzzy_merge(prior, new)
     assert len(result) == 2
+
+
+def test_score_match_merges_on_participant_overlap_with_no_text_overlap() -> None:
+    """In-game chat (Minecraft, Roblox) fades older messages out faster
+    than the worker resamples. Two consecutive frames may share zero
+    message text yet be the same conversation — same platform + same
+    named participant should merge.
+    """
+    fragment = ConversationFragment(
+        platform="Minecraft",
+        participants=["Steve_2009"],
+        messages=[
+            ChatMessage(sender="Steve_2009", text="lol"),
+            ChatMessage(sender="child", text="ok"),
+        ],
+    )
+    candidate = {
+        "id": 42,
+        "platform": "Minecraft",
+        "participants_json": '["Steve_2009"]',
+        "messages_json": '[{"sender":"Steve_2009","text":"hey what server are you on"},'
+                         '{"sender":"child","text":"hypixel"}]',
+    }
+    assert _score_match(fragment, [candidate]) == 42
+
+
+def test_score_match_does_not_cross_platforms() -> None:
+    """Same participant on different platforms must NOT merge."""
+    fragment = ConversationFragment(
+        platform="Discord",
+        participants=["Steve_2009"],
+        messages=[ChatMessage(sender="Steve_2009", text="yo")],
+    )
+    candidate = {
+        "id": 1,
+        "platform": "Minecraft",
+        "participants_json": '["Steve_2009"]',
+        "messages_json": '[{"sender":"Steve_2009","text":"hey"}]',
+    }
+    assert _score_match(fragment, [candidate]) is None
+
+
+def test_score_match_no_overlap_no_merge() -> None:
+    """Same platform but different participants and no text overlap →
+    do NOT merge (would happily over-merge on platform alone otherwise)."""
+    fragment = ConversationFragment(
+        platform="Minecraft",
+        participants=["Alex"],
+        messages=[ChatMessage(sender="Alex", text="lol")],
+    )
+    candidate = {
+        "id": 1,
+        "platform": "Minecraft",
+        "participants_json": '["Steve_2009"]',
+        "messages_json": '[{"sender":"Steve_2009","text":"hey"}]',
+    }
+    assert _score_match(fragment, [candidate]) is None
 
 
 def test_db_conversation_crud(tmp_path: Path) -> None:

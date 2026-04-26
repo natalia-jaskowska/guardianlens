@@ -555,12 +555,27 @@ def _score_match(
         run_len = _longest_contiguous_run(frag_texts_raw, cand_texts_raw)
 
         total_hits = exact_hits + fuzzy_hits
-        strong = long_hits >= 1 or total_hits >= 2 or run_len >= MATCH_MIN_RUN
+        # Same platform + ≥1 named participant overlap is itself a strong
+        # signal: in chat apps with fading message history (Minecraft
+        # in-game chat, Roblox, etc.) the on-screen text rolls out faster
+        # than our worker re-samples, so consecutive frames legitimately
+        # share zero message text but are still the same conversation.
+        # Without this gate every Minecraft scroll spawns a fresh alert.
+        strong = (
+            long_hits >= 1
+            or total_hits >= 2
+            or run_len >= MATCH_MIN_RUN
+            or part_hits >= 1
+        )
 
         if frag_size == 1:
-            # Only accept a single-message fragment when the one message
-            # is itself distinctive (long exact / fuzzy / inside a run).
-            single_ok = long_hits >= 1 or (run_len >= 1 and total_hits >= 1)
+            # A single-message fragment may merge when the message is
+            # distinctive on its own OR when the participant carries over.
+            single_ok = (
+                long_hits >= 1
+                or (run_len >= 1 and total_hits >= 1)
+                or part_hits >= 1
+            )
             strong = strong and single_ok
 
         score = (
