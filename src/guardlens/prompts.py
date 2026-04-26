@@ -138,15 +138,23 @@ pattern; high = 6+ msgs clear persistent pattern.
 parent_alert_recommended = true ONLY when certainty ∈ {medium,high}
 AND threat_level ∈ {warning, alert, critical}.
 
-HARD RULE (no exceptions): if category is anything other than "none"
-(grooming, bullying, predatory, spam, harassment, etc.) then
-threat_level MUST be at least "caution". A non-none category with
-threat_level=safe is contradictory and forbidden — pick one:
-  - if you genuinely see no concern → category="none", threat_level="safe"
-  - if you see bullying signals      → category="bullying", threat_level≥"caution"
-  - if you see grooming signals      → category="grooming", threat_level≥"caution"
-  - same logic for spam, predatory, harassment, etc.
-Escalate further per the bullying / grooming severity rules above.
+CATEGORY ↔ THREAT_LEVEL rule. These two fields must agree:
+  - If you observe ANY harmful pattern (bullying, grooming, scam,
+    inappropriate_content, personal_info_sharing) you MUST set both
+    the matching category AND raise threat_level to at least
+    "caution". Don't downgrade category to "none" just to keep
+    threat_level "safe" — flagging the harm is the entire job.
+  - Only use category="none" + threat_level="safe" when the chat
+    is genuinely benign (peer planning, friendly small talk, etc.).
+  - The reverse is also true: don't pick threat_level "warning" or
+    higher with category="none" — that has no meaning, name what
+    you saw.
+
+Worked examples:
+  - Friend chat about a video game             → none / safe
+  - Bot DM offering free Nitro with a link     → scam / caution-warning
+  - Multiple users mocking one player          → bullying / warning-alert
+  - Stranger asking child's age + Snap         → grooming / warning-alert
 
 Revise the prior status UP or DOWN based on new evidence.
 
