@@ -282,13 +282,7 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                 },
                 "reasoning": {
                     "type": "string",
-                    "description": (
-                        "ONE short sentence (≤25 words) explaining WHY "
-                        "you reached this verdict. Reference the specific "
-                        "signal(s) you saw — e.g. 'Stranger asked age then "
-                        "proposed moving to Snapchat — classic isolation "
-                        "step.' Shown to the parent under 'AI Reasoning'."
-                    ),
+                    "description": "One short sentence (≤25 words) naming the signal(s) behind the verdict.",
                 },
                 "parent_alert_recommended": {
                     "type": "boolean",
