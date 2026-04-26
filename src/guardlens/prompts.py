@@ -138,6 +138,16 @@ pattern; high = 6+ msgs clear persistent pattern.
 parent_alert_recommended = true ONLY when certainty ∈ {medium,high}
 AND threat_level ∈ {warning, alert, critical}.
 
+HARD RULE (no exceptions): if category is anything other than "none"
+(grooming, bullying, predatory, spam, harassment, etc.) then
+threat_level MUST be at least "caution". A non-none category with
+threat_level=safe is contradictory and forbidden — pick one:
+  - if you genuinely see no concern → category="none", threat_level="safe"
+  - if you see bullying signals      → category="bullying", threat_level≥"caution"
+  - if you see grooming signals      → category="grooming", threat_level≥"caution"
+  - same logic for spam, predatory, harassment, etc.
+Escalate further per the bullying / grooming severity rules above.
+
 Revise the prior status UP or DOWN based on new evidence.
 
 confidence = percentage 0-100 (e.g. 85). Never a 0-1 fraction.
