@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Discord — friend DM (safe)</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+html, body {
+  background: #000;
+  height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  font-family: -apple-system, 'SF Pro Display', 'Inter', 'gg sans', sans-serif;
+  overflow: hidden;
+}
+.phone {
+  width: 390px; height: 844px;
+  background: #1e1f22;
+  border-radius: 44px;
+  box-shadow: 0 0 0 12px #1a1a1a, 0 24px 80px rgba(0,0,0,0.6);
+  display: flex; flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+.notch {
+  position: absolute; top: 12px; left: 50%;
+  transform: translateX(-50%);
+  width: 120px; height: 32px;
+  background: #000;
+  border-radius: 18px;
+  z-index: 20;
+}
+.status-bar {
+  height: 54px; flex-shrink: 0;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 18px 32px 0 28px;
+  color: white; font-size: 15px; font-weight: 600;
+}
+.status-icons { display: flex; gap: 5px; align-items: center; }
+
+/* Discord wordmark + Clyde-ish logo at top-left so the screenshot is
+   instantly identifiable as Discord, not just "another chat". */
+.app-bar {
+  position: absolute; top: 56px; left: 0; right: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 18px;
+  height: 36px;
+  z-index: 10;
+}
+.dc-logo {
+  display: flex; align-items: center; gap: 7px;
+  color: white; font-weight: 700; font-size: 17px;
+  letter-spacing: -0.3px;
+}
+.dc-logo svg { display: block; }
+
+.header {
+  height: 56px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 14px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.06);
+  margin-top: 36px;
+  background: #2b2d31;
+}
+.back {
+  color: #b5bac1; font-size: 24px; line-height: 1; cursor: pointer;
+  width: 28px; text-align: center;
+}
+.header-avatar-wrap { position: relative; }
+.header-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  /* Friendly purple-pink — recognizable Discord-style avatar gradient. */
+  background: linear-gradient(135deg, #f472b6 0%, #c084fc 50%, #818cf8 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 12px; font-weight: 700;
+  flex-shrink: 0;
+}
+.online-dot {
+  position: absolute; bottom: -2px; right: -2px;
+  width: 12px; height: 12px;
+  background: #23a55a;
+  border: 2.5px solid #2b2d31;
+  border-radius: 50%;
+}
+.header-meta { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.header-name { color: white; font-size: 15px; font-weight: 600; }
+.header-sub { color: #b5bac1; font-size: 11px; margin-top: 1px; }
+.header-actions { display: flex; gap: 18px; color: #b5bac1; font-size: 18px; }
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 14px 12px;
+  display: flex; flex-direction: column; gap: 10px;
+  scroll-behavior: smooth;
+  background: #313338;
+}
+.messages::-webkit-scrollbar { width: 0; }
+
+.day-divider {
+  display: flex; align-items: center; gap: 10px;
+  margin: 4px 0 8px;
+  color: #949ba4;
+  font-size: 11px;
+  font-weight: 600;
+}
+.day-divider::before, .day-divider::after {
+  content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.08);
+}
+
+/* Discord uses a flat layout, not bubbles. Sender name + timestamp
+   header on the first message of a run; subsequent messages from the
+   same sender just indent under that. */
+.msg-group {
+  display: flex; gap: 12px;
+  opacity: 0; transform: translateY(6px);
+  animation: slide-in 0.3s ease-out forwards;
+  will-change: transform, opacity;
+}
+@keyframes slide-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+.msg-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 13px; font-weight: 700;
+}
+.msg-avatar.them {
+  background: linear-gradient(135deg, #f472b6 0%, #c084fc 50%, #818cf8 100%);
+}
+.msg-avatar.you {
+  background: linear-gradient(135deg, #5865f2 0%, #4752c4 100%);
+}
+.msg-avatar.spacer { background: transparent; visibility: hidden; }
+.msg-body { flex: 1; min-width: 0; }
+.msg-head {
+  display: flex; align-items: baseline; gap: 6px;
+  margin-bottom: 2px;
+}
+.msg-name {
+  color: #e8d4ff;
+  font-size: 14px;
+  font-weight: 600;
+}
+.msg-name.you { color: #b9c4ff; }
+.msg-time {
+  color: #949ba4;
+  font-size: 11px;
+}
+.msg-text {
+  color: #dbdee1;
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+}
+.msg-followup {
+  margin-left: 48px;
+}
+
+.typing {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 14px 0;
+  color: #b5bac1;
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0;
+  animation: fade-in 0.2s ease-out forwards;
+}
+@keyframes fade-in { to { opacity: 1; } }
+.typing-dots { display: flex; gap: 3px; }
+.typing-dots span {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: #b5bac1;
+  animation: blink 1.3s ease-in-out infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0.3; }
+  40% { opacity: 1; }
+}
+
+.input-bar {
+  flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px 22px;
+  background: #1e1f22;
+  border-top: 0.5px solid rgba(255,255,255,0.04);
+}
+.plus {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #4e5058;
+  color: white; font-size: 22px; font-weight: 300;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.input {
+  flex: 1;
+  background: #383a40;
+  border-radius: 22px;
+  padding: 10px 14px;
+  color: #6d6f78;
+  font-size: 14px;
+}
+.input-actions { display: flex; gap: 12px; color: #b5bac1; font-size: 18px; padding-right: 4px; }
+
+.home-indicator {
+  position: absolute; bottom: 8px; left: 50%;
+  transform: translateX(-50%);
+  width: 134px; height: 5px;
+  background: white;
+  border-radius: 3px;
+  opacity: 0.9;
+}
+
+.start-overlay {
+  position: absolute; inset: 0;
+  background: rgba(0,0,0,0.82);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+  z-index: 50;
+  cursor: pointer;
+  transition: opacity 0.4s;
+  backdrop-filter: blur(8px);
+}
+.start-overlay.hidden { opacity: 0; pointer-events: none; }
+.start-title { color: white; font-size: 22px; font-weight: 600; }
+.start-hint { color: rgba(255,255,255,0.6); font-size: 13px; }
+.start-btn {
+  margin-top: 8px;
+  background: #5865f2;
+  color: white;
+  padding: 12px 28px;
+  border-radius: 24px;
+  font-size: 15px; font-weight: 600;
+  box-shadow: 0 4px 16px rgba(88, 101, 242, 0.4);
+}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="notch"></div>
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="status-icons">
+      <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><path d="M1 10h2v-2H1v2zM5 10h2V6H5v4zM9 10h2V3H9v7zM13 10h2V0h-2v10z" fill="white"/></svg>
+      <svg width="24" height="11" viewBox="0 0 24 11" fill="none"><rect x="0.5" y="0.5" width="21" height="10" rx="2.5" stroke="white" stroke-opacity="0.4"/><rect x="2" y="2" width="18" height="7" rx="1" fill="white"/><rect x="22.5" y="4" width="1.5" height="3" rx="0.5" fill="white" fill-opacity="0.4"/></svg>
+    </div>
+  </div>
+
+  <!-- Discord logo bar above the conversation header. Clyde-style mark. -->
+  <div class="app-bar">
+    <div class="dc-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09-.01-.02-.04-.03-.07-.03-1.5.26-2.93.71-4.27 1.33-.01 0-.02.01-.03.02-2.72 4.07-3.47 8.03-3.1 11.95 0 .02.01.04.03.05a16.18 16.18 0 0 0 4.84 2.45c.03.01.06 0 .08-.02a11.41 11.41 0 0 0 .98-1.6.06.06 0 0 0-.04-.08c-.52-.2-1.02-.43-1.5-.7a.06.06 0 0 1-.01-.1c.1-.08.2-.16.3-.24.02-.02.04-.02.07-.01a11.5 11.5 0 0 0 9.9 0c.02-.01.04-.01.06.01.1.08.2.16.3.24a.06.06 0 0 1-.01.1 12.9 12.9 0 0 1-1.5.7.06.06 0 0 0-.03.08c.28.55.6 1.08.97 1.6.02.02.05.03.08.02a16.13 16.13 0 0 0 4.84-2.45.06.06 0 0 0 .03-.05c.45-4.53-.75-8.46-3.18-11.95a.05.05 0 0 0-.03-.02zM8.52 14.3c-.95 0-1.74-.87-1.74-1.94 0-1.07.77-1.94 1.74-1.94.97 0 1.75.88 1.74 1.94 0 1.07-.78 1.94-1.74 1.94zm6.97 0c-.95 0-1.74-.87-1.74-1.94 0-1.07.77-1.94 1.74-1.94.97 0 1.75.88 1.74 1.94 0 1.07-.77 1.94-1.74 1.94z" fill="#5865F2"/>
+      </svg>
+      <span>Discord</span>
+    </div>
+  </div>
+
+  <div class="header">
+    <div class="back">&lsaquo;</div>
+    <div class="header-avatar-wrap">
+      <div class="header-avatar">M</div>
+      <div class="online-dot"></div>
+    </div>
+    <div class="header-meta">
+      <div class="header-name">maya.exe</div>
+      <div class="header-sub">Online</div>
+    </div>
+    <div class="header-actions">
+      <span>📞</span>
+      <span>📹</span>
+    </div>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="day-divider">Today</div>
+  </div>
+
+  <div class="input-bar">
+    <div class="plus">+</div>
+    <div class="input">Message @maya.exe</div>
+    <div class="input-actions">
+      <span>🎁</span>
+      <span>GIF</span>
+    </div>
+  </div>
+  <div class="home-indicator"></div>
+
+  <div class="start-overlay" id="startOverlay">
+    <div class="start-title">Discord — DM with a friend</div>
+    <div class="start-hint">Start your screen recorder first, then tap</div>
+    <div class="start-btn">▶ Play conversation</div>
+  </div>
+</div>
+
+<script>
+// Safe peer-to-peer chat: two friends planning to play ranked tonight.
+// Realistic teen Discord patterns — short messages, gaming references,
+// platform-specific lingo ("vc", "rotate", "queue"). Nothing here should
+// trigger any threat indicator; this is the "normal day" baseline that
+// the dashboard should classify as SAFE with high confidence.
+const SCRIPT = [
+  { who: 'them', name: 'maya.exe', text: 'yo are you on tonight' },
+  { who: 'them', name: 'maya.exe', text: 'I wanna grind ranked' },
+  { who: 'you',  name: 'you',      text: 'ya gimme like 20 min, finishing math hw' },
+  { who: 'them', name: 'maya.exe', text: 'no rush' },
+  { who: 'them', name: 'maya.exe', text: 'we can hop in vc whenever' },
+  { who: 'you',  name: 'you',      text: 'k' },
+  { who: 'them', name: 'maya.exe', text: 'also tara might queue with us' },
+  { who: 'them', name: 'maya.exe', text: 'she just hit plat 🥳' },
+  { who: 'you',  name: 'you',      text: 'lets goooo' },
+];
+
+const messagesEl = document.getElementById('messages');
+
+function timeNow() {
+  // Plausible HH:MM "today" stamp; consistent across the run.
+  return '9:42 PM';
+}
+
+function addTyping(name) {
+  const el = document.createElement('div');
+  el.className = 'typing';
+  el.innerHTML = `<span>${name} is typing</span><span class="typing-dots"><span></span><span></span><span></span></span>`;
+  messagesEl.appendChild(el);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+  return el;
+}
+
+function addMessage(who, name, text, isFollowup) {
+  if (isFollowup) {
+    const el = document.createElement('div');
+    el.className = 'msg-group';
+    el.innerHTML = `
+      <div class="msg-avatar spacer"></div>
+      <div class="msg-body"><div class="msg-text">${text}</div></div>
+    `;
+    messagesEl.appendChild(el);
+  } else {
+    const el = document.createElement('div');
+    el.className = 'msg-group';
+    el.innerHTML = `
+      <div class="msg-avatar ${who}">${name[0].toUpperCase()}</div>
+      <div class="msg-body">
+        <div class="msg-head">
+          <span class="msg-name ${who === 'you' ? 'you' : ''}">${name}</span>
+          <span class="msg-time">${timeNow()}</span>
+        </div>
+        <div class="msg-text">${text}</div>
+      </div>
+    `;
+    messagesEl.appendChild(el);
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function play() {
+  // Brisk peer chat — short pauses between messages. Total ~14 s.
+  await sleep(800);
+  let prevWho = null, prevName = null;
+  for (let i = 0; i < SCRIPT.length; i++) {
+    const msg = SCRIPT[i];
+    const sameAsPrev = msg.who === prevWho && msg.name === prevName;
+    if (msg.who === 'them' && !sameAsPrev) {
+      const t = addTyping(msg.name);
+      await sleep(900 + Math.random() * 400);
+      t.remove();
+    } else if (!sameAsPrev) {
+      await sleep(700);
+    } else {
+      await sleep(500);
+    }
+    addMessage(msg.who, msg.name, msg.text, sameAsPrev);
+    prevWho = msg.who; prevName = msg.name;
+  }
+}
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+const overlay = document.getElementById('startOverlay');
+function begin() {
+  if (overlay.classList.contains('hidden')) return;
+  overlay.classList.add('hidden');
+  play();
+}
+overlay.addEventListener('click', begin);
+window.addEventListener('keydown', (e) => {
+  if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); begin(); }
+});
+if (new URLSearchParams(location.search).has('record')) {
+  overlay.classList.add('hidden');
+  setTimeout(play, 300);
+}
+</script>
+</body>
+</html>
