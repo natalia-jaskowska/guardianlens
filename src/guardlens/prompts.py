@@ -94,8 +94,12 @@ each in-game chat is a separate conversation.
 For EACH conversation:
 1. Identify the platform (Discord, Instagram, Minecraft, TikTok, Roblox,
    Snapchat, WhatsApp, YouTube, or the name you see)
-2. List every non-child username visible in that conversation
-3. Transcribe EVERY chat message you can read, in order, as {sender, text}
+2. Set chat_type to "dm" for one-on-one or small-group direct message
+   threads (TikTok DM, Discord DM, WhatsApp), or "global" for in-game
+   or streaming chats with rotating speakers (Minecraft world chat,
+   Roblox lobby, Twitch chat) where the chat box is one shared stream
+3. List every non-child username visible in that conversation
+4. Transcribe EVERY chat message you can read, in order, as {sender, text}
    - Copy the exact text — do not paraphrase or summarize
    - Use "child" as the sender for the child's own messages
 

@@ -188,6 +188,14 @@ class ConversationFragment(BaseModel):
     """One chat conversation slice visible on screen in a single frame."""
 
     platform: str
+    # "dm" = identity is the participant set (TikTok DM, Discord DM,
+    # WhatsApp 1-on-1). Different participants → different conversation.
+    # "global" = identity is the channel/server (Minecraft world chat,
+    # Roblox lobby). Many speakers rotate through one stream; consecutive
+    # frames legitimately share zero participants. Default "dm" because
+    # the strict matcher behavior is the safe option when the model
+    # didn't classify.
+    chat_type: str = "dm"
     participants: list[str] = Field(default_factory=list)
     messages: list[ChatMessage] = Field(default_factory=list)
     screenshot_path: Path | None = None

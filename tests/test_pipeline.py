@@ -201,10 +201,11 @@ def test_score_match_dm_platform_no_overlap_no_merge() -> None:
 
 def test_score_match_global_chat_merges_disjoint_participants() -> None:
     """Minecraft / Roblox / etc. show a rolling chat window — different
-    speakers per frame is normal. Same-platform candidate should merge
-    even with zero participant or text overlap."""
+    speakers per frame is normal. When chat_type='global', a same-platform
+    candidate should merge even with zero participant or text overlap."""
     fragment = ConversationFragment(
         platform="Minecraft",
+        chat_type="global",
         participants=["Bymonkee"],
         messages=[ChatMessage(sender="Bymonkee", text="check this out")],
     )
@@ -224,6 +225,7 @@ def test_score_match_global_chat_picks_most_recent_candidate() -> None:
     that ordering even when scores tie at zero."""
     fragment = ConversationFragment(
         platform="Minecraft",
+        chat_type="global",
         participants=["Liam"],
         messages=[ChatMessage(sender="Liam", text="gg")],
     )
@@ -243,12 +245,52 @@ def test_score_match_global_chat_picks_most_recent_candidate() -> None:
     assert _score_match(fragment, [most_recent, older]) == 9
 
 
+def test_score_match_chat_type_global_overrides_unknown_platform() -> None:
+    """When the model classifies chat_type='global' on an unknown platform
+    (one not in the hardcoded fallback list), the matcher should still
+    treat it as global chat. The whole point of the new field is to let
+    the model decide instead of the hardcoded list."""
+    fragment = ConversationFragment(
+        platform="SomeNewGame",       # NOT in _GLOBAL_CHAT_PLATFORM_HINTS
+        chat_type="global",            # but the model said global
+        participants=["Alpha"],
+        messages=[ChatMessage(sender="Alpha", text="gg")],
+    )
+    candidate = {
+        "id": 11,
+        "platform": "SomeNewGame",
+        "participants_json": '["Beta"]',
+        "messages_json": '[{"sender":"Beta","text":"hey"}]',
+    }
+    assert _score_match(fragment, [candidate]) == 11
+
+
+def test_score_match_chat_type_dm_keeps_strict_gate_even_for_minecraft() -> None:
+    """Inverse: if the model labels something Minecraft as a DM (e.g.
+    Minecraft Realms private message), the strict gate applies — no
+    merge without participant or text overlap."""
+    fragment = ConversationFragment(
+        platform="Minecraft",
+        chat_type="dm",                # model says it's a DM
+        participants=["Alex"],
+        messages=[ChatMessage(sender="Alex", text="lol")],
+    )
+    candidate = {
+        "id": 1,
+        "platform": "Minecraft",
+        "participants_json": '["Steve_2009"]',
+        "messages_json": '[{"sender":"Steve_2009","text":"hey"}]',
+    }
+    assert _score_match(fragment, [candidate]) is None
+
+
 def test_score_match_unknown_participant_does_not_block_merge() -> None:
     """A fragment whose participant is the placeholder 'Unknown' should
     still merge into a real Minecraft conversation via the global-chat
     rule (platform alone)."""
     fragment = ConversationFragment(
         platform="Minecraft",
+        chat_type="global",
         participants=["Unknown"],
         messages=[ChatMessage(sender="Unknown", text="lol")],
     )

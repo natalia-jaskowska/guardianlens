@@ -188,6 +188,18 @@ EXTRACT_CONVERSATIONS_TOOL: dict[str, Any] = {
                                 "type": "string",
                                 "description": "The platform (Discord, Instagram, Minecraft, etc.).",
                             },
+                            "chat_type": {
+                                "type": "string",
+                                "enum": ["dm", "global"],
+                                "description": (
+                                    "'dm' for one-on-one or small-group direct "
+                                    "message threads (TikTok DM, Discord DM, "
+                                    "WhatsApp). 'global' for in-game / server "
+                                    "chats with rotating speakers (Minecraft, "
+                                    "Roblox, Twitch chat) where the identity is "
+                                    "the channel, not the visible participants."
+                                ),
+                            },
                             "participants": {
                                 "type": "array",
                                 "items": {"type": "string"},
@@ -211,7 +223,7 @@ EXTRACT_CONVERSATIONS_TOOL: dict[str, Any] = {
                                 ),
                             },
                         },
-                        "required": ["platform", "participants", "messages"],
+                        "required": ["platform", "chat_type", "participants", "messages"],
                     },
                 },
             },

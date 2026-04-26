@@ -62,17 +62,20 @@ that both contain "Unknown" would falsely "match" and two fragments
 where one says "Unknown" and the other names a real player would falsely
 fail to match because of the placeholder."""
 
-_GLOBAL_CHAT_PLATFORMS = {
+_GLOBAL_CHAT_PLATFORM_HINTS = {
     "minecraft", "roblox", "fortnite", "valorant",
     "league of legends", "csgo", "counter-strike",
     "twitch", "youtube live",
 }
-"""Platforms where conversation identity is the *server / channel*, not
-the visible participants. In these the on-screen chat shows a rolling
-window of messages from many speakers, so consecutive worker frames
-legitimately have non-overlapping participant lists. Fragments on these
-platforms merge into any same-platform candidate within the staleness
-window — see ``_score_match``."""
+"""Defensive fallback for ``_infer_chat_type``: when the vision model
+omits the ``chat_type`` field, treat these well-known game/stream
+platforms as global chats. The model's own classification — when it
+provides one — always wins; this list only kicks in for missing data."""
+
+
+def _infer_chat_type(platform: str) -> str:
+    """Best-effort chat_type when the model didn't classify the fragment."""
+    return "global" if platform.strip().lower() in _GLOBAL_CHAT_PLATFORM_HINTS else "dm"
 
 logger = logging.getLogger(__name__)
 
@@ -252,9 +255,12 @@ class ConversationPipeline:
                 for m in conv_raw.get("messages", [])
                 if isinstance(m, dict)
             ]
+            platform = conv_raw.get("platform", "Unknown")
+            chat_type = conv_raw.get("chat_type") or _infer_chat_type(platform)
             fragments.append(
                 ConversationFragment(
-                    platform=conv_raw.get("platform", "Unknown"),
+                    platform=platform,
+                    chat_type=chat_type,
                     participants=conv_raw.get("participants", []),
                     messages=messages,
                 )
@@ -515,7 +521,7 @@ def _score_match(
 
     frag_parts = [_normalize_name(p) for p in fragment.participants if p and p.lower() != "child"]
     frag_parts = [p for p in frag_parts if p and p not in _PLACEHOLDER_PARTICIPANT_NAMES]
-    is_global_chat = fragment.platform.strip().lower() in _GLOBAL_CHAT_PLATFORMS
+    is_global_chat = fragment.chat_type == "global"
 
     frag_texts_raw = [
         _normalize_text(m.text)
