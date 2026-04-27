@@ -160,7 +160,7 @@ Revise the prior status UP or DOWN based on new evidence.
 
 confidence = percentage 0-100 (e.g. 85). Never a 0-1 fraction.
 short_summary = ONE sentence, max 20 words, parent-facing.
-reasoning    = ONE sentence, ≤25 words, naming the signal(s) you saw.
+reasoning    = Two sentences, ≤50 words, naming the signal(s) you saw and why they matter.
 indicators   = up to 3 short labels.
 """
 

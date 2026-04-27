@@ -282,7 +282,7 @@ UPDATE_CONVERSATION_STATUS_TOOL: dict[str, Any] = {
                 },
                 "reasoning": {
                     "type": "string",
-                    "description": "One short sentence (≤25 words) naming the signal(s) behind the verdict.",
+                    "description": "Two sentences (≤50 words) naming the signal(s) and why they matter.",
                 },
                 "parent_alert_recommended": {
                     "type": "boolean",
