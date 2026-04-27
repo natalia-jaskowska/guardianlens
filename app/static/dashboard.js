@@ -505,33 +505,36 @@ function renderConversationDetail(snapshot, sel) {
     shotsEl.innerHTML = "";
   }
 
-  // Arc — reconstruct from indicators (we don't have per-message stream here
-  // yet, so render indicators as escalating dots).
+  // Arc — reconstruct from indicators. Hidden when there are no
+  // indicators and the conversation isn't safe-baseline (otherwise
+  // the section just renders a placeholder which clutters the panel).
   const arc = $("convArc");
+  const arcLabel = $("convArcLabel");
   arc.innerHTML = "";
   const indicators = c.indicators || [];
+  let arcRows = [];
   if (indicators.length === 0 && lvl === "safe") {
-    safeArcItems(c).forEach(label => {
-      const row = document.createElement("div");
-      row.className = "gl-arc-item";
-      row.innerHTML = `<div class="gl-arc-dot"></div><div class="gl-arc-body"><div class="gl-arc-text">${escapeHtml(label)}</div></div>`;
-      arc.appendChild(row);
-    });
-  } else if (indicators.length === 0) {
-    const row = document.createElement("div");
-    row.className = "gl-arc-item";
-    row.innerHTML = `<div class="gl-arc-dot"></div><div class="gl-arc-body"><div class="gl-arc-text">No flagged messages yet</div></div>`;
-    arc.appendChild(row);
-  } else {
-    indicators.forEach((ind, i) => {
+    arcRows = safeArcItems(c).map(label => ({label, cls: ""}));
+  } else if (indicators.length > 0) {
+    arcRows = indicators.map((ind, i) => {
       const isAlert = lvl === "alert" && i >= indicators.length - 2;
-      const dotCls = isAlert ? "alert" : lvl === "warn" ? "warn" : "";
+      const cls = isAlert ? "alert" : lvl === "warn" ? "warn" : "";
+      return {label: prettyIndicator(ind), cls, isAlert};
+    });
+  }
+  if (arcRows.length === 0) {
+    arc.hidden = true;
+    arcLabel.hidden = true;
+  } else {
+    arc.hidden = false;
+    arcLabel.hidden = false;
+    arcRows.forEach(({label, cls, isAlert}) => {
       const row = document.createElement("div");
       row.className = "gl-arc-item";
       row.innerHTML = `
-        <div class="gl-arc-dot ${dotCls}"></div>
+        <div class="gl-arc-dot ${cls}"></div>
         <div class="gl-arc-body">
-          <div class="gl-arc-text ${dotCls}">${escapeHtml(prettyIndicator(ind))}</div>
+          <div class="gl-arc-text ${cls}">${escapeHtml(label)}</div>
           ${isAlert ? '<div class="gl-arc-label alert">Alert trigger</div>' : ""}
         </div>`;
       arc.appendChild(row);
