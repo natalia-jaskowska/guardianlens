@@ -16,12 +16,6 @@ Targeting the Safety & Trust track + Ollama special prize.
 
 ---
 
-## Architecture
-
-![GuardianLens architecture](docs/architecture.png)
-
----
-
 ## What it does
 
 - Captures the child's screen at a fixed interval (default 15 s).
