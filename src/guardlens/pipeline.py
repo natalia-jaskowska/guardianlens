@@ -55,12 +55,16 @@ to serve as a standalone merge signal."""
 MATCH_MIN_RUN = 2
 """Minimum number of contiguous in-order message matches to count as a run."""
 
-_PLACEHOLDER_PARTICIPANT_NAMES = {"unknown", "user", "anon", "anonymous", "?"}
-"""Names the vision model emits when it can't read a username. They must
-not count for or against participant overlap — otherwise two fragments
-that both contain "Unknown" would falsely "match" and two fragments
-where one says "Unknown" and the other names a real player would falsely
-fail to match because of the placeholder."""
+_PLACEHOLDER_PARTICIPANT_NAMES = {
+    "unknown", "user", "anon", "anonymous", "?",
+    "child", "kid", "you", "me", "self", "the child", "victim",
+}
+"""Names the vision model emits when it can't read a username, or generic
+role-words it occasionally returns instead of a real handle. They must
+not count for or against participant overlap, and they must not surface
+in the dashboard as if they were a real user — "child" in particular is
+the prompt's own placeholder for the monitored user and should never
+appear in the participants list shown to the parent."""
 
 _GLOBAL_CHAT_PLATFORM_HINTS = {
     "minecraft", "roblox", "fortnite", "valorant",
@@ -832,15 +836,19 @@ def _dedup_participants(names: list[str]) -> list[str]:
 
     Different OCR reads of the same username collapse to one entry so the
     dashboard doesn't render "Kidgamer09, KidGamer09, kidgamer" for what
-    is really one person.
+    is really one person. Placeholder/role-word names (``"child"``,
+    ``"user"``, ``"unknown"`` …) are dropped entirely so they never
+    surface to the parent as if they were a separate participant.
     """
     canonical: dict[str, str] = {}  # key → best display form
     for raw in names:
         name = (raw or "").strip()
         if not name:
             continue
+        if name.lower() in _PLACEHOLDER_PARTICIPANT_NAMES:
+            continue
         key = _normalize_name(name)
-        if not key:
+        if not key or key in _PLACEHOLDER_PARTICIPANT_NAMES:
             continue
         existing = canonical.get(key)
         if existing is None or len(name) > len(existing):

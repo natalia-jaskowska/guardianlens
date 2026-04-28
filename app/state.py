@@ -243,9 +243,26 @@ class MonitorWorker:
 # ====================================================================== helpers
 
 
+_DISPLAY_PARTICIPANT_BLOCKLIST = {
+    "child", "kid", "you", "me", "self", "the child", "victim",
+    "user", "unknown", "anon", "anonymous", "?",
+}
+
+
+def _clean_participants(names: list[str]) -> list[str]:
+    """Drop placeholder/role-word names before showing to the parent.
+
+    Belt-and-suspenders sibling of the pipeline-side filter: legacy DB
+    rows written before the fix may still contain ``"child"`` etc., and
+    this guarantees they never reach the UI.
+    """
+    return [n for n in (names or []) if (n or "").strip().lower() not in _DISPLAY_PARTICIPANT_BLOCKLIST]
+
+
 def _participant_label(c: dict) -> str:
     """Format the participant list like the activity card — up to 3, +N overflow."""
-    names = c.get("participants") or ([c["participant"]] if c.get("participant") else [])
+    raw = c.get("participants") or ([c["participant"]] if c.get("participant") else [])
+    names = _clean_participants(raw)
     if not names:
         return "Unknown"
     shown = ", ".join(names[:3])
@@ -256,7 +273,7 @@ def _serialize_db_conversation(row: Any) -> dict[str, Any]:
     """Flatten a conversations DB row into the dashboard JSON shape."""
     status = json.loads(row["status_json"]) if row["status_json"] else {}
     messages = json.loads(row["messages_json"])
-    participants = json.loads(row["participants_json"])
+    participants = _clean_participants(json.loads(row["participants_json"]))
     screenshots_raw = json.loads(row["screenshots_json"]) if row["screenshots_json"] else []
     screenshots = [
         {"url": f"/screenshots/{Path(s['path']).name}", "timestamp": s.get("timestamp", "")}
