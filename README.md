@@ -33,17 +33,7 @@ Everything runs locally. The child's chats never leave the device.
 
 ## Architecture
 
-```
-┌──────────────────────────┐          ┌────────────────────────────────────┐
-│  CLIENT (child's device) │          │        SERVER (home machine)       │
-│                          │          │                                    │
-│  guardlens-client        │  PNG     │  POST /api/frames                  │
-│  ├─ mss screen capture   │─────────▶│  ├─ ConversationPipeline           │
-│  └─ httpx sender         │          │  │    └─ Gemma 4 via Ollama        │
-│                          │          │  ├─ SQLite database                │
-└──────────────────────────┘          │  └─ FastAPI dashboard :7860        │
-                                      └────────────────────────────────────┘
-```
+![GuardianLens pipeline architecture](docs/architecture.png)
 
 The client and server can run on the **same machine** (standalone mode) or on
 **separate devices** across the local network (client/server mode).
