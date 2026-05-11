@@ -229,8 +229,3 @@ All configuration lives in `src/guardlens/config.py` (Pydantic Settings).
 Override anything via environment variables (`GUARDLENS_OLLAMA__HOST=...`) or
 a YAML config file passed to `--config`.
 
----
-
-## License
-
-MIT.
