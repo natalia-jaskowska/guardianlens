@@ -211,7 +211,6 @@ client/                 Standalone capture client (uv, pyproject.toml)
   src/guardlens_client/ capture.py · sender.py · main.py
 Dockerfile              Server Docker image
 docker-compose.yaml     Ollama + GuardianLens stack
-outputs/                Screenshots, SQLite database (gitignored)
 ```
 
 ---
