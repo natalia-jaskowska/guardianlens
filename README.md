@@ -10,6 +10,7 @@
 [![▶ Watch the demo on YouTube](https://img.youtube.com/vi/diCV7LlIw88/maxresdefault.jpg)](https://youtu.be/diCV7LlIw88)
 
 *▶ [Watch the demo on YouTube](https://youtu.be/diCV7LlIw88)*
+*📝 [Read the writeup on Kaggle](https://www.kaggle.com/competitions/gemma-4-good-hackathon/writeups/guardianlens-on-device-ai-child-safety-monitor)*
 
 Built for the **Gemma 4 Good Hackathon** (Kaggle x Google DeepMind).
 Targeting the Safety & Trust track + Ollama special prize.
